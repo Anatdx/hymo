@@ -1,8 +1,8 @@
 id=meta-mm
 metamodule=1
 name=Magic Mount MetaModule
-version=0.1.0
-versionCode=2511190013
+version=v0.1.0
+versionCode=2511201925
 author=7a72
 description=An implementation of a metamodule using Magic Mount, Based on MKSU, Template is from meta-overlay
 updateJson=https://zrlab.org/api/m/k/mm/update.json

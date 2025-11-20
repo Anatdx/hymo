@@ -14,7 +14,11 @@ case "$ABI" in
         ;;
     armeabi-v7a)
         ui_print "- Selected architecture: ARM"
-        ARCH_BINARY="mm_arm"
+        ARCH_BINARY="mm_armv7"
+        ;;
+    x86_64)
+        ui_print "- Selected architecture: AMD64"
+        ARCH_BINARY="mm_amd64"
         ;;
     *)
         abort "! Unsupported architecture: $ABI"
@@ -29,10 +33,10 @@ fi
 ui_print "- Installing $ARCH_BINARY as meta-mm"
 
 # Rename the selected binary to the generic name
-mv "$MODPATH/$ARCH_BINARY" "$MODPATH/meta-mm" || abort "! Failed to rename binary"
+mv "$MODPATH/bin/$ARCH_BINARY" "$MODPATH/meta-mm" || abort "! Failed to rename binary"
 
 # Remove the unused binary
-# rm -f "$MODPATH/$REMOVE_BINARY"
+rm -rf "$MODPATH/bin"
 
 # Ensure the binary is executable
 chmod 755 "$MODPATH/meta-mm" || abort "! Failed to set permissions"
