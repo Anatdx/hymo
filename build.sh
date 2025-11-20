@@ -100,8 +100,29 @@ build_for_type() {
     fi
     echo -e "${GREEN}========================================${NC}"
 
-    # Step 1: Enter src directory and execute make
-    echo -e "\n${YELLOW}[1/5] Compiling source code...${NC}"
+    # Create build directory structure
+    BUILD_DIR="build/${BUILD_TYPE}_temp"
+    if [ -d "$BUILD_DIR" ]; then
+        rm -rf "$BUILD_DIR"
+    fi
+    mkdir -p "$BUILD_DIR"
+
+    # Step 1: Copy template to build directory
+    echo -e "\n${YELLOW}[1/6] Copying template to build directory...${NC}"
+    if [ ! -d "template" ]; then
+        echo -e "${RED}Error: template directory does not exist${NC}"
+        return 1
+    fi
+
+    cp -r template/* "$BUILD_DIR/"
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}Error: Failed to copy template${NC}"
+        return 1
+    fi
+    echo -e "${GREEN}Template copied${NC}"
+
+    # Step 2: Compile source code in src directory
+    echo -e "\n${YELLOW}[2/6] Compiling source code...${NC}"
     if [ ! -d "src" ]; then
         echo -e "${RED}Error: src directory does not exist${NC}"
         return 1
@@ -109,7 +130,7 @@ build_for_type() {
 
     cd src || return 1
     make clean
-    make $BUILD_TYPE version="$VERSION"
+    make $BUILD_TYPE VERSION="$VERSION"
     if [ $? -ne 0 ]; then
         echo -e "${RED}Error: Compilation failed${NC}"
         cd ..
@@ -118,10 +139,10 @@ build_for_type() {
     cd ..
     echo -e "${GREEN}Compilation completed${NC}"
 
-    # Step 2: Modify log level in metamount.sh
-    echo -e "\n${YELLOW}[2/5] Modifying metamount.sh configuration...${NC}"
-    if [ ! -f "template/metamount.sh" ]; then
-        echo -e "${RED}Error: template/metamount.sh does not exist${NC}"
+    # Step 3: Modify log level in metamount.sh (in build directory)
+    echo -e "\n${YELLOW}[3/6] Modifying metamount.sh configuration...${NC}"
+    if [ ! -f "$BUILD_DIR/metamount.sh" ]; then
+        echo -e "${RED}Error: $BUILD_DIR/metamount.sh does not exist${NC}"
         return 1
     fi
 
@@ -132,17 +153,17 @@ build_for_type() {
     fi
 
     # Use sed to modify log level
-    sed -i "s/MODULE_METADATA_LOGLEVEL=.*/MODULE_METADATA_LOGLEVEL=$LOG_LEVEL/" template/metamount.sh
+    sed -i "s/MODULE_METADATA_LOGLEVEL=.*/MODULE_METADATA_LOGLEVEL=$LOG_LEVEL/" "$BUILD_DIR/metamount.sh"
     if [ $? -ne 0 ]; then
         echo -e "${RED}Error: Failed to modify metamount.sh${NC}"
         return 1
     fi
     echo -e "${GREEN}metamount.sh configuration completed (LOG_LEVEL=$LOG_LEVEL)${NC}"
 
-    # Step 3: Modify module.prop
-    echo -e "\n${YELLOW}[3/5] Modifying module.prop...${NC}"
-    if [ ! -f "template/module.prop" ]; then
-        echo -e "${RED}Error: template/module.prop does not exist${NC}"
+    # Step 4: Modify module.prop (in build directory)
+    echo -e "\n${YELLOW}[4/6] Modifying module.prop...${NC}"
+    if [ ! -f "$BUILD_DIR/module.prop" ]; then
+        echo -e "${RED}Error: $BUILD_DIR/module.prop does not exist${NC}"
         return 1
     fi
 
@@ -150,35 +171,30 @@ build_for_type() {
     VERSION_CODE=$(date +%y%m%d%H%M)
 
     # Modify version and versionCode
-    sed -i "s/^version=.*/version=$VERSION/" template/module.prop
-    sed -i "s/^versionCode=.*/versionCode=$VERSION_CODE/" template/module.prop
+    sed -i "s/^version=.*/version=$VERSION/" "$BUILD_DIR/module.prop"
+    sed -i "s/^versionCode=.*/versionCode=$VERSION_CODE/" "$BUILD_DIR/module.prop"
     if [ $? -ne 0 ]; then
         echo -e "${RED}Error: Failed to modify module.prop${NC}"
         return 1
     fi
     echo -e "${GREEN}module.prop configuration completed (version=$VERSION, versionCode=$VERSION_CODE)${NC}"
 
-    # Step 4: Move bin directory
-    echo -e "\n${YELLOW}[4/5] Moving bin directory...${NC}"
+    # Step 5: Copy bin directory to build directory
+    echo -e "\n${YELLOW}[5/6] Copying bin directory...${NC}"
     if [ ! -d "src/bin" ]; then
         echo -e "${RED}Error: src/bin directory does not exist${NC}"
         return 1
     fi
 
-    # Remove target if it exists
-    if [ -d "template/bin" ]; then
-        rm -rf template/bin
-    fi
-
-    cp -r src/bin template/
+    cp -r src/bin "$BUILD_DIR/"
     if [ $? -ne 0 ]; then
         echo -e "${RED}Error: Failed to copy bin directory${NC}"
         return 1
     fi
     echo -e "${GREEN}bin directory copied${NC}"
 
-    # Step 5: Package as zip
-    echo -e "\n${YELLOW}[5/5] Packaging module...${NC}"
+    # Step 6: Package as zip
+    echo -e "\n${YELLOW}[6/6] Packaging module...${NC}"
 
     # Build filename
     if [ -n "$GIT_SUFFIX" ]; then
@@ -186,33 +202,37 @@ build_for_type() {
     else
         OUTPUT_NAME="meta-magic_mount-${VERSION}-${BUILD_TYPE}-${VERSION_CODE}.zip"
     fi
-    mkdir build
 
-    # Enter template directory and package
-    cd template || return 1
-    zip -r "../build/$OUTPUT_NAME" ./* -x "*.git*"
+    # Enter build directory and package
+    cd "$BUILD_DIR" || return 1
+    zip -r "../../build/$OUTPUT_NAME" ./* -x "*.git*"
     if [ $? -ne 0 ]; then
         echo -e "${RED}Error: Packaging failed${NC}"
-        cd ..
+        cd ../..
         return 1
     fi
-    cd ..
+    cd ../..
 
-    # Remove target if it exists
-    if [ -d "template/bin" ]; then
-        rm -rf template/bin
-    fi
+    # Clean up temporary build directory
+    rm -rf "$BUILD_DIR"
+    
+    # Clean up src/bin
     if [ -d "src/bin" ]; then
         rm -rf src/bin
     fi
 
     echo -e "\n${GREEN}========================================${NC}"
     echo -e "${GREEN}Build completed!${NC}"
-    echo -e "${GREEN}Output file: $OUTPUT_NAME${NC}"
+    echo -e "${GREEN}Output file: build/$OUTPUT_NAME${NC}"
     echo -e "${GREEN}========================================${NC}"
     
     return 0
 }
+
+# Create build directory if it doesn't exist
+if [ ! -d "build" ]; then
+    mkdir build
+fi
 
 # Build for each specified type
 SUCCESS_COUNT=0
