@@ -42,7 +42,7 @@ body {
 .app-root {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: calc(100vh - var(--window-inset-top, 0px) - var(--window-inset-bottom, 0px));
 }
 
 /* Top bar for language selector */
@@ -197,7 +197,7 @@ button:disabled {
 /* ---------- Bottom Tabs ---------- */
 .bottom-bar {
   position: fixed;
-  bottom: 0;
+  bottom: var(--window-inset-bottom, 0px);
   left: 0;
   right: 0;
   height: 52px;
