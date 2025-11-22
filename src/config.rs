@@ -1,7 +1,10 @@
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
+
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use std::fs;
-use std::path::{Path, PathBuf};
 
 const CONFIG_FILE_DEFAULT: &str = "/data/adb/magic_mount/config.toml";
 

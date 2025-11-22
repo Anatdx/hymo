@@ -1,11 +1,13 @@
-use anyhow::{Context, Result, bail};
-use log::LevelFilter;
-use simplelog::{Config, WriteLogger};
-use std::fs::{OpenOptions, create_dir_all, read_to_string, remove_dir_all, remove_file, write};
-use std::path::{Path, PathBuf};
+use std::{
+    fs::{OpenOptions, create_dir_all, read_to_string, remove_dir_all, remove_file, write},
+    path::{Path, PathBuf},
+};
 
+use anyhow::{Context, Result, bail};
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use extattr::{Flags as XattrFlags, lsetxattr};
+use log::LevelFilter;
+use simplelog::{Config, WriteLogger};
 
 const SELINUX_XATTR: &str = "security.selinux";
 

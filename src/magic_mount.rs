@@ -1,24 +1,23 @@
-use crate::magic_mount::NodeFileType::{Directory, RegularFile, Symlink, Whiteout};
-use crate::utils::{ensure_dir_exists, lgetfilecon, lsetfilecon};
+use std::{
+    cmp::PartialEq,
+    collections::{HashMap, hash_map::Entry},
+    fs::{self, DirEntry, FileType, create_dir, create_dir_all, read_dir, read_link},
+    os::unix::fs::{FileTypeExt, MetadataExt, symlink},
+    path::{Path, PathBuf},
+};
+
 use anyhow::{Context, Result, bail};
 use extattr::lgetxattr;
-use rustix::fs::{Gid, Mode, Uid, chmod, chown};
-/*use rustix::fs::{
-    Gid, MetadataExt, Mode, MountFlags, MountPropagationFlags, Uid, UnmountFlags, bind_mount,
-    chmod, chown, mount, move_mount, remount, unmount,
-};*/
-use rustix::mount::{
-    MountFlags, MountPropagationFlags, UnmountFlags, mount, mount_bind, mount_change, mount_move,
-    mount_remount, unmount,
+use rustix::{
+    fs::{Gid, Mode, Uid, chmod, chown},
+    mount::{
+        MountFlags, MountPropagationFlags, UnmountFlags, mount, mount_bind, mount_change,
+        mount_move, mount_remount, unmount,
+    },
+    path::Arg,
 };
-use rustix::path::Arg;
-use std::cmp::PartialEq;
-use std::collections::HashMap;
-use std::collections::hash_map::Entry;
-use std::fs;
-use std::fs::{DirEntry, FileType, create_dir, create_dir_all, read_dir, read_link};
-use std::os::unix::fs::{FileTypeExt, MetadataExt, symlink};
-use std::path::{Path, PathBuf};
+
+use crate::utils::{ensure_dir_exists, lgetfilecon, lsetfilecon};
 
 const DISABLE_FILE_NAME: &str = "disable";
 const REMOVE_FILE_NAME: &str = "remove";
@@ -96,11 +95,11 @@ enum NodeFileType {
 impl NodeFileType {
     fn from_file_type(file_type: FileType) -> Option<Self> {
         if file_type.is_file() {
-            Some(RegularFile)
+            Some(Self::RegularFile)
         } else if file_type.is_dir() {
-            Some(Directory)
+            Some(Self::Directory)
         } else if file_type.is_symlink() {
-            Some(Symlink)
+            Some(Self::Symlink)
         } else {
             None
         }
@@ -131,7 +130,7 @@ impl Node {
             };
 
             if let Some(node) = node {
-                has_file |= if node.file_type == Directory {
+                has_file |= if node.file_type == NodeFileType::Directory {
                     node.collect_module_files(dir.join(&node.name))? || node.replace
                 } else {
                     true
@@ -145,7 +144,7 @@ impl Node {
     fn new_root<T: ToString>(name: T) -> Self {
         Node {
             name: name.to_string(),
-            file_type: Directory,
+            file_type: NodeFileType::Directory,
             children: Default::default(),
             module_path: None,
             replace: false,
@@ -157,13 +156,13 @@ impl Node {
         if let Ok(metadata) = entry.metadata() {
             let path = entry.path();
             let file_type = if metadata.file_type().is_char_device() && metadata.rdev() == 0 {
-                Some(Whiteout)
+                Some(NodeFileType::Whiteout)
             } else {
                 NodeFileType::from_file_type(metadata.file_type())
             };
             if let Some(file_type) = file_type {
                 let mut replace = false;
-                if file_type == Directory
+                if file_type == NodeFileType::Directory
                     && let Ok(v) = lgetxattr(&path, REPLACE_DIR_XATTR)
                     && String::from_utf8_lossy(&v) == "y"
                 {
@@ -329,7 +328,7 @@ fn do_magic_mount<P: AsRef<Path>, WP: AsRef<Path>>(
     let path = path.as_ref().join(&current.name);
     let work_dir_path = work_dir_path.as_ref().join(&current.name);
     match current.file_type {
-        RegularFile => {
+        NodeFileType::RegularFile => {
             let target_path = if has_tmpfs {
                 fs::File::create(&work_dir_path)?;
                 &work_dir_path
@@ -357,7 +356,7 @@ fn do_magic_mount<P: AsRef<Path>, WP: AsRef<Path>>(
                 bail!("cannot mount root file {}!", path.display());
             }
         }
-        Symlink => {
+        NodeFileType::Symlink => {
             if let Some(module_path) = &current.module_path {
                 log::debug!(
                     "create module symlink {} -> {}",
@@ -371,20 +370,20 @@ fn do_magic_mount<P: AsRef<Path>, WP: AsRef<Path>>(
                 bail!("cannot mount root symlink {}!", path.display());
             }
         }
-        Directory => {
+        NodeFileType::Directory => {
             let mut create_tmpfs = !has_tmpfs && current.replace && current.module_path.is_some();
             if !has_tmpfs && !create_tmpfs {
                 for it in &mut current.children {
                     let (name, node) = it;
                     let real_path = path.join(name);
                     let need = match node.file_type {
-                        Symlink => true,
-                        Whiteout => real_path.exists(),
+                        NodeFileType::Symlink => true,
+                        NodeFileType::Whiteout => real_path.exists(),
                         _ => {
                             if let Ok(metadata) = real_path.symlink_metadata() {
                                 let file_type = NodeFileType::from_file_type(metadata.file_type())
-                                    .unwrap_or(Whiteout);
-                                file_type != node.file_type || file_type == Symlink
+                                    .unwrap_or(NodeFileType::Whiteout);
+                                file_type != node.file_type || file_type == NodeFileType::Symlink
                             } else {
                                 // real path not exists
                                 true
@@ -516,7 +515,7 @@ fn do_magic_mount<P: AsRef<Path>, WP: AsRef<Path>>(
                 send_unmountable(path);
             }
         }
-        Whiteout => {
+        NodeFileType::Whiteout => {
             log::debug!("file {} is removed", path.display());
         }
     }

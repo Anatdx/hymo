@@ -2,10 +2,11 @@ mod config;
 mod magic_mount;
 mod utils;
 
+use std::path::PathBuf;
+
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use config::Config;
-use std::path::PathBuf;
 
 const CONFIG_FILE_DEFAULT: &str = "/data/adb/magic_mount/config.toml";
 
