@@ -15,6 +15,12 @@ handle_partition() {
 	echo 0 > /dev/null ; true
 }
 
+mark_replace() {
+	replace_target="$1"
+	mkdir -p "$replace_target"
+	setfattr -n trusted.overlay.opaque -v y "$replace_target"
+}
+
 # call install function, this is important!
 install_module
 
