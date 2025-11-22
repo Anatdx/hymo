@@ -1,11 +1,11 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use log::LevelFilter;
 use simplelog::{Config, WriteLogger};
-use std::fs::{OpenOptions, write, remove_file, create_dir_all, remove_dir_all, read_to_string};
+use std::fs::{OpenOptions, create_dir_all, read_to_string, remove_dir_all, remove_file, write};
 use std::path::{Path, PathBuf};
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
-use extattr::{lsetxattr, Flags as XattrFlags};
+use extattr::{Flags as XattrFlags, lsetxattr};
 
 const SELINUX_XATTR: &str = "security.selinux";
 
@@ -51,9 +51,7 @@ pub fn ensure_dir_exists<T: AsRef<Path>>(dir: T) -> Result<()> {
 }
 
 pub fn init_logger(logfile: &Path, verbose: bool) -> Result<()> {
-    let level = if verbose {
-        LevelFilter::Debug
-    } else if cfg!(debug_assertions) {
+    let level = if verbose && cfg!(debug_assertions) {
         LevelFilter::Debug
     } else {
         LevelFilter::Info
@@ -65,8 +63,7 @@ pub fn init_logger(logfile: &Path, verbose: bool) -> Result<()> {
         .open(logfile)
         .with_context(|| format!("failed to open log file {logfile:?}"))?;
 
-    WriteLogger::init(level, Config::default(), file)
-        .context("failed to init file logger")?;
+    WriteLogger::init(level, Config::default(), file).context("failed to init file logger")?;
 
     log::info!("log level: {:?}", level);
 
@@ -139,8 +136,7 @@ pub fn ensure_temp_dir(temp_dir: &Path) -> Result<()> {
             .with_context(|| format!("failed to clean temp dir {temp_dir:?}"))?;
     }
 
-    create_dir_all(temp_dir)
-        .with_context(|| format!("failed to create temp dir {temp_dir:?}"))?;
+    create_dir_all(temp_dir).with_context(|| format!("failed to create temp dir {temp_dir:?}"))?;
 
     log::debug!("temp dir ready: {}", temp_dir.display());
     Ok(())

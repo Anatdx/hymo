@@ -4,8 +4,8 @@ mod utils;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use std::path::PathBuf;
 use config::Config;
+use std::path::PathBuf;
 
 const CONFIG_FILE_DEFAULT: &str = "/data/adb/magic_mount/config.toml";
 
@@ -60,13 +60,15 @@ fn load_config(cli: &Cli) -> Result<Config> {
     // 1. 尝试从指定的配置文件加载
     if let Some(config_path) = &cli.config {
         log::info!("Loading config from: {}", config_path.display());
-        return Config::from_file(config_path)
-            .context("failed to load specified config file");
+        return Config::from_file(config_path).context("failed to load specified config file");
     }
 
     // 2. 尝试从默认位置加载
     if let Some(config) = Config::load_default() {
-        log::info!("Loaded config from default location: {}", CONFIG_FILE_DEFAULT);
+        log::info!(
+            "Loaded config from default location: {}",
+            CONFIG_FILE_DEFAULT
+        );
         return Ok(config);
     }
 
@@ -114,8 +116,7 @@ fn main() -> Result<()> {
         log::info!("temp dir (cfg)  : {}", temp.display());
         temp
     } else {
-        let temp = utils::select_temp_dir()
-            .context("failed to select temp dir automatically")?;
+        let temp = utils::select_temp_dir().context("failed to select temp dir automatically")?;
         log::info!("temp dir (auto) : {}", temp.display());
         temp
     };
@@ -153,9 +154,10 @@ fn main() -> Result<()> {
 
 fn generate_config(output: &PathBuf) -> Result<()> {
     let config = Config::default();
-    config.save_to_file(output)
+    config
+        .save_to_file(output)
         .context("failed to generate config file")?;
-    
+
     println!("✓ Config file generated at: {}", output.display());
     println!("\nExample content:");
     println!("{}", Config::example());
@@ -166,8 +168,11 @@ fn show_config(config: &Config) -> Result<()> {
     println!("Current Configuration:");
     println!("=====================");
     println!("Module Dir    : {}", config.moduledir.display());
-    println!("Temp Dir      : {}", 
-        config.tempdir.as_ref()
+    println!(
+        "Temp Dir      : {}",
+        config
+            .tempdir
+            .as_ref()
             .map(|p| p.display().to_string())
             .unwrap_or_else(|| "(auto)".to_string())
     );

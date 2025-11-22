@@ -1,5 +1,5 @@
 use crate::magic_mount::NodeFileType::{Directory, RegularFile, Symlink, Whiteout};
-use crate::utils::{lgetfilecon, lsetfilecon, ensure_dir_exists};
+use crate::utils::{ensure_dir_exists, lgetfilecon, lsetfilecon};
 use anyhow::{Context, Result, bail};
 use extattr::lgetxattr;
 use rustix::fs::{
@@ -470,8 +470,7 @@ pub fn magic_mount<T: AsRef<Path>>(
         let tmp_dir = tmp_root.join("workdir");
         ensure_dir_exists(&tmp_dir)?;
 
-        mount(mount_source, &tmp_dir, "tmpfs", MountFlags::empty(), "")
-            .context("mount tmp")?;
+        mount(mount_source, &tmp_dir, "tmpfs", MountFlags::empty(), "").context("mount tmp")?;
         mount_change(&tmp_dir, MountPropagationFlags::PRIVATE).context("make tmp private")?;
 
         let result = do_magic_mount("/", &tmp_dir, root, false);
