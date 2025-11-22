@@ -239,13 +239,11 @@ fn mount_mirror<P: AsRef<Path>, WP: AsRef<Path>>(
         create_dir(&work_dir_path)?;
         let metadata = entry.metadata()?;
         chmod(&work_dir_path, Mode::from_raw_mode(metadata.mode()))?;
-        unsafe {
-            chown(
-                &work_dir_path,
-                Some(Uid::from_raw(metadata.uid())),
-                Some(Gid::from_raw(metadata.gid())),
-            )?;
-        }
+        chown(
+            &work_dir_path,
+            Some(Uid::from_raw(metadata.uid())),
+            Some(Gid::from_raw(metadata.gid())),
+        )?;
         lsetfilecon(&work_dir_path, lgetfilecon(&path)?.as_str())?;
         for entry in read_dir(&path)?.flatten() {
             mount_mirror(&path, &work_dir_path, &entry)?;
@@ -364,13 +362,11 @@ fn do_magic_mount<P: AsRef<Path>, WP: AsRef<Path>>(
                     bail!("cannot mount root dir {}!", path.display());
                 };
                 chmod(&work_dir_path, Mode::from_raw_mode(metadata.mode()))?;
-                unsafe {
-                    chown(
-                        &work_dir_path,
-                        Some(Uid::from_raw(metadata.uid())),
-                        Some(Gid::from_raw(metadata.gid())),
-                    )?;
-                }
+                chown(
+                    &work_dir_path,
+                    Some(Uid::from_raw(metadata.uid())),
+                    Some(Gid::from_raw(metadata.gid())),
+                )?;
                 lsetfilecon(&work_dir_path, lgetfilecon(path)?.as_str())?;
             }
 
