@@ -50,6 +50,7 @@ jobs:
           cargo ndk -t arm64-v8a b -r
           cd webui/
           npm run build
+          cd ../
           cp ./target/aarch64-linux-android/release/magic_mount_rs ./module/
           cd module/
       - name: Upload release version
