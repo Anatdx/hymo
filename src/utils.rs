@@ -58,7 +58,11 @@ pub fn init_logger(verbose: bool) -> Result<()> {
     };
 
     #[cfg(target_os = "android")]
-    android_logger::init_once(android_logger::Config::default().with_max_level(level));
+    android_logger::init_once(
+        android_logger::Config::default()
+            .with_max_level(level)
+            .with_tag("meta-mm"),
+    );
 
     log::info!("log level: {:?}", level);
 
