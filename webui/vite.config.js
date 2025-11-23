@@ -5,7 +5,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte'
 export default defineConfig({
   base: './',
   build: {
-    outDir: '../template/webroot',
+    outDir: '../module/webroot',
   },
   plugins: [svelte()],
 })
