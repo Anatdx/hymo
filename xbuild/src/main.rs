@@ -31,6 +31,8 @@ fn main() -> Result<()> {
 
     cargo.args(args);
 
+    cargo.spawn()?.wait()?;
+
     let module_dir = module_dir();
     dir::copy(
         &module_dir,
