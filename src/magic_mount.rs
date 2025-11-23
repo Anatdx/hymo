@@ -60,7 +60,7 @@ where
     let path = CString::new(target.as_ref().as_str()?)?;
     let cmd = KsuAddTryUmount {
         arg: path.as_ptr() as u64,
-        flags: 0x2,
+        flags: 2,
         mode: 1,
     };
 
@@ -69,14 +69,14 @@ where
         let ret = libc::ioctl(
             grab_fd() as libc::c_int,
             KSU_IOCTL_ADD_TRY_UMOUNT as u64,
-            cmd,
+            &cmd,
         );
 
         #[cfg(not(target_env = "gnu"))]
         let ret = libc::ioctl(
             grab_fd() as libc::c_int,
             KSU_IOCTL_ADD_TRY_UMOUNT as i32,
-            cmd,
+            &cmd,
         );
 
         if ret < 0 {
