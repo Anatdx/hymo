@@ -8,19 +8,19 @@ MODDIR="${0%/*}"
 BINARY="$MODDIR/meta-mm"
 
 if [ ! -f "$BINARY" ]; then
-    log "ERROR: Binary not found: $BINARY"
-    exit 1
+  log "ERROR: Binary not found: $BINARY"
+  exit 1
 fi
 
-$BINARY > "/data/adb/magic_mount/mm.log"
+nohup $BINARY >"/data/adb/magic_mount/mm.log" 2>&1 &
 
 EXIT_CODE=$?
 
 if [ "$EXIT_CODE" = 0 ]; then
-    /data/adb/ksud kernel notify-module-mounted
-    log "Mount completed successfully"
+  /data/adb/ksud kernel notify-module-mounted
+  log "Mount completed successfully"
 else
-    log "Mount failed with exit code $EXIT_CODE"
+  log "Mount failed with exit code $EXIT_CODE"
 fi
 
 exit 0
