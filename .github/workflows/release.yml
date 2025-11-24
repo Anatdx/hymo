@@ -1,0 +1,140 @@
+name: Release Meta-Hybrid
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth:
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26b
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: aarch64-linux-android
+          components: rust-src
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: webui/package-lock.json
+
+      - name: Install WebUI Dependencies
+        run: |
+          cd webui
+          npm install
+
+      - name: Build Project
+        run: |
+          # 运行 xbuild (内部会自动处理 WebUI、Rust 编译、版本号注入和打包)
+          cargo run -p xbuild --release
+
+      - name: Generate Update Files
+        id: meta
+        run: |
+          # 1. 提取 module.prop 信息
+          PROP_FILE="output/module_files/module.prop"
+          VERSION=$(grep "^version=" "$PROP_FILE" | cut -d= -f2)
+          VERSION_CODE=$(grep "^versionCode=" "$PROP_FILE" | cut -d= -f2)
+          
+          # 获取生成的 ZIP 文件名
+          ZIP_FILE=$(cd output && ls *.zip | head -n 1)
+          
+          # 构建下载链接
+          REPO="${{ github.repository }}"
+          TAG="${{ github.ref_name }}"
+          DOWNLOAD_URL="https://github.com/$REPO/releases/download/$TAG/$ZIP_FILE"
+          # 你的 changelog 固定链接
+          CHANGELOG_URL="https://raw.githubusercontent.com/YuzakiKokuban/meta-hybrid_mount/master/changelog.md"
+          
+          echo "Version: $VERSION"
+          echo "Code: $VERSION_CODE"
+          echo "Zip: $ZIP_FILE"
+          
+          # 2. 生成 update.json (临时文件)
+          cat <<EOF > /tmp/update.json
+          {
+            "version": "$VERSION",
+            "versionCode": $VERSION_CODE,
+            "zipUrl": "$DOWNLOAD_URL",
+            "changelog": "$CHANGELOG_URL"
+          }
+          EOF
+          
+          # 3. 生成 changelog.md (临时文件)
+          # 获取上一个 tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          
+          echo "## $VERSION" > /tmp/changelog.md
+          echo "" >> /tmp/changelog.md
+          
+          if [ -z "$PREV_TAG" ]; then
+            echo "Initial release." >> /tmp/changelog.md
+            git log --pretty=format:"* %s" >> /tmp/changelog.md
+          else
+            echo "Changes since $PREV_TAG:" >> /tmp/changelog.md
+            git log --pretty=format:"* %s" "$PREV_TAG..HEAD" >> /tmp/changelog.md
+          fi
+          
+          # 打印出来检查一下
+          cat /tmp/update.json
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          draft: false
+          prerelease: false
+          files: output/*.zip
+          body_path: /tmp/changelog.md
+
+      - name: Push Update Info to Master
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # 切换到 master 分支
+          git fetch origin master
+          git checkout master
+          
+          # 将生成的临时文件移动到仓库根目录
+          mv /tmp/update.json update.json
+          mv /tmp/changelog.md changelog.md
+          
+          # 提交并推送
+          git add update.json changelog.md
+          
+          if git diff --staged --quiet; then
+            echo "No changes to update.json or changelog.md"
+          else
+            git commit -m "[skip ci] Update KernelSU json and changelog for ${{ github.ref_name }}"
+            git push origin master
+          fi

@@ -62,13 +62,9 @@ pub fn init_logger(verbose: bool) -> Result<()> {
     let mut builder = Builder::new();
 
     builder.format(|buf, record| {
-        let local_time = chrono::Local::now();
-        let time_str = local_time.format("%Y-%m-%d %H:%M:%S%.3f").to_string();
-
         writeln!(
             buf,
-            "[{}] [{}] [{}] {}",
-            time_str,
+            "[{}] [{}] {}",
             record.level(),
             record.target(),
             record.args()
