@@ -1,11 +1,16 @@
 #!/system/bin/sh
 ############################################
-# mm-mm uninstall.sh
+# meta-hybrid uninstall.sh
 # Cleanup script for metamodule removal
 ############################################
 
-MODDIR="${0%/*}"
+BASE_DIR="/data/adb/meta-hybrid"
+MNT_DIR="$BASE_DIR/mnt"
 
-rm -rf /data/adb/magic_mount
+if mountpoint -q "$MNT_DIR"; then
+    umount "$MNT_DIR" 2>/dev/null || umount -l "$MNT_DIR"
+fi
+
+rm -rf "$BASE_DIR"
 
 exit 0
