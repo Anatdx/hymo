@@ -58,14 +58,10 @@ jobs:
 
       - name: Build Project
         run: |
-          # Run the custom build tool 'xbuild'
-          # Use cargo-ndk to set up the cross-compilation environment (Linker, CC, AR)
-          # -t arm64-v8a: Target Architecture
-          # -p 30: Android API Level
-          cargo ndk -t arm64-v8a -p 30 -- cargo run -p xbuild --release
+          # FIX: Do NOT wrap this in cargo-ndk. xbuild runs on host and calls cargo-ndk internally.
+          cargo run -p xbuild --release
           
           # Export version to GITHUB_ENV for the next step
-          # xbuild has already written the version to output/version
           if [ -f "output/version" ]; then
             echo "MODULE_VERSION=$(cat output/version)" >> $GITHUB_ENV
           else

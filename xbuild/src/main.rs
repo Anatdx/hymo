@@ -13,16 +13,20 @@ use zip::{CompressionMethod, write::FileOptions};
 use crate::zip_ext::zip_create_from_directory_with_options;
 
 fn main() -> Result<()> {
-
+    // 1. Define build output directory (CI will upload this directly)
     let build_dir = Path::new("output").join("module_files");
 
+    // Clean and create output directory
     if build_dir.exists() {
         fs::remove_dir_all(&build_dir)?;
     }
     fs::create_dir_all(&build_dir)?;
 
+    // 2. [CRITICAL] Build WebUI FIRST, so module/webroot is populated before copy
     build_webui()?;
 
+    // 3. Compile Rust Binary (meta-hybrid) for Android
+    // Note: cargo-ndk is called here internally
     let mut cargo = cargo_ndk();
     let args = vec![
         "build",
@@ -41,6 +45,8 @@ fn main() -> Result<()> {
         anyhow::bail!("Cargo build failed");
     }
 
+    // 4. Copy module directory to output
+    // Now includes the freshly built webroot
     let module_dir = module_dir();
     dir::copy(
         &module_dir,
@@ -48,22 +54,28 @@ fn main() -> Result<()> {
         &dir::CopyOptions::new().overwrite(true).content_only(true),
     )?;
     
+    // Cleanup
     if build_dir.join(".gitignore").exists() {
         fs::remove_file(build_dir.join(".gitignore"))?;
     }
 
+    // 5. Inject Dynamic Version (v0.x.x-gXXXXXX)
+    // And write version to output/version for GitHub Actions
     let version = inject_version(&build_dir).unwrap_or_else(|e| {
         println!("Warning: Failed to inject version: {}", e);
         "unknown".to_string()
     });
     fs::write(Path::new("output").join("version"), &version)?;
 
+    // 6. Copy compiled binary
     file::copy(
         bin_path(),
         build_dir.join("meta-hybrid"),
         &file::CopyOptions::new().overwrite(true),
     )?;
 
+    // 7. Create Zip (Local Backup / Verification)
+    // CI will upload the folder structure directly
     let options = FileOptions::<()>::default()
         .compression_method(CompressionMethod::Deflated)
         .compression_level(Some(9));
@@ -84,7 +96,7 @@ fn main() -> Result<()> {
 }
 
 fn inject_version(target_dir: &Path) -> Result<String> {
-    // 获取 git短hash
+    // Get git short hash
     let output = Command::new("git")
         .args(["rev-parse", "--short", "HEAD"])
         .output()?;
@@ -103,7 +115,7 @@ fn inject_version(target_dir: &Path) -> Result<String> {
         
         for line in content.lines() {
             if line.starts_with("version=") {
-                // 保留原版本号，追加 hash，例如: version=v0.3.0-g1a2b3c
+                // Append hash to version: version=v0.3.0-g1a2b3c
                 let base = line.trim().strip_prefix("version=").unwrap_or("");
                 full_version = format!("{}-g{}", base, hash);
                 new_lines.push(format!("version={}", full_version));
@@ -123,10 +135,6 @@ fn module_dir() -> PathBuf {
     Path::new("module").to_path_buf()
 }
 
-fn temp_dir() -> PathBuf {
-    Path::new("output").join(".temp")
-}
-
 fn bin_path() -> PathBuf {
     Path::new("target")
         .join("aarch64-linux-android")
@@ -136,8 +144,9 @@ fn bin_path() -> PathBuf {
 
 fn cargo_ndk() -> Command {
     let mut command = Command::new("cargo");
+    // Inner cargo-ndk call handles the cross-compilation
     command
-        .args(["ndk", "--platform", "31", "-t", "arm64-v8a"])
+        .args(["ndk", "--platform", "30", "-t", "arm64-v8a"])
         .env("RUSTFLAGS", "-C default-linker-libraries")
         .env("CARGO_CFG_BPF_TARGET_ARCH", "aarch64");
     command
