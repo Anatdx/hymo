@@ -49,7 +49,9 @@ where
     use std::ffi::CString;
     use rustix::path::Arg;
 
-    let path_str = target.as_ref().as_str()?;
+    let target_ref = target.as_ref();
+    let path_str = target_ref.as_str()?;
+    
     let path = CString::new(path_str)?;
     let cmd = KsuAddTryUmount {
         arg: path.as_ptr() as u64,
@@ -72,7 +74,7 @@ where
     };
 
     // SUSFS Operation
-    if let Ok(abs_path) = std::fs::canonicalize(target.as_ref()) {
+    if let Ok(abs_path) = std::fs::canonicalize(target_ref) {
         let bytes = abs_path.as_os_str().as_bytes();
         
         if bytes.len() < SUSFS_MAX_LEN_PATHNAME {
@@ -98,7 +100,6 @@ where
             if error == 0 {
                 log::info!("SUSFS: Added try_umount for {}", abs_path.display());
             } else {
-                // Only warn if it fails, it might not be installed
                 log::debug!("SUSFS: Failed to add try_umount for {}, error: {}", abs_path.display(), error);
             }
         }
