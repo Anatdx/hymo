@@ -118,12 +118,14 @@ html, body, #app {
   background-color: var(--md-sys-color-surface);
   border-bottom: 1px solid var(--md-sys-color-outline-variant);
   z-index: 2000;
-  padding-top: calc(env(safe-area-inset-top, 24px) + 8px);
+  /* Increased top padding to push content down slightly */
+  padding-top: calc(env(safe-area-inset-top, 24px) + 16px);
   box-shadow: var(--md-sys-elevation-1);
 }
 
 .app-bar-content {
-  height: 64px;
+  /* Increased height for better centering */
+  height: 72px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -175,7 +177,8 @@ html, body, #app {
   overscroll-behavior: contain;
   padding: 20px;
   
-  padding-top: calc(64px + env(safe-area-inset-top, 24px) + 8px + 20px);
+  /* Adjusted padding-top to account for the taller app bar */
+  padding-top: calc(72px + env(safe-area-inset-top, 24px) + 16px + 20px);
   
   padding-left: calc(20px + env(safe-area-inset-left));
   padding-right: calc(20px + env(safe-area-inset-right));
@@ -254,7 +257,8 @@ html, body, #app {
     position: static;
     grid-area: content;
     padding: 32px 48px;
-    padding-top: calc(64px + 32px + env(safe-area-inset-top, 0px) + 8px);
+    /* Adjusted for desktop layout as well */
+    padding-top: calc(72px + 32px + env(safe-area-inset-top, 0px) + 16px);
     margin-bottom: 0;
   }
   
@@ -410,6 +414,13 @@ button {
   justify-content: flex-end;
   gap: 12px;
   margin-bottom: 16px;
+}
+
+/* New style for logs actions: stacked and left aligned */
+.actions-bar.logs-actions {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
 }
 
 .actions-bar .text-field {

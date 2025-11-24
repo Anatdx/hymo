@@ -31,6 +31,7 @@
   let lang = 'en';
   let theme = 'dark';
   $: L = locate[lang];
+
   const availableLanguages = Object.keys(locate).map(code => ({
     code,
     name: locate[code]?.lang?.display || code.toUpperCase()
@@ -47,7 +48,6 @@
   let config = { ...DEFAULT_CONFIG };
   let partitionInput = '';
   let modules = [];
-  
   let loading = { config: false, modules: false, logs: false };
   let saving = { config: false, modules: false };
   let messages = { config: null, modules: null, logs: null };
@@ -123,11 +123,25 @@
       });
 
       const dir = config.moduledir || DEFAULT_CONFIG.moduledir;
-      const { errno, stdout } = await exec(`ls -1 "${dir}"`);
+      
+      const cmd = `
+        cd "${dir}" && for d in *; do
+          if [ -d "$d" ] && \
+             [ ! -f "$d/disable" ] && \
+             [ ! -f "$d/skip_mount" ] && \
+             [ ! -f "$d/remove" ] && \
+             { [ -d "$d/system" ] || [ -d "$d/vendor" ] || [ -d "$d/product" ] || [ -d "$d/system_ext" ] || [ -d "$d/odm" ] || [ -d "$d/oem" ]; }; then
+            echo "$d"
+          fi
+        done
+      `;
+      
+      const { errno, stdout } = await exec(cmd);
+
       if (errno === 0) {
         modules = stdout.split('\n')
           .map(s => s.trim())
-          .filter(s => s && !['meta-hybrid', 'meta-overlayfs'].includes(s))
+          .filter(s => s && !['meta-hybrid', 'meta-overlayfs', 'magic_mount'].includes(s))
           .map(id => ({ id, mode: modeMap.get(id) || 'auto' }));
       } else {
         messages.modules = L.modules.scanError;
@@ -152,7 +166,8 @@
     loading.logs = true;
     logContent = '';
     try {
-      const f = logSelection === 'current' ? (config.logfile || DEFAULT_CONFIG.logfile) : `${config.logfile || DEFAULT_CONFIG.logfile}.old`;
+      const f = logSelection === 'current' ?
+        (config.logfile || DEFAULT_CONFIG.logfile) : `${config.logfile || DEFAULT_CONFIG.logfile}.old`;
       const { errno, stdout, stderr } = await exec(`[ -f "${f}" ] && cat "${f}" || echo "Log empty"`);
       logContent = errno === 0 ? stdout : `${L.logs.readFailed}: ${stderr}`;
     } catch (e) { messages.logs = L.logs.readException; }
@@ -177,7 +192,10 @@
     }
   }
 
-  function toggleTheme() { setTheme(theme === 'light' ? 'dark' : 'light'); }
+  function toggleTheme() { 
+    setTheme(theme === 'light' ? 'dark' : 'light');
+  }
+  
   $: if (activeTab === 'modules') loadModules();
   $: if (activeTab === 'logs') loadLog();
 </script>
@@ -239,12 +257,12 @@
               <div class="rule-card">
                 <div style="flex: 2; display:flex; align-items:center; gap:12px; min-width: 180px;">
                   <div class="icon-box" style="background:var(--md-sys-color-surface-variant); width:40px; height:40px; border-radius:8px;">
-                     <svg viewBox="0 0 24 24" width="24" height="24"><path d={icons.extension} fill="currentColor"/></svg>
+                      <svg viewBox="0 0 24 24" width="24" height="24"><path d={icons.extension} fill="currentColor"/></svg>
                   </div>
                   <span style="font-weight:500;">{mod.id}</span>
                 </div>
                 <div class="text-field mode-select" style="margin-bottom:0 !important">
-                  <select bind:value={mod.mode}>
+                   <select bind:value={mod.mode}>
                     <option value="auto">{L.modules.modeAuto}</option>
                     <option value="magic">{L.modules.modeMagic}</option>
                   </select>
@@ -254,9 +272,17 @@
           {/if}
         </div>
       {:else if activeTab === 'logs'}
-        <div class="actions-bar">
-          <div class="text-field" style="margin-bottom:0; width: 150px;"><select bind:value={logSelection} on:change={loadLog}><option value="current">{L.logs.current}</option><option value="old">{L.logs.old}</option></select></div>
-          <button class="btn-tonal" on:click={loadLog} disabled={loading.logs}><svg viewBox="0 0 24 24" width="18" height="18"><path d={icons.refresh} fill="currentColor"/></svg>{L.logs.refresh}</button>
+        <div class="actions-bar logs-actions">
+          <div class="text-field" style="margin-bottom:0; width: 100%; max-width: 200px;">
+            <select bind:value={logSelection} on:change={loadLog}>
+              <option value="current">{L.logs.current}</option>
+              <option value="old">{L.logs.old}</option>
+            </select>
+          </div>
+          <button class="btn-tonal" on:click={loadLog} disabled={loading.logs}>
+            <svg viewBox="0 0 24 24" width="18" height="18"><path d={icons.refresh} fill="currentColor"/></svg>
+            {L.logs.refresh}
+          </button>
         </div>
         <div class="log-container">{loading.logs ? 'Loading...' : (logContent || L.logs.empty)}</div>
       {/if}
