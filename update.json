@@ -1,6 +1,6 @@
 {
-  "version": "v0.2.2-Hybrid-g10badc0",
-  "versionCode": 3,
-  "zipUrl": "https://github.com/YuzakiKokuban/meta-hybrid_mount/releases/download/v0.2.2-Hybrid/meta-hybrid-v0.2.2-Hybrid-g10badc0.zip",
+  "version": "v0.2.2-Hybrid-uifix-g0ae51a2",
+  "versionCode": 4,
+  "zipUrl": "https://github.com/YuzakiKokuban/meta-hybrid_mount/releases/download/v0.2.2-Hybrid-uifix/meta-hybrid-v0.2.2-Hybrid-uifix-g0ae51a2.zip",
   "changelog": "https://raw.githubusercontent.com/YuzakiKokuban/meta-hybrid_mount/master/changelog.md"
 }
