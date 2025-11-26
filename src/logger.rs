@@ -1,14 +1,9 @@
 use std::path::Path;
 use anyhow::Result;
 use tracing_subscriber::fmt::format::Writer;
-use tracing_subscriber::fmt::time::FormatTime;
-use tracing_subscriber::{fmt, EnvFilter, Layer};
+use tracing_subscriber::{fmt, EnvFilter};
 use tracing_subscriber::prelude::*;
-
-// Custom timer is not strictly needed if we don't log time in the file 
-// (WebUI doesn't seem to parse time, just Level/Target/Msg)
-// But standard logs usually have it. The original FileLogger didn't have a timestamp.
-// Original format: "[{}] [{}] {}" -> [LEVEL] [TARGET] MESSAGE
+use tracing_subscriber::fmt::FormatFields; // 修复编译错误的关键
 
 struct SimpleFormatter;
 
@@ -39,13 +34,13 @@ where
 pub fn init(verbose: bool, log_path: &Path) -> Result<()> {
     let level = if verbose { "debug" } else { "info" };
     
-    // 1. File Layer (Non-blocking)
-    // We split path into directory and filename for tracing_appender
-    let log_dir = log_path.parent().unwrap_or_else(|| Path::new("/data/adb/meta-hybrid"));
-    let log_file_name = log_path.file_name().unwrap_or_else(|| std::ffi::OsStr::new("daemon.log"));
+    // Ensure log directory exists
+    if let Some(parent) = log_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
 
-    let file_appender = tracing_appender::rolling::never(log_dir, log_file_name);
-    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+    // 1. File Layer (Blocking for CLI reliability)
+    // Using standard File append mode to ensure logs are flushed before process exit.
     let file_appender = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
