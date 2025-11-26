@@ -2,14 +2,14 @@ mod zip_ext;
 
 use std::{
     env,
-    fs::{self, File},
+    fs, // Removed `File` as it's not used here
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use fs_extra::{dir, file};
+use fs_extra::dir; // Removed `file` as we use fs::copy instead
 use zip::{write::FileOptions, CompressionMethod};
 
 use crate::zip_ext::zip_create_from_directory_with_options;
@@ -83,6 +83,17 @@ fn main() -> Result<()> {
             if let Some(zakosign) = zakosign_bin {
                 if let Some(key) = resolve_sign_key(sign_key) {
                     println!(":: Signing meta-hybrid binary...");
+                    // Make binary executable just in case
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::fs::PermissionsExt;
+                        if let Ok(metadata) = fs::metadata(&zakosign) {
+                            let mut perms = metadata.permissions();
+                            perms.set_mode(0o755);
+                            let _ = fs::set_permissions(&zakosign, perms);
+                        }
+                    }
+
                     let status = Command::new(zakosign)
                         .current_dir(&root)
                         .arg("sign")
@@ -92,6 +103,8 @@ fn main() -> Result<()> {
                         .arg("--output")
                         .arg(&dest_bin)
                         .arg("--force")
+                        .stdout(Stdio::inherit())
+                        .stderr(Stdio::inherit())
                         .status()
                         .context("Failed to execute zakosign")?;
 
@@ -159,19 +172,31 @@ fn build_webui(root: &Path) -> Result<()> {
 fn build_zakosign(root: &Path) -> Result<Option<PathBuf>> {
     let zakosign_dir = root.join("zakosign");
     if !zakosign_dir.exists() {
-        println!(":: [INFO] zakosign directory not found. Skipping zakosign build.");
+        println!(":: [INFO] zakosign directory not found at {}. Skipping zakosign build.", zakosign_dir.display());
         return Ok(None);
     }
 
     println!(":: Building Zakosign (Host)...");
     
-    // 1. Run setupdep for host if needed (assuming tools/setupdep exists)
-    // Note: setupdep handles boringssl compilation
+    // 1. Run setupdep for host if needed
     let setup_script = zakosign_dir.join("tools/setupdep");
     if setup_script.exists() {
-        let status = Command::new(setup_script)
+        // Make script executable
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if let Ok(metadata) = fs::metadata(&setup_script) {
+                let mut perms = metadata.permissions();
+                perms.set_mode(0o755);
+                let _ = fs::set_permissions(&setup_script, perms);
+            }
+        }
+
+        let status = Command::new(&setup_script)
             .current_dir(&zakosign_dir)
             .arg("host")
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
             .status()?;
         if !status.success() { anyhow::bail!("zakosign setupdep failed"); }
     }
@@ -179,6 +204,8 @@ fn build_zakosign(root: &Path) -> Result<Option<PathBuf>> {
     // 2. Run Make
     let status = Command::new("make")
         .current_dir(&zakosign_dir)
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
         .status()?;
     
     if !status.success() { anyhow::bail!("zakosign make failed"); }
@@ -187,7 +214,7 @@ fn build_zakosign(root: &Path) -> Result<Option<PathBuf>> {
     if bin_path.exists() {
         Ok(Some(bin_path))
     } else {
-        anyhow::bail!("zakosign binary not found after build");
+        anyhow::bail!("zakosign binary not found after build at {}", bin_path.display());
     }
 }
 
@@ -213,6 +240,10 @@ fn build_core(root: &Path, release: bool) -> Result<PathBuf> {
         .join(profile)
         .join("meta-hybrid");
         
+    if !bin_path.exists() {
+        anyhow::bail!("Core binary not found at {}", bin_path.display());
+    }
+
     Ok(bin_path)
 }
 
