@@ -73,12 +73,27 @@ pub fn init_logger(verbose: bool, log_path: &Path) -> Result<()> {
 
 pub fn lsetfilecon<P: AsRef<Path>>(path: P, con: &str) -> Result<()> {
     #[cfg(any(target_os = "linux", target_os = "android"))]
-    lsetxattr(&path, SELINUX_XATTR, con, XattrFlags::empty()).with_context(|| {
-        format!(
-            "Failed to change SELinux context for {}",
-            path.as_ref().display()
-        )
-    })?;
+    {
+        // Try to set xattr. If it fails, convert the errno to std::io::Error to check the kind.
+        if let Err(e) = lsetxattr(&path, SELINUX_XATTR, con, XattrFlags::empty()) {
+            let io_err = std::io::Error::from(e);
+            
+            // Check if the error is PermissionDenied (EACCES/EPERM)
+            if io_err.kind() == std::io::ErrorKind::PermissionDenied {
+                log::warn!(
+                    "Failed to change SELinux context for {}: Permission denied (ignored)",
+                    path.as_ref().display()
+                );
+            } else {
+                return Err(io_err).with_context(|| {
+                    format!(
+                        "Failed to change SELinux context for {}",
+                        path.as_ref().display()
+                    )
+                });
+            }
+        }
+    }
     Ok(())
 }
 
