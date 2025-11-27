@@ -144,6 +144,7 @@ pub fn sync_dir(src: &Path, dst: &Path) -> Result<()> {
     if !src.exists() { return Ok(()); }
     ensure_dir_exists(dst)?;
 
+    // 1. Copy files
     let status = Command::new("cp")
         .arg("-af")
         .arg(format!("{}/.", src.display()))
@@ -154,6 +155,17 @@ pub fn sync_dir(src: &Path, dst: &Path) -> Result<()> {
     if !status.success() {
         bail!("Failed to sync {} to {}", src.display(), dst.display());
     }
+
+    let chcon_status = Command::new("chcon")
+        .arg("-R")
+        .arg("u:object_r:system_file:s0")
+        .arg(dst)
+        .status();
+        
+    if let Err(e) = chcon_status {
+         log::warn!("Failed to execute chcon on {}: {}", dst.display(), e);
+    }
+
     Ok(())
 }
 
