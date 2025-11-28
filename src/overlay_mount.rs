@@ -10,6 +10,7 @@ use procfs::process::Process;
 use rustix::{fd::AsFd, fs::CWD, mount::*};
 
 use crate::defs::{DISABLE_FILE_NAME, KSU_OVERLAY_SOURCE, SKIP_MOUNT_FILE_NAME, SYSTEM_RW_DIR};
+use crate::utils::send_unmountable;
 
 pub fn mount_overlayfs(
     lower_dirs: &[String],
@@ -73,6 +74,10 @@ pub fn mount_overlayfs(
             data,
         )?;
     }
+    
+    // Apply try_umount logic to overlay mounts as well
+    let _ = send_unmountable(dest.as_ref());
+    
     Ok(())
 }
 
@@ -96,6 +101,10 @@ pub fn bind_mount(from: impl AsRef<Path>, to: impl AsRef<Path>) -> Result<()> {
         to.as_ref(),
         MoveMountFlags::MOVE_MOUNT_F_EMPTY_PATH,
     )?;
+    
+    // Apply try_umount logic to bind mounts
+    let _ = send_unmountable(to.as_ref());
+    
     Ok(())
 }
 

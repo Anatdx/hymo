@@ -1,11 +1,10 @@
 mod node;
-mod try_umount;
+// Removed mod try_umount;
 
 // Only keep XATTR const
 pub(super) const REPLACE_DIR_FILE_NAME: &str = ".replace";
 pub(super) const REPLACE_DIR_XATTR: &str = "trusted.overlay.opaque";
 
-// Added from patch 5d9f19
 use std::sync::atomic::AtomicBool;
 pub static UMOUNT: AtomicBool = AtomicBool::new(false);
 
@@ -25,12 +24,10 @@ use rustix::{
     },
 };
 
+// Changed import to utils
 use crate::{
-    magic_mount::{
-        node::{Node, NodeFileType},
-        try_umount::send_unmountable,
-    },
-    utils::{ensure_dir_exists, lgetfilecon, lsetfilecon},
+    magic_mount::node::{Node, NodeFileType},
+    utils::{ensure_dir_exists, lgetfilecon, lsetfilecon, send_unmountable},
 };
 
 // Modified to accept a list of specific content paths
@@ -201,9 +198,6 @@ fn do_magic_mount<P: AsRef<Path>, WP: AsRef<Path>>(
                         }
                     };
                     if need {
-                        // CRITICAL FIX: Prevent creating tmpfs on Root (or any node without module source).
-                        // If we create tmpfs on Root, it mirrors the entire OS, causing "No space left on device".
-                        // Instead, we must skip this specific conflicting child.
                         if current.module_path.is_none() {
                             log::error!(
                                 "Cannot create tmpfs on {} (no module source), ignoring conflicting child: {}",
