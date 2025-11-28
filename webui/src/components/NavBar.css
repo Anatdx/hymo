@@ -36,6 +36,14 @@
   border-bottom: 1px solid var(--md-sys-color-outline-variant);
   overflow-x: auto;
   flex-shrink: 0;
+  /* Hide scrollbar for app-like feel */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+
+/* Chrome/Safari/Webkit */
+.nav-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .nav-tab {
@@ -53,6 +61,7 @@
   transition: all 0.2s;
   background: none;
   cursor: pointer;
+  white-space: nowrap; /* Ensure text doesn't wrap */
 }
 
 .nav-tab.active {

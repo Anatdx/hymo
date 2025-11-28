@@ -7,7 +7,10 @@
   let { activeTab, onTabChange } = $props();
   let showLangMenu = $state(false);
   
-  // Updated TABS to include 'status'
+  // Refs for scrolling logic
+  let navContainer;
+  let tabRefs = {};
+
   const TABS = [
     { id: 'status', icon: ICONS.home },
     { id: 'config', icon: ICONS.settings },
@@ -20,6 +23,25 @@
     name: locate[code]?.lang?.display || code.toUpperCase()
   }));
   
+  // Svelte 5 Effect: Watch activeTab and scroll into view
+  $effect(() => {
+    if (activeTab && tabRefs[activeTab] && navContainer) {
+      const tab = tabRefs[activeTab];
+      const containerWidth = navContainer.clientWidth;
+      const tabLeft = tab.offsetLeft;
+      const tabWidth = tab.clientWidth;
+      
+      // Calculate position to center the tab
+      // Target Scroll = (Tab Left Offset) - (Half Container Width) + (Half Tab Width)
+      const scrollLeft = tabLeft - (containerWidth / 2) + (tabWidth / 2);
+      
+      navContainer.scrollTo({
+        left: scrollLeft,
+        behavior: 'smooth'
+      });
+    }
+  });
+
   function toggleTheme() {
     store.setTheme(store.theme === 'light' ? 'dark' : 'light');
   }
@@ -53,9 +75,13 @@
     </div>
   {/if}
 
-  <nav class="nav-tabs">
+  <nav class="nav-tabs" bind:this={navContainer}>
     {#each TABS as tab}
-      <button class="nav-tab {activeTab === tab.id ? 'active' : ''}" onclick={() => onTabChange(tab.id)}>
+      <button 
+        class="nav-tab {activeTab === tab.id ? 'active' : ''}" 
+        onclick={() => onTabChange(tab.id)}
+        bind:this={tabRefs[tab.id]}
+      >
         <svg viewBox="0 0 24 24"><path d={tab.icon}/></svg>
         {store.L.tabs[tab.id]}
       </button>
