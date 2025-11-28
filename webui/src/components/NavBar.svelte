@@ -6,8 +6,10 @@
   let { activeTab, onTabChange } = $props();
   let showLangMenu = $state(false);
   
-  // Refs for scrolling logic
+  // Refs
   let navContainer;
+  let langButtonRef;
+  let menuRef;
   let tabRefs = {};
 
   const TABS = [
@@ -16,22 +18,15 @@
     { id: 'modules', icon: ICONS.modules },
     { id: 'logs', icon: ICONS.description }
   ];
-  
-  // Generate supported languages list dynamically
-  // The glob import keys are like "../locales/en.json"
-  // We extract "en" from the filename.
-  // Note: We don't have the display name (e.g. "English") immediately available
-  // without loading the file. For simplicity, we use the code or a simple map.
+
+  // Dynamic languages list
   const localeFiles = import.meta.glob('../locales/*.json');
-  
-  // Hardcoded map for Display Names since we load JSONs lazily
   const LANG_DISPLAY = {
     en: 'English',
     zh: '中文',
     ja: '日本語',
     ru: 'Русский'
   };
-
   const languages = Object.keys(localeFiles).map(path => {
     const code = path.match(/\/([a-z]+)\.json$/)[1];
     return {
@@ -39,7 +34,7 @@
       name: LANG_DISPLAY[code] || code.toUpperCase()
     };
   });
-  
+
   $effect(() => {
     if (activeTab && tabRefs[activeTab] && navContainer) {
       const tab = tabRefs[activeTab];
@@ -60,27 +55,42 @@
   }
 
   function setLang(code) {
-    store.setLang(code); // Async, but we don't need to await here
+    store.setLang(code);
     showLangMenu = false;
   }
+  
+  // Close menu when clicking outside
+  function handleOutsideClick(e) {
+    if (showLangMenu && 
+        menuRef && !menuRef.contains(e.target) && 
+        langButtonRef && !langButtonRef.contains(e.target)) {
+      showLangMenu = false;
+    }
+  }
 </script>
+
+<svelte:window onclick={handleOutsideClick} />
 
 <header class="app-bar">
   <div class="app-bar-content">
     <h1 class="screen-title">{store.L.common.appName}</h1>
     <div class="top-actions">
       <button class="btn-icon" onclick={toggleTheme} title={store.L.common.theme}>
-        <svg viewBox="0 0 24 24"><path d={store.theme === 'light' ?
-          ICONS.dark_mode : ICONS.light_mode} fill="currentColor"/></svg>
+        <svg viewBox="0 0 24 24"><path d={store.theme === 'light' ? ICONS.dark_mode : ICONS.light_mode} fill="currentColor"/></svg>
       </button>
-      <button class="btn-icon" onclick={() => showLangMenu = !showLangMenu} title={store.L.common.language}>
+      <button 
+        class="btn-icon" 
+        bind:this={langButtonRef}
+        onclick={() => showLangMenu = !showLangMenu} 
+        title={store.L.common.language}
+      >
         <svg viewBox="0 0 24 24"><path d={ICONS.translate} fill="currentColor"/></svg>
       </button>
     </div>
   </div>
   
   {#if showLangMenu}
-    <div class="menu-dropdown">
+    <div class="menu-dropdown" bind:this={menuRef}>
       {#each languages as l}
         <button class="menu-item" onclick={() => setLang(l.code)}>{l.name}</button>
       {/each}
