@@ -1,3 +1,4 @@
+// meta-hybrid_mount/src/main.rs
 mod config;
 mod defs;
 mod utils;
@@ -16,6 +17,7 @@ use clap::{Parser, Subcommand};
 use config::{Config, CONFIG_FILE_DEFAULT};
 use rustix::mount::{unmount, UnmountFlags};
 use serde::Serialize;
+// Import procfs to check mount type
 use procfs::process::Process;
 
 #[derive(Parser, Debug)]
@@ -317,11 +319,16 @@ fn check_storage() -> Result<()> {
         return Ok(());
     }
 
+    // Attempt to resolve symlinks to match what's in /proc/mounts
+    // If resolution fails, use original path
+    let canonical_path = fs::canonicalize(&path).unwrap_or(path.clone());
+
     // Determine filesystem type from mountinfo
     let mut fs_type = "unknown".to_string();
     if let Ok(mounts) = Process::myself().and_then(|p| p.mountinfo()) {
         for m in mounts.0 {
-            if m.mount_point == path {
+            // Compare against resolved path
+            if m.mount_point == canonical_path {
                 fs_type = m.fs_type;
                 break;
             }
@@ -457,7 +464,7 @@ fn run() -> Result<()> {
     let extra_parts: Vec<&str> = config.partitions.iter().map(|s| s.as_str()).collect();
     all_partitions.extend(extra_parts);
 
-    // Iterate by reference using &active_modules
+    // [FIX] Iterate by reference using &active_modules
     for (module_id, content_path) in &active_modules {
         let mode = module_modes.get(module_id).map(|s| s.as_str()).unwrap_or("auto");
         if mode == "magic" {
@@ -483,7 +490,7 @@ fn run() -> Result<()> {
         }
     }
 
-    // Capture count before move
+    // [FIX] Capture count before move
     let magic_count = magic_mount_modules.len();
 
     // Phase B: Magic Mount
