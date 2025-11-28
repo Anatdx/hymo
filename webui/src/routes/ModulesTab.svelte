@@ -2,23 +2,34 @@
   import { store } from '../lib/store.svelte';
   import { ICONS } from '../lib/constants';
   import { onMount } from 'svelte';
+  import { slide } from 'svelte/transition';
   import Skeleton from '../components/Skeleton.svelte';
   import './ModulesTab.css';
 
   let searchQuery = $state('');
-  let filterType = $state('all'); // all, auto, magic
+  let filterType = $state('all'); 
+  let expandedMap = $state({}); // Track expanded modules by ID
 
   onMount(() => {
     store.loadModules();
   });
 
-  // Derived state for filtering modules
   let filteredModules = $derived(store.modules.filter(m => {
     const q = searchQuery.toLowerCase();
     const matchSearch = m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q);
     const matchFilter = filterType === 'all' || m.mode === filterType;
     return matchSearch && matchFilter;
   }));
+
+  function toggleExpand(id) {
+    if (expandedMap[id]) {
+      delete expandedMap[id];
+    } else {
+      expandedMap[id] = true;
+    }
+    // Re-assign to trigger reactivity in Svelte 5 rune
+    expandedMap = { ...expandedMap };
+  }
 </script>
 
 <div class="md3-card" style="padding: 16px;">
@@ -66,19 +77,28 @@
 {:else}
   <div class="rules-list">
     {#each filteredModules as mod (mod.id)}
-      <div class="rule-card">
-        <div class="rule-info">
-          <div style="display:flex; flex-direction:column;">
-            <span class="module-name">{mod.name}</span>
-            <span class="module-id">{mod.id}</span>
+      <div class="rule-card" class:expanded={expandedMap[mod.id]} onclick={() => toggleExpand(mod.id)}>
+        <div class="rule-main">
+          <div class="rule-info">
+            <div style="display:flex; flex-direction:column;">
+              <span class="module-name">{mod.name}</span>
+              <span class="module-id">{mod.id} <span style="opacity:0.6; margin-left: 8px;">{mod.version}</span></span>
+            </div>
+          </div>
+          <div class="text-field" style="margin-bottom:0; width: 140px; flex-shrink: 0;" onclick={(e) => e.stopPropagation()}>
+            <select bind:value={mod.mode}>
+              <option value="auto">{store.L.modules.modeAuto}</option>
+              <option value="magic">{store.L.modules.modeMagic}</option>
+            </select>
           </div>
         </div>
-        <div class="text-field" style="margin-bottom:0; width: 140px; flex-shrink: 0;">
-          <select bind:value={mod.mode}>
-            <option value="auto">{store.L.modules.modeAuto}</option>
-            <option value="magic">{store.L.modules.modeMagic}</option>
-          </select>
-        </div>
+        
+        {#if expandedMap[mod.id]}
+          <div class="rule-details" transition:slide={{ duration: 200 }}>
+            <p class="module-desc">{mod.description || 'No description'}</p>
+            <p class="module-meta">Author: {mod.author || 'Unknown'}</p>
+          </div>
+        {/if}
       </div>
     {/each}
   </div>
