@@ -132,8 +132,12 @@
     <svg viewBox="0 0 24 24" width="20" height="20"><path d={ICONS.copy} fill="currentColor"/></svg>
   </button>
   <div style="flex:1"></div>
-  <button class="btn-filled" onclick={() => refreshLogs(false)} disabled={store.loading.logs}>
-    <svg viewBox="0 0 24 24" width="18" height="18"><path d={ICONS.refresh} fill="currentColor"/></svg>
-    {store.L.logs.refresh}
+  <button 
+    class="btn-tonal" 
+    onclick={() => refreshLogs(false)} 
+    disabled={store.loading.logs}
+    title={store.L.logs.refresh}
+  >
+    <svg viewBox="0 0 24 24" width="20" height="20"><path d={ICONS.refresh} fill="currentColor"/></svg>
   </button>
 </div>

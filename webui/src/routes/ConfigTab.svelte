@@ -80,7 +80,14 @@
 </div>
 
 <div class="bottom-actions">
-  <button class="btn-tonal" onclick={() => store.loadConfig()} disabled={store.loading.config}>{store.L.config.reload}</button>
+  <button 
+    class="btn-tonal" 
+    onclick={() => store.loadConfig()} 
+    disabled={store.loading.config}
+    title={store.L.config.reload}
+  >
+    <svg viewBox="0 0 24 24" width="20" height="20"><path d={ICONS.refresh} fill="currentColor"/></svg>
+  </button>
   <button class="btn-filled" onclick={save} disabled={store.saving.config}>
     <svg viewBox="0 0 24 24" width="18" height="18"><path d={ICONS.save} fill="currentColor"/></svg>
     {store.saving.config ? store.L.common.saving : store.L.config.save}

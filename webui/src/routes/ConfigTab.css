@@ -52,7 +52,7 @@
   left: 4px;
 }
 
-/* Input Validation & Reset Button Styles (Added) */
+/* Input Validation & Reset Button Styles */
 .text-field.error input {
   border-color: var(--md-sys-color-error);
   color: var(--md-sys-color-error);

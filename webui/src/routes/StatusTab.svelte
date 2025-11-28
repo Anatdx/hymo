@@ -72,8 +72,13 @@
 </div>
 
 <div class="bottom-actions">
-  <button class="btn-filled" onclick={() => store.loadStatus()} disabled={store.loading.status}>
-    <svg viewBox="0 0 24 24" width="18" height="18"><path d={ICONS.refresh} fill="currentColor"/></svg>
-    {store.L.logs.refresh}
+  <div style="flex:1"></div>
+  <button 
+    class="btn-tonal" 
+    onclick={() => store.loadStatus()} 
+    disabled={store.loading.status}
+    title={store.L.logs.refresh}
+  >
+    <svg viewBox="0 0 24 24" width="20" height="20"><path d={ICONS.refresh} fill="currentColor"/></svg>
   </button>
 </div>
