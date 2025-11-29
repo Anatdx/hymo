@@ -121,7 +121,12 @@ fn run() -> Result<()> {
     if let Ok(entries) = fs::read_dir(&mnt_base) {
         for entry in entries.flatten() {
             if entry.path().is_dir() {
-                active_modules.insert(entry.file_name().to_string_lossy().to_string(), entry.path());
+                let name = entry.file_name().to_string_lossy().to_string();
+                // Filter out system directories like 'lost+found' (common in ext4)
+                // and our own directory to prevent miscounting modules
+                if name != "lost+found" && name != "meta-hybrid" {
+                    active_modules.insert(name, entry.path());
+                }
             }
         }
     }
