@@ -35,3 +35,6 @@ pub const MODULE_LKM_DIR: &str = "/data/adb/modules/meta-hybrid/lkm/binaries";
 
 // Module Prop Path (for dynamic description updates)
 pub const MODULE_PROP_FILE: &str = "/data/adb/modules/meta-hybrid/module.prop";
+
+// Standard Android partitions to check
+pub const BUILTIN_PARTITIONS: &[&str] = &["system", "vendor", "product", "system_ext", "odm", "oem"];
