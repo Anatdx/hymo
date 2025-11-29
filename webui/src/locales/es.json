@@ -19,7 +19,11 @@
     "moduleActive": "Activos",
     "modeStats": "Estadísticas",
     "modeAuto": "OverlayFS",
-    "modeMagic": "Magic Mount"
+    "modeMagic": "Magic Mount",
+    "sysInfoTitle": "Información del sistema",
+    "kernel": "Núcleo",
+    "selinux": "SELinux",
+    "mountBase": "Base de montaje"
   },
   "config": {
     "title": "Configuración",

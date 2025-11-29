@@ -92,6 +92,31 @@ export const API = {
     return { size: '-', used: '-', percent: '0%', type: null };
   },
 
+  getSystemInfo: async () => {
+    try {
+      // Execute multiple checks in one shell command to save overhead
+      const cmd = `
+        echo "KERNEL:$(uname -r)"
+        echo "SELINUX:$(getenforce)"
+        echo "MOUNT:$(cat "${PATHS.MOUNT_POINT_STATE}" 2>/dev/null || echo "Unknown")"
+      `;
+      const { errno, stdout } = await exec(cmd);
+      
+      if (errno === 0 && stdout) {
+        const info = { kernel: '-', selinux: '-', mountBase: '-' };
+        stdout.split('\n').forEach(line => {
+          if (line.startsWith('KERNEL:')) info.kernel = line.substring(7).trim();
+          else if (line.startsWith('SELINUX:')) info.selinux = line.substring(8).trim();
+          else if (line.startsWith('MOUNT:')) info.mountBase = line.substring(6).trim();
+        });
+        return info;
+      }
+    } catch (e) {
+      console.error("System info check failed:", e);
+    }
+    return { kernel: 'Unknown', selinux: 'Unknown', mountBase: 'Unknown' };
+  },
+
   fetchSystemColor: async () => {
     try {
       const { stdout } = await exec('settings get secure theme_customization_overlay_packages');

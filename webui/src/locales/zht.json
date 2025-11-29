@@ -19,7 +19,11 @@
     "moduleActive": "活躍模組",
     "modeStats": "模式統計",
     "modeAuto": "OverlayFS",
-    "modeMagic": "Magic Mount"
+    "modeMagic": "Magic Mount",
+    "sysInfoTitle": "系統資訊",
+    "kernel": "核心版本",
+    "selinux": "SELinux",
+    "mountBase": "掛載基點 (Mount Base)"
   },
   "config": {
     "title": "設定",

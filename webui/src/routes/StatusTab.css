@@ -98,7 +98,7 @@
   color: var(--md-sys-color-on-surface-variant);
 }
 
-/* Mode Distribution */
+/* Mode Distribution & System Info Card */
 .mode-card {
   background-color: var(--md-sys-color-surface-container-low);
   border-radius: 16px;
@@ -133,6 +133,46 @@
   color: var(--md-sys-color-on-surface);
 }
 
+/* System Info Grid */
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.info-item.full-width {
+  grid-column: 1 / -1;
+  padding-top: 8px;
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.info-label {
+  font-size: 11px;
+  color: var(--md-sys-color-on-surface-variant);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.info-val {
+  font-size: 14px;
+  color: var(--md-sys-color-on-surface);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.info-val.mono {
+  font-family: var(--md-ref-typeface-mono);
+  font-size: 12px;
+}
+
+/* Storage Type Badges */
 .storage-type-badge {
   font-size: 10px;
   padding: 2px 8px;

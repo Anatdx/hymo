@@ -11,6 +11,7 @@ export const store = $state({
   modules: [],
   logs: [],
   storage: { used: '-', size: '-', percent: '0%' },
+  systemInfo: { kernel: '-', selinux: '-', mountBase: '-' },
   
   // UI State
   loading: { config: false, modules: false, logs: false, status: false },
@@ -48,8 +49,8 @@ export const store = $state({
         common: { appName: "Hybrid Mount", saving: "...", theme: "Theme", language: "Language" },
         lang: { display: "English" },
         tabs: { status: "Status", config: "Config", modules: "Modules", logs: "Logs" },
-        status: { storageTitle: "Storage", storageDesc: "", moduleTitle: "Modules", moduleActive: "Active", modeStats: "Stats", modeAuto: "Auto", modeMagic: "Magic" },
-        config: { title: "Config", verboseLabel: "Verbose", verboseOff: "Off", verboseOn: "On", forceExt4: "Force Ext4", enableNuke: "Nuke LKM", moduleDir: "Dir", tempDir: "Temp", mountSource: "Source", logFile: "Log", partitions: "Partitions", autoPlaceholder: "Auto", reload: "Reload", save: "Save", reset: "Reset to Auto", invalidPath: "Invalid path detected", loadSuccess: "", loadError: "", loadDefault: "", saveSuccess: "", saveFailed: "" },
+        status: { storageTitle: "Storage", storageDesc: "", moduleTitle: "Modules", moduleActive: "Active", modeStats: "Stats", modeAuto: "Auto", modeMagic: "Magic", sysInfoTitle: "System Info", kernel: "Kernel", selinux: "SELinux", mountBase: "Mount Base" },
+        config: { title: "Config", verboseLabel: "Verbose", verboseOff: "Off", verboseOn: "On", forceExt4: "Force Ext4", enableNuke: "Nuke LKM", disableUmount: "Disable Umount", moduleDir: "Dir", tempDir: "Temp", mountSource: "Source", logFile: "Log", partitions: "Partitions", autoPlaceholder: "Auto", reload: "Reload", save: "Save", reset: "Reset to Auto", invalidPath: "Invalid path detected", loadSuccess: "", loadError: "", loadDefault: "", saveSuccess: "", saveFailed: "" },
         modules: { title: "Modules", desc: "", modeAuto: "Overlay", modeMagic: "Magic", scanning: "...", reload: "Refresh", save: "Save", empty: "Empty", scanError: "", saveSuccess: "", saveFailed: "", searchPlaceholder: "Search", filterLabel: "Filter", filterAll: "All" },
         logs: { title: "Logs", loading: "...", refresh: "Refresh", empty: "Empty", copy: "Copy", copySuccess: "Copied", copyFail: "Failed", searchPlaceholder: "Search", filterLabel: "Filter", levels: { all: "All", info: "Info", warn: "Warn", error: "Error" } }
     };
@@ -188,7 +189,15 @@ export const store = $state({
   async loadStatus() {
     this.loading.status = true;
     try {
-      this.storage = await API.getStorageUsage();
+      // Parallel fetch for speed
+      const [storageData, sysInfoData] = await Promise.all([
+        API.getStorageUsage(),
+        API.getSystemInfo()
+      ]);
+      
+      this.storage = storageData;
+      this.systemInfo = sysInfoData;
+
       if (this.modules.length === 0) {
         this.modules = await API.scanModules(this.config.moduledir);
       }

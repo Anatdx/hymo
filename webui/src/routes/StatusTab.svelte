@@ -49,6 +49,24 @@
   </div>
 
   <div class="mode-card">
+    <div class="storage-title" style="margin-bottom: 12px;">{store.L.status.sysInfoTitle}</div>
+    <div class="info-grid">
+      <div class="info-item">
+        <span class="info-label">{store.L.status.kernel}</span>
+        <span class="info-val">{store.systemInfo.kernel}</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">{store.L.status.selinux}</span>
+        <span class="info-val">{store.systemInfo.selinux}</span>
+      </div>
+      <div class="info-item full-width">
+        <span class="info-label">{store.L.status.mountBase}</span>
+        <span class="info-val mono">{store.systemInfo.mountBase}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="mode-card">
     <div class="storage-title" style="margin-bottom: 8px;">{store.L.status.modeStats}</div>
     
     <div class="mode-row">
