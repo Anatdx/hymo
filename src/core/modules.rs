@@ -1,10 +1,11 @@
-// meta-hybrid_mount/src/modules.rs
+// meta-hybrid_mount/src/core/modules.rs
 use std::fs;
 use std::io::{BufRead, BufReader};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use anyhow::Result;
 use serde::Serialize;
-use crate::{config, defs, utils, state};
+// Adjusted imports: state is now in core
+use crate::{conf::config, defs, utils, core::state};
 
 #[derive(Serialize)]
 struct ModuleInfo {
@@ -90,7 +91,6 @@ pub fn sync_active(source_dir: &Path, target_base: &Path) -> Result<()> {
     log::debug!("Found {} enabled modules to sync.", ids.len());
     
     // 1. Prune stale modules from storage (e.g. from modules.img)
-    // This fixes the issue where uninstalled/disabled modules persist in ext4 mode
     if target_base.exists() {
         for entry in fs::read_dir(target_base)? {
             let entry = entry?;

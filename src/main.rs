@@ -1,28 +1,32 @@
 // meta-hybrid_mount/src/main.rs
-mod cli;
-mod config;
+mod conf;
+mod core;
 mod defs;
-mod modules;
-mod nuke;
-mod storage;
+mod mount;
 mod utils;
-mod state;
-mod planner;
-mod executor;
-
-#[path = "magic_mount/mod.rs"]
-mod magic_mount;
-mod overlay_mount;
-
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::fs;
 use anyhow::Result;
 use clap::Parser;
 use rustix::mount::{unmount, UnmountFlags};
 use mimalloc::MiMalloc;
 
-use cli::{Cli, Commands};
-use config::{Config, CONFIG_FILE_DEFAULT};
-use state::RuntimeState;
+use conf::{
+    cli::{Cli, Commands},
+    config::{Config, CONFIG_FILE_DEFAULT},
+};
+use core::{
+    executor,
+    modules,
+    planner,
+    state::RuntimeState,
+    storage,
+};
+use mount::{
+    magic,
+    nuke,
+    overlay,
+};
 
 // Set mimalloc as the global allocator for better performance
 #[global_allocator]

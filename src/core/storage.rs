@@ -1,8 +1,9 @@
-// meta-hybrid_mount/src/storage.rs
+// meta-hybrid_mount/src/core/storage.rs
 use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use rustix::mount::{unmount, UnmountFlags};
-use crate::{defs, utils, state};
+// Adjusted imports
+use crate::{defs, utils, core::state};
 
 pub fn setup(mnt_dir: &Path, image_path: &Path, force_ext4: bool) -> Result<String> {
     log::info!("Setting up storage at {}", mnt_dir.display());
@@ -84,4 +85,3 @@ pub fn print_status() -> Result<()> {
     );
     Ok(())
 }
-    

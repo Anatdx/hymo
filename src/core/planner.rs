@@ -1,9 +1,10 @@
-// meta-hybrid_mount/src/planner.rs
+// meta-hybrid_mount/src/core/planner.rs
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use anyhow::Result;
-use crate::{config, defs};
+// Adjusted imports: config is in conf, defs is at root
+use crate::{conf::config, defs};
 
 #[derive(Debug)]
 pub struct OverlayOperation {

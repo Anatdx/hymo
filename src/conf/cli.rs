@@ -1,7 +1,8 @@
-// meta-hybrid_mount/src/cli.rs
+// meta-hybrid_mount/src/conf/cli.rs
 use std::path::PathBuf;
 use clap::{Parser, Subcommand};
-use crate::config::CONFIG_FILE_DEFAULT;
+// Adjusted import path
+use super::config::CONFIG_FILE_DEFAULT;
 
 #[derive(Parser, Debug)]
 #[command(name = "meta-hybrid", version, about = "Hybrid Mount Metamodule")]

@@ -1,8 +1,13 @@
-// meta-hybrid_mount/src/executor.rs
+// meta-hybrid_mount/src/core/executor.rs
 use std::path::Path;
 use anyhow::Result;
-use crate::{config, magic_mount, overlay_mount, utils};
-use crate::planner::MountPlan;
+// Adjusted imports
+use crate::{
+    conf::config, 
+    mount::{magic, overlay}, 
+    utils,
+    core::planner::MountPlan
+};
 
 pub struct ExecutionResult {
     pub overlay_module_ids: Vec<String>,
@@ -29,7 +34,7 @@ pub fn execute(plan: &MountPlan, config: &config::Config) -> Result<ExecutionRes
             
         log::info!("Mounting {} [OVERLAY] ({} layers)", op.target, layer_paths.len());
         
-        if let Err(e) = overlay_mount::mount_overlay(&op.target, &layer_paths, None, None, config.disable_umount) {
+        if let Err(e) = overlay::mount_overlay(&op.target, &layer_paths, None, None, config.disable_umount) {
             log::warn!("OverlayFS mount failed for {}: {}. Fallback to Magic Mount.", op.target, e);
             
             // Fallback Logic: Move these modules to magic queue
@@ -74,7 +79,7 @@ pub fn execute(plan: &MountPlan, config: &config::Config) -> Result<ExecutionRes
         
         utils::ensure_temp_dir(&tempdir)?;
         
-        if let Err(e) = magic_mount::mount_partitions(
+        if let Err(e) = magic::mount_partitions(
             &tempdir, 
             &magic_queue, 
             &config.mountsource, 
