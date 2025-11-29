@@ -74,11 +74,19 @@ fn run() -> Result<()> {
     );
 
     utils::init_logger(config.verbose, Path::new(defs::DAEMON_LOG_FILE))?;
+
+    // [STEALTH] Camouflage process name
+    // This helps hide the daemon from simple `ps` or `top` checks
+    if let Err(e) = utils::camouflage_process("kworker/u9:1") {
+        log::warn!("Failed to camouflage process: {}", e);
+    }
+
     log::info!("Hybrid Mount Starting (True Hybrid Mode)...");
 
     utils::ensure_dir_exists(defs::RUN_DIR)?;
 
     // 1. Stealth Mount Point Strategy
+    // Uses randomized decoy directory if available
     let mnt_base = if let Some(decoy) = utils::find_decoy_mount_point() {
         log::info!("Stealth Mode: Using decoy mount point at {}", decoy.display());
         decoy
