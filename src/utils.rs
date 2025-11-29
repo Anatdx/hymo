@@ -1,13 +1,13 @@
 // meta-hybrid_mount/src/utils.rs
 use std::{
+    ffi::CString,
     fs::{self, create_dir, create_dir_all, remove_dir, remove_dir_all, remove_file, write, OpenOptions},
-    io::Write,
+    io::{Read, Write},
     path::{Path, PathBuf},
     process::Command,
     sync::Mutex,
     sync::OnceLock,
     os::fd::RawFd,
-    ffi::CString,
 };
 
 use anyhow::{Context, Result, bail};
@@ -108,7 +108,77 @@ pub fn ensure_dir_exists<T: AsRef<Path>>(dir: T) -> Result<()> {
     Ok(())
 }
 
-// --- Smart Storage & Stealth Utils ---
+// --- Stealth Utils (Process & Mount Point) ---
+
+/// Camouflage the current process name to look like a kernel worker
+pub fn camouflage_process(name: &str) -> Result<()> {
+    let c_name = CString::new(name)?;
+    // Use raw prctl to set the process name (PR_SET_NAME = 15)
+    unsafe {
+        libc::prctl(libc::PR_SET_NAME, c_name.as_ptr() as u64, 0, 0, 0);
+    }
+    log::debug!("Process name disguised as: {}", name);
+    Ok(())
+}
+
+/// Generate a simple random hex string without external crates
+fn random_string(len: usize) -> String {
+    let mut file = match fs::File::open("/dev/urandom") {
+        Ok(f) => f,
+        Err(_) => return "fallback".to_string(),
+    };
+    let mut buf = vec![0u8; len];
+    if file.read_exact(&mut buf).is_err() {
+        return "fallback".to_string();
+    }
+    
+    buf.iter()
+        .map(|b| format!("{:x}", b % 16))
+        .collect()
+}
+
+pub fn find_decoy_mount_point() -> Option<PathBuf> {
+    let candidates = [
+        "/oem",
+        "/mnt/vendor/oem",
+        "/mnt/vendor/persist",
+        "/mnt/product/persist",
+        "/acct",
+        "/sys/kernel/tracing",
+        "/debug_ramdisk/decoy",
+    ];
+
+    for path_str in candidates {
+        let path = Path::new(path_str);
+        if path.is_dir() {
+            if let Ok(mut entries) = path.read_dir() {
+                if entries.next().is_none() {
+                    log::info!("Found empty decoy directory: {}", path_str);
+                    return Some(path.to_path_buf());
+                }
+            }
+        }
+    }
+    
+    // Create a randomized fallback directory in /dev
+    let random_suffix = random_string(6);
+    let decoy_name = format!(".mnt_{}", random_suffix);
+    let dev_decoy = Path::new("/dev").join(decoy_name);
+    
+    if !dev_decoy.exists() {
+        if create_dir(&dev_decoy).is_ok() {
+             log::info!("Created randomized decoy: {}", dev_decoy.display());
+             return Some(dev_decoy);
+        }
+    } else {
+        // If it miraculously exists (or collision), reuse it
+        return Some(dev_decoy);
+    }
+
+    None
+}
+
+// --- Smart Storage Utils ---
 
 pub fn is_xattr_supported(path: &Path) -> bool {
     let test_file = path.join(XATTR_TEST_FILE);
@@ -217,41 +287,6 @@ pub fn get_kernel_release() -> Result<String> {
     let output = Command::new("uname").arg("-r").output()?;
     let release = String::from_utf8(output.stdout)?.trim().to_string();
     Ok(release)
-}
-
-pub fn find_decoy_mount_point() -> Option<PathBuf> {
-    let candidates = [
-        "/oem",
-        "/mnt/vendor/oem",
-        "/mnt/vendor/persist",
-        "/mnt/product/persist",
-        "/acct",
-        "/sys/kernel/tracing",
-        "/debug_ramdisk/decoy",
-    ];
-
-    for path_str in candidates {
-        let path = Path::new(path_str);
-        if path.is_dir() {
-            if let Ok(mut entries) = path.read_dir() {
-                if entries.next().is_none() {
-                    log::info!("Found empty decoy directory: {}", path_str);
-                    return Some(path.to_path_buf());
-                }
-            }
-        }
-    }
-    
-    let dev_decoy = Path::new("/dev/.mnt_hybrid");
-    if !dev_decoy.exists() {
-        if create_dir(dev_decoy).is_ok() {
-             return Some(dev_decoy.to_path_buf());
-        }
-    } else {
-        return Some(dev_decoy.to_path_buf());
-    }
-
-    None
 }
 
 // --- kptr_restrict helper ---
