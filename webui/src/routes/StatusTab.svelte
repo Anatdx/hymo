@@ -2,16 +2,16 @@
   import { onMount } from 'svelte';
   import { store } from '../lib/store.svelte';
   import { ICONS } from '../lib/constants';
+  import { BUILTIN_PARTITIONS } from '../lib/constants_gen';
+  
   import './StatusTab.css';
 
   onMount(() => {
     store.loadStatus();
   });
 
-  // Base list of partitions to check against
-  const BASE_PARTITIONS = ['system', 'vendor', 'product', 'system_ext', 'odm', 'oem'];
-  // Combine with user configured partitions
-  let displayPartitions = $derived([...new Set([...BASE_PARTITIONS, ...store.config.partitions])]);
+  // Combine built-in partitions with user configured ones
+  let displayPartitions = $derived([...new Set([...BUILTIN_PARTITIONS, ...store.config.partitions])]);
 </script>
 
 <div class="dashboard-grid">
