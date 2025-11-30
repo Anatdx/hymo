@@ -4,7 +4,10 @@
     "appName": "Hybrid Mount",
     "saving": "保存中...",
     "theme": "テーマ切り替え",
-    "language": "言語"
+    "language": "言語",
+    "themeAuto": "自動 (システム)",
+    "themeLight": "ライトモード",
+    "themeDark": "ダークモード"
   },
   "tabs": {
     "status": "ステータス",

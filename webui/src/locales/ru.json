@@ -4,7 +4,10 @@
     "appName": "Hybrid Mount",
     "saving": "Сохранение...",
     "theme": "Тема",
-    "language": "Язык"
+    "language": "Язык",
+    "themeAuto": "Авто (Система)",
+    "themeLight": "Светлая тема",
+    "themeDark": "Темная тема"
   },
   "tabs": {
     "status": "Статус",

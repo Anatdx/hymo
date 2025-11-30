@@ -4,7 +4,10 @@
     "appName": "Hybrid Mount",
     "saving": "Guardando...",
     "theme": "Cambiar Tema",
-    "language": "Idioma"
+    "language": "Idioma",
+    "themeAuto": "Auto (Sistema)",
+    "themeLight": "Modo Claro",
+    "themeDark": "Modo Oscuro"
   },
   "tabs": {
     "status": "Estado",
