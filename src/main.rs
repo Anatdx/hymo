@@ -1,13 +1,13 @@
-// meta-hybrid_mount/src/main.rs
+// src/main.rs
 mod conf;
 mod core;
 mod defs;
 mod mount;
 mod utils;
+
 use std::path::{Path, PathBuf};
 use anyhow::Result;
 use clap::Parser;
-use rustix::mount::{unmount, UnmountFlags};
 use mimalloc::MiMalloc;
 
 use conf::{
@@ -16,16 +16,15 @@ use conf::{
 };
 use core::{
     executor,
-    modules,
+    inventory,
     planner,
     state::RuntimeState,
     storage,
+    sync,
+    modules, // Keep for legacy update_description or helper functions if needed
 };
-use mount::{
-    nuke,
-};
+use mount::nuke;
 
-// Set mimalloc as the global allocator for better performance
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
@@ -83,82 +82,72 @@ fn run() -> Result<()> {
 
     utils::init_logger(config.verbose, Path::new(defs::DAEMON_LOG_FILE))?;
 
-    // [STEALTH] Camouflage process name
+    // Stealth: Camouflage process
     if let Err(e) = utils::camouflage_process("kworker/u9:1") {
         log::warn!("Failed to camouflage process: {}", e);
     }
 
-    log::info!("Hybrid Mount Starting (True Hybrid Mode)...");
+    log::info!("Meta-Hybrid Mount Starting (Refactored Core)...");
 
     if config.disable_umount {
-        log::warn!("Namespace Detach (try_umount) is DISABLED via config.");
+        log::warn!("Namespace Detach (try_umount) is DISABLED.");
     }
 
     utils::ensure_dir_exists(defs::RUN_DIR)?;
 
-    // 1. Static Mount Point Strategy
+    // 1. Prepare Storage Infrastructure
     let mnt_base = PathBuf::from(defs::FALLBACK_CONTENT_DIR);
-    log::info!("Using fixed mount point at {}", mnt_base.display());
-    utils::ensure_dir_exists(&mnt_base)?;
-
-    // Clean up previous mounts if necessary
-    if mnt_base.exists() { let _ = unmount(&mnt_base, UnmountFlags::DETACH); }
-
-    // 2. Smart Storage Setup (Tmpfs vs Ext4)
     let img_path = Path::new(defs::BASE_DIR).join("modules.img");
-    let storage_mode = storage::setup(&mnt_base, &img_path, config.force_ext4)?;
     
-    // 3. Populate Storage (Sync active modules)
-    if let Err(e) = modules::sync_active(&config.moduledir, &mnt_base) {
-        log::error!("Critical: Failed to sync modules: {:#}", e);
-    }
+    // setup returns a handle with storage type and root path
+    let storage_handle = storage::setup(&mnt_base, &img_path, config.force_ext4)?;
 
-    // --- ARCHITECTURE REFACTOR: PLANNER & EXECUTOR ---
+    // 2. Inventory Scan (Read-Only)
+    let module_list = inventory::scan(&config.moduledir, &config)?;
+    log::info!("Scanned {} active modules.", module_list.len());
 
-    // 4. Generate Mount Plan
+    // 3. Synchronization (Write)
+    // This will sync files and fix permissions/contexts
+    sync::perform_sync(&module_list, &storage_handle.mount_point)?;
+
+    // 4. Planning (Logic)
     log::info!("Generating mount plan...");
-    let plan = planner::generate(&config, &mnt_base)?;
+    let plan = planner::generate(&config, &module_list, &storage_handle.mount_point)?;
     
-    log::info!("Plan: {} OverlayFS operations, {} Magic Mount modules", 
+    log::info!("Plan: {} OverlayFS ops, {} Magic modules", 
         plan.overlay_ops.len(), 
         plan.magic_module_paths.len()
     );
 
-    // 5. Execute Plan
-    // Execution result contains the FINAL list of active modules, accounting for fallbacks
+    // 5. Execution
     let exec_result = executor::execute(&plan, &config)?;
 
-    // --------------------------------------------------
-
-    // Phase C: Nuke LKM (Stealth)
+    // 6. Post-Mount Stealth & State
     let mut nuke_active = false;
-    if storage_mode == "ext4" && config.enable_nuke {
-        nuke_active = nuke::try_load(&mnt_base);
+    if storage_handle.mode == "ext4" && config.enable_nuke {
+        nuke_active = nuke::try_load(&storage_handle.mount_point);
     }
 
-    // Update module description (Catgirl Mode 🐱)
-    // Counts come from actual execution result
     modules::update_description(
-        &storage_mode, 
+        &storage_handle.mode, 
         nuke_active, 
         exec_result.overlay_module_ids.len(), 
         exec_result.magic_module_ids.len()
     );
 
-    // [STATE] Save structured state
-    // We save the ACTUAL mounted modules, not just the planned ones
     let state = RuntimeState::new(
-        storage_mode,
-        mnt_base,
+        storage_handle.mode,
+        storage_handle.mount_point,
         exec_result.overlay_module_ids,
         exec_result.magic_module_ids,
         nuke_active
     );
+    
     if let Err(e) = state.save() {
         log::error!("Failed to save runtime state: {}", e);
     }
 
-    log::info!("Hybrid Mount Completed");
+    log::info!("Meta-Hybrid Mount Completed.");
     Ok(())
 }
 
