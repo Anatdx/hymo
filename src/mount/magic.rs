@@ -22,7 +22,7 @@ use rustix::{
     },
 };
 
-use crate::utils::{ensure_dir_exists, lgetfilecon, lsetfilecon, send_unmountable, copy_path_context};
+use crate::utils::{ensure_dir_exists, lgetfilecon, lsetfilecon, send_unmountable};
 
 // --- Node Logic (Formerly node.rs) ---
 
@@ -431,8 +431,6 @@ fn prepare_tmpfs_dir<P: AsRef<Path>, WP: AsRef<Path>>(
 ) -> Result<()> {
     create_dir_all(work_dir_path.as_ref())?;
     
-    // Determine source metadata for the new tmpfs dir
-    // Priority: Real System Path > Module Path
     let (metadata, src_path) = if path.as_ref().exists() { 
         (path.as_ref().metadata()?, path.as_ref()) 
     } else { 
@@ -444,12 +442,7 @@ fn prepare_tmpfs_dir<P: AsRef<Path>, WP: AsRef<Path>>(
     unsafe {
         chown(work_dir_path.as_ref(), Some(Uid::from_raw(metadata.uid())), Some(Gid::from_raw(metadata.gid())))?;
     }
-    
-    // Use copy_path_context which now intelligently falls back if xattr read fails
-    // Here we strictly want to copy from src_path to work_dir_path
-    if let Err(e) = copy_path_context(src_path, work_dir_path.as_ref()) {
-        log::warn!("Failed to set SELinux context for tmpfs dir {}: {}", work_dir_path.as_ref().display(), e);
-    }
+    lsetfilecon(work_dir_path.as_ref(), lgetfilecon(src_path)?.as_str())?;
     
     mount_bind(work_dir_path.as_ref(), work_dir_path.as_ref())?;
     Ok(())
@@ -530,23 +523,13 @@ fn do_magic_mount<P: AsRef<Path>, WP: AsRef<Path>>(
                 } else if has_tmpfs {
                     if !work_dir_path.exists() {
                         create_dir(&work_dir_path)?;
-                        
-                        // INHERIT CONTEXT LOGIC
-                        let (metadata, src_path) = if path.exists() { 
-                            (path.metadata()?, path.as_path()) 
-                        } else { 
-                            (current.module_path.as_ref().unwrap().metadata()?, current.module_path.as_ref().unwrap().as_path()) 
-                        };
-                        
+                        let (metadata, src_path) = if path.exists() { (path.metadata()?, &path) } 
+                                                   else { (current.module_path.as_ref().unwrap().metadata()?, current.module_path.as_ref().unwrap()) };
                         chmod(&work_dir_path, Mode::from_raw_mode(metadata.mode()))?;
                         unsafe {
                             chown(&work_dir_path, Some(Uid::from_raw(metadata.uid())), Some(Gid::from_raw(metadata.gid())))?;
                         }
-                        
-                        // Use the new helper here too
-                        if let Err(e) = copy_path_context(src_path, &work_dir_path) {
-                             log::warn!("Failed to inherit context for child tmpfs dir {}: {}", work_dir_path.display(), e);
-                        }
+                        lsetfilecon(&work_dir_path, lgetfilecon(src_path)?.as_str())?;
                     }
                 }
             }

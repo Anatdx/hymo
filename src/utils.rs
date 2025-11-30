@@ -3,7 +3,7 @@ use std::{
     ffi::CString,
     fs::{self, create_dir_all, remove_dir_all, remove_file, write, OpenOptions},
     io::Write,
-    os::unix::fs::{PermissionsExt, symlink},
+    os::unix::fs::symlink,
     path::{Path, PathBuf},
     process::Command,
     sync::Mutex,
@@ -22,7 +22,7 @@ use extattr::{Flags as XattrFlags, lsetxattr};
 
 const SELINUX_XATTR: &str = "security.selinux";
 const XATTR_TEST_FILE: &str = ".xattr_test";
-const DEFAULT_CONTEXT: &str = "u:object_r:system_file:s0";
+const MODULE_CONTEXT: &str = "u:object_r:system_file:s0";
 
 // --- File Logger Implementation ---
 struct FileLogger {
@@ -85,6 +85,7 @@ pub fn lsetfilecon<P: AsRef<Path>>(path: P, con: &str) -> Result<()> {
     #[cfg(any(target_os = "linux", target_os = "android"))]
     {
         if let Err(e) = lsetxattr(&path, SELINUX_XATTR, con, XattrFlags::empty()) {
+            // Log debug but don't fail, some filesystems might not support it
             let io_err = std::io::Error::from(e);
             log::debug!("lsetfilecon: {} -> {} failed: {}", path.as_ref().display(), con, io_err);
         }
@@ -105,15 +106,6 @@ pub fn lgetfilecon<P: AsRef<Path>>(_path: P) -> Result<String> {
     unimplemented!()
 }
 
-pub fn copy_path_context<S: AsRef<Path>, D: AsRef<Path>>(src: S, dst: D) -> Result<()> {
-    let context = if src.as_ref().exists() {
-        lgetfilecon(&src).unwrap_or_else(|_| DEFAULT_CONTEXT.to_string())
-    } else {
-        DEFAULT_CONTEXT.to_string()
-    };
-    lsetfilecon(dst, &context)
-}
-
 pub fn ensure_dir_exists<T: AsRef<Path>>(dir: T) -> Result<()> {
     if !dir.as_ref().exists() {
         log::debug!("Creating directory: {}", dir.as_ref().display());
@@ -124,6 +116,7 @@ pub fn ensure_dir_exists<T: AsRef<Path>>(dir: T) -> Result<()> {
 
 // --- Stealth Utils (Process) ---
 
+/// Camouflage the current process name to look like a kernel worker
 pub fn camouflage_process(name: &str) -> Result<()> {
     let c_name = CString::new(name)?;
     unsafe {
@@ -172,13 +165,13 @@ pub fn mount_image(image_path: &Path, target: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Recursive copy implementation to replace `cp -af`
 fn native_cp_r(src: &Path, dst: &Path) -> Result<()> {
     if !dst.exists() {
         create_dir_all(dst)?;
         let src_meta = src.metadata()?;
         fs::set_permissions(dst, src_meta.permissions())?;
-        // Initial context, will be fixed by repair_contexts later
-        lsetfilecon(dst, DEFAULT_CONTEXT)?;
+        lsetfilecon(dst, MODULE_CONTEXT)?;
     }
 
     for entry in fs::read_dir(src)? {
@@ -192,15 +185,18 @@ fn native_cp_r(src: &Path, dst: &Path) -> Result<()> {
         } else if ft.is_symlink() {
             let link_target = fs::read_link(&src_path)?;
             if dst_path.exists() {
-                remove_file(&dst_path)?; 
+                remove_file(&dst_path)?; // overwrite symlinks
             }
             symlink(&link_target, &dst_path)?;
-            let _ = lsetfilecon(&dst_path, DEFAULT_CONTEXT);
+            // Symlinks don't strictly need xattr, but we try anyway (no-op on some fs)
+            let _ = lsetfilecon(&dst_path, MODULE_CONTEXT);
         } else {
+            // Regular file
             fs::copy(&src_path, &dst_path)?;
+            // Apply permissions and context
             let src_meta = src_path.metadata()?;
             fs::set_permissions(&dst_path, src_meta.permissions())?;
-            lsetfilecon(&dst_path, DEFAULT_CONTEXT)?;
+            lsetfilecon(&dst_path, MODULE_CONTEXT)?;
         }
     }
     Ok(())
@@ -209,6 +205,9 @@ fn native_cp_r(src: &Path, dst: &Path) -> Result<()> {
 pub fn sync_dir(src: &Path, dst: &Path) -> Result<()> {
     if !src.exists() { return Ok(()); }
     ensure_dir_exists(dst)?;
+
+    // Use native Rust copy instead of spawning `cp`
+    // This is faster (no fork/exec) and more robust
     native_cp_r(src, dst).with_context(|| {
         format!("Failed to natively sync {} to {}", src.display(), dst.display())
     })
@@ -230,10 +229,15 @@ pub fn ensure_temp_dir(temp_dir: &Path) -> Result<()> {
 }
 
 pub fn select_temp_dir() -> Result<PathBuf> {
+    // Instead of scanning random system directories like /dev or /sbin,
+    // we use a dedicated subdirectory within our own runtime folder.
+    // This is safer and cleaner (SSOT).
     let run_dir = Path::new(defs::RUN_DIR);
     ensure_dir_exists(run_dir)?;
+
     let work_dir = run_dir.join("workdir");
     log::debug!("Selected temp dir: {}", work_dir.display());
+    
     Ok(work_dir)
 }
 
@@ -243,6 +247,7 @@ pub fn get_kernel_release() -> Result<String> {
     Ok(release)
 }
 
+// --- kptr_restrict helper ---
 pub struct ScopedKptrRestrict {
     original: String,
 }
@@ -273,10 +278,14 @@ impl Drop for ScopedKptrRestrict {
     }
 }
 
+// --- KSU Calls & Ioctl Logic ---
+
 const KSU_INSTALL_MAGIC1: u32 = 0xDEADBEEF;
 const KSU_INSTALL_MAGIC2: u32 = 0xCAFEBABE;
-const KSU_IOCTL_NUKE_EXT4_SYSFS: u32 = 0x40004b11; 
-const KSU_IOCTL_ADD_TRY_UMOUNT: u32 = 0x40004b12; 
+
+// IOCTL Commands (from ksucalls.rs)
+const KSU_IOCTL_NUKE_EXT4_SYSFS: u32 = 0x40004b11; // _IOC(_IOC_WRITE, 'K', 17, 0)
+const KSU_IOCTL_ADD_TRY_UMOUNT: u32 = 0x40004b12; // _IOC(_IOC_WRITE, 'K', 18, 0)
 
 static DRIVER_FD: OnceLock<RawFd> = OnceLock::new();
 
@@ -313,6 +322,7 @@ where
 {
     let path_ref = target.as_ref();
     let path_str = path_ref.as_str().unwrap_or_default(); 
+    
     if path_str.is_empty() { return Ok(()); }
 
     let path = CString::new(path_str)?;
@@ -322,14 +332,17 @@ where
         mode: 1,
     };
     let fd = *DRIVER_FD.get_or_init(grab_fd);
+
     if fd < 0 { return Ok(()); }
 
     unsafe {
         #[cfg(target_env = "gnu")]
         let _ = libc::ioctl(fd as libc::c_int, KSU_IOCTL_ADD_TRY_UMOUNT as u64, &cmd);
+
         #[cfg(not(target_env = "gnu"))]
         let _ = libc::ioctl(fd as libc::c_int, KSU_IOCTL_ADD_TRY_UMOUNT as i32, &cmd);
     };
+
     Ok(())
 }
 
@@ -338,16 +351,19 @@ pub fn send_unmountable<P>(_target: P) -> Result<()> {
     Ok(())
 }
 
+// SukiSU-Ultra style nuke_ext4_sysfs via ioctl
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub fn ksu_nuke_sysfs(target: &str) -> Result<()> {
     let c_path = CString::new(target)?;
     let cmd = NukeExt4SysfsCmd {
         arg: c_path.as_ptr() as u64,
     };
+    
     let fd = *DRIVER_FD.get_or_init(grab_fd);
     if fd < 0 {
         bail!("KSU driver not available");
     }
+
     let ret = unsafe {
         #[cfg(target_env = "gnu")]
         let r = libc::ioctl(fd as libc::c_int, KSU_IOCTL_NUKE_EXT4_SYSFS as u64, &cmd);
@@ -355,9 +371,11 @@ pub fn ksu_nuke_sysfs(target: &str) -> Result<()> {
         let r = libc::ioctl(fd as libc::c_int, KSU_IOCTL_NUKE_EXT4_SYSFS as i32, &cmd);
         r
     };
+
     if ret != 0 {
         bail!("ioctl failed with code {}", ret);
     }
+
     Ok(())
 }
 
