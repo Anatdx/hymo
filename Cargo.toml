@@ -13,7 +13,7 @@ clap = { version = "4", features = ["derive"] }
 extattr = "1"
 # Log facade is kept for compatibility with dependencies using log
 log = "0.4"
-rustix = { version = "1.0", features = ["fs", "mount", "process", "thread", "param"] }
+rustix = { version = "0.38", features = ["fs", "mount", "process", "thread", "param"] }
 libc = "0.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -31,7 +31,7 @@ tracing-log = "0.2" # Captures logs from 'log' crate macros
 
 # Android specific
 [target.aarch64-linux-android.dependencies]
-android_logger = "0.15"
+android_logger = "0.13"
 
 [profile.release]
 overflow-checks = false
