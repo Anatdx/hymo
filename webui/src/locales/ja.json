@@ -24,7 +24,8 @@
     "kernel": "カーネル",
     "selinux": "SELinux",
     "mountBase": "マウントベース",
-    "activePartitions": "アクティブパーティション"
+    "activePartitions": "アクティブパーティション",
+    "conflictsTitle": "ファイルの競合を検出"
   },
   "config": {
     "title": "設定",

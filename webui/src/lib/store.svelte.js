@@ -2,6 +2,7 @@ import { API } from './api';
 import { DEFAULT_CONFIG, DEFAULT_SEED } from './constants';
 import { Monet } from './theme';
 
+// Load all locale JSONs eagerly to avoid conflict with NavBar and simplify sync access
 const localeModules = import.meta.glob('../locales/*.json', { eager: true });
 
 // Global state using Svelte 5 Runes
@@ -10,7 +11,7 @@ export const store = $state({
   modules: [],
   logs: [],
   storage: { used: '-', size: '-', percent: '0%' },
-  systemInfo: { kernel: '-', selinux: '-', mountBase: '-' },
+  systemInfo: { kernel: '-', selinux: '-', mountBase: '-', conflicts: [] },
   activePartitions: [], // List of currently mounted partitions
   
   // UI State
@@ -22,7 +23,7 @@ export const store = $state({
   theme: 'dark',
   lang: 'en',
   seed: DEFAULT_SEED,
-  loadedLocale: null, // Stores the content of the loaded JSON
+  loadedLocale: null,
 
   // Computed: Available languages list for UI
   get availableLanguages() {
@@ -49,7 +50,7 @@ export const store = $state({
         common: { appName: "Hybrid Mount", saving: "...", theme: "Theme", language: "Language" },
         lang: { display: "English" },
         tabs: { status: "Status", config: "Config", modules: "Modules", logs: "Logs" },
-        status: { storageTitle: "Storage", storageDesc: "", moduleTitle: "Modules", moduleActive: "Active", modeStats: "Stats", modeAuto: "Auto", modeMagic: "Magic", sysInfoTitle: "System Info", kernel: "Kernel", selinux: "SELinux", mountBase: "Mount Base", activePartitions: "Active Partitions" },
+        status: { storageTitle: "Storage", storageDesc: "", moduleTitle: "Modules", moduleActive: "Active", modeStats: "Stats", modeAuto: "Auto", modeMagic: "Magic", sysInfoTitle: "System Info", kernel: "Kernel", selinux: "SELinux", mountBase: "Mount Base", activePartitions: "Active Partitions", conflictsTitle: "File Conflicts" },
         config: { title: "Config", verboseLabel: "Verbose", verboseOff: "Off", verboseOn: "On", forceExt4: "Force Ext4", enableNuke: "Nuke LKM", disableUmount: "Disable Umount", moduleDir: "Dir", tempDir: "Temp", mountSource: "Source", logFile: "Log", partitions: "Partitions", autoPlaceholder: "Auto", reload: "Reload", save: "Save", reset: "Reset to Auto", invalidPath: "Invalid path detected", loadSuccess: "", loadError: "", loadDefault: "", saveSuccess: "", saveFailed: "" },
         modules: { title: "Modules", desc: "", modeAuto: "Overlay", modeMagic: "Magic", scanning: "...", reload: "Refresh", save: "Save", empty: "Empty", scanError: "", saveSuccess: "", saveFailed: "", searchPlaceholder: "Search", filterLabel: "Filter", filterAll: "All" },
         logs: { title: "Logs", loading: "...", refresh: "Refresh", empty: "Empty", copy: "Copy", copySuccess: "Copied", copyFail: "Failed", searchPlaceholder: "Search", filterLabel: "Filter", levels: { all: "All", info: "Info", warn: "Warn", error: "Error" } }

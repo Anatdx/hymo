@@ -4,6 +4,59 @@
   gap: 16px;
 }
 
+/* Conflict Card Styles */
+.conflict-card {
+  background-color: var(--md-sys-color-error-container) !important;
+  color: var(--md-sys-color-on-error-container);
+  border: 1px solid var(--md-sys-color-error);
+}
+
+.conflict-title {
+  color: var(--md-sys-color-on-error-container) !important;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: bold;
+}
+
+.conflict-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.conflict-item {
+  background-color: rgba(255, 255, 255, 0.5);
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 12px;
+}
+
+.conflict-path {
+  font-family: var(--md-ref-typeface-mono);
+  word-break: break-all;
+  margin-bottom: 4px;
+  color: #000; /* Force black for readability on error container */
+  opacity: 0.8;
+}
+
+.conflict-modules {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.module-tag {
+  background-color: var(--md-sys-color-error);
+  color: var(--md-sys-color-on-error);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+}
+
 /* Storage Card Styles */
 .storage-card {
   background-color: var(--md-sys-color-primary-container);
@@ -133,7 +186,7 @@
   color: var(--md-sys-color-on-surface);
 }
 
-/* System Info Grid */
+/* System Info Grid - Updated for Vertical Stack */
 .info-grid {
   display: flex;
   flex-direction: column;

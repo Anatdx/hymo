@@ -15,6 +15,26 @@
 </script>
 
 <div class="dashboard-grid">
+  {#if store.systemInfo.conflicts && store.systemInfo.conflicts.length > 0}
+    <div class="mode-card conflict-card">
+      <div class="storage-title conflict-title">
+        ⚠️ {store.L.status.conflictsTitle}
+      </div>
+      <div class="conflict-list">
+        {#each store.systemInfo.conflicts as conflict}
+          <div class="conflict-item">
+            <div class="conflict-path">{conflict.path}</div>
+            <div class="conflict-modules">
+              {#each conflict.modules as mod}
+                <span class="module-tag">{mod}</span>
+              {/each}
+            </div>
+          </div>
+        {/each}
+      </div>
+    </div>
+  {/if}
+
   <div class="storage-card">
     <div class="storage-header">
       <div style="display:flex; align-items:center; gap:8px;">
