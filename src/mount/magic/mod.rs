@@ -237,7 +237,7 @@ fn prepare_tmpfs_dir<P: AsRef<Path>, WP: AsRef<Path>>(
 fn mount_directory_children<P: AsRef<Path>, WP: AsRef<Path>>(
     path: P,
     work_dir_path: WP,
-    mut node: Node,
+    node: Node, // Removed `mut` here
     has_tmpfs: bool,
     disable_umount: bool,
 ) -> Result<()> {
@@ -255,7 +255,7 @@ fn mount_directory_children<P: AsRef<Path>, WP: AsRef<Path>>(
 
     // 2. Mount/Process children defined in the module
     // We iterate over the node's children (consuming the map)
-    for (name, mut child_node) in node.children {
+    for (_name, child_node) in node.children { // Changed name to _name, removed mut from child_node
         // NOTE: The original code logic for skipping children in 'should_create_tmpfs'
         // was inline. Here we assume 'should_create_tmpfs' logic is sufficient to decide
         // the 'has_tmpfs' flag for this directory, and we pass that down.
@@ -295,7 +295,7 @@ fn finalize_tmpfs_overlay<P: AsRef<Path>, WP: AsRef<Path>>(
 fn do_magic_mount<P: AsRef<Path>, WP: AsRef<Path>>(
     path: P,
     work_dir_path: WP,
-    mut current: Node,
+    current: Node, // Removed `mut` here
     has_tmpfs: bool,
     disable_umount: bool,
 ) -> Result<()> {
@@ -311,7 +311,16 @@ fn do_magic_mount<P: AsRef<Path>, WP: AsRef<Path>>(
             mount_symlink(&work_dir_path, &current)?;
         }
         NodeFileType::Directory => {
+            // Determine if we need to escalate to tmpfs for this directory
+            // Note: If 'has_tmpfs' is already true from parent, we stick with it.
             let create_tmpfs = !has_tmpfs && should_create_tmpfs(&current, &path, false);
+            
+            // If we detected a need for tmpfs but failed (e.g. no source), 
+            // should_create_tmpfs might have logged error.
+            // But we might still need to process children if it returned true?
+            // Actually, in the original code, it iterated children to decide.
+            // Here we re-check skipping children inside 'mount_directory_children'.
+            
             let effective_tmpfs = has_tmpfs || create_tmpfs;
 
             if effective_tmpfs {

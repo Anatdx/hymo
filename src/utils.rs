@@ -1,9 +1,9 @@
 // meta-hybrid_mount/src/utils.rs
 use std::{
     ffi::CString,
-    fs::{self, create_dir, create_dir_all, remove_dir, remove_dir_all, remove_file, write, OpenOptions},
+    fs::{self, create_dir_all, remove_dir_all, remove_file, write, OpenOptions},
     io::Write,
-    os::unix::fs::{PermissionsExt, MetadataExt, symlink},
+    os::unix::fs::{PermissionsExt, symlink},
     path::{Path, PathBuf},
     process::Command,
     sync::Mutex,
@@ -165,6 +165,7 @@ pub fn mount_image(image_path: &Path, target: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Recursive copy implementation to replace `cp -af`
 fn native_cp_r(src: &Path, dst: &Path) -> Result<()> {
     if !dst.exists() {
         create_dir_all(dst)?;
@@ -184,12 +185,15 @@ fn native_cp_r(src: &Path, dst: &Path) -> Result<()> {
         } else if ft.is_symlink() {
             let link_target = fs::read_link(&src_path)?;
             if dst_path.exists() {
-                remove_file(&dst_path)?;
+                remove_file(&dst_path)?; // overwrite symlinks
             }
             symlink(&link_target, &dst_path)?;
+            // Symlinks don't strictly need xattr, but we try anyway (no-op on some fs)
             let _ = lsetfilecon(&dst_path, MODULE_CONTEXT);
         } else {
+            // Regular file
             fs::copy(&src_path, &dst_path)?;
+            // Apply permissions and context
             let src_meta = src_path.metadata()?;
             fs::set_permissions(&dst_path, src_meta.permissions())?;
             lsetfilecon(&dst_path, MODULE_CONTEXT)?;
@@ -201,6 +205,9 @@ fn native_cp_r(src: &Path, dst: &Path) -> Result<()> {
 pub fn sync_dir(src: &Path, dst: &Path) -> Result<()> {
     if !src.exists() { return Ok(()); }
     ensure_dir_exists(dst)?;
+
+    // Use native Rust copy instead of spawning `cp`
+    // This is faster (no fork/exec) and more robust
     native_cp_r(src, dst).with_context(|| {
         format!("Failed to natively sync {} to {}", src.display(), dst.display())
     })
@@ -222,6 +229,9 @@ pub fn ensure_temp_dir(temp_dir: &Path) -> Result<()> {
 }
 
 pub fn select_temp_dir() -> Result<PathBuf> {
+    // Instead of scanning random system directories like /dev or /sbin,
+    // we use a dedicated subdirectory within our own runtime folder.
+    // This is safer and cleaner (SSOT).
     let run_dir = Path::new(defs::RUN_DIR);
     ensure_dir_exists(run_dir)?;
 
