@@ -1,6 +1,6 @@
 {
-  "version": "v0.2.8-r8-g88da6bd",
-  "versionCode": 38,
-  "zipUrl": "https://github.com/YuzakiKokuban/meta-hybrid_mount/releases/download/v0.2.8-r8/meta-hybrid-v0.2.8-r8-g88da6bd.zip",
-  "changelog": "https://raw.githubusercontent.com/YuzakiKokuban/meta-hybrid_mount/master/changelog.md"
+  "version": "v0.3.0",
+  "versionCode": 1,
+  "zipUrl": "https://github.com/Anatdx/hymo/releases/download/v0.3.0/hymo-v0.3.0.zip",
+  "changelog": "https://raw.githubusercontent.com/Anatdx/hymo/master/changelog.md"
 }
