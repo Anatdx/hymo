@@ -1,6 +1,6 @@
-// Import generated paths from Rust source (SSOT)
-// This file is created by 'cargo xtask build'
-import { RUST_PATHS } from './constants_gen.js';
+// Import generated paths from C++ source (SSOT)
+// This file is synced with src/defs.hpp
+import { C_PATHS } from './constants_gen.js';
 
 // Default configuration values
 // Note: While paths are synced, defaults like 'verbose' are still defined here for UI initialization
@@ -8,7 +8,7 @@ export const DEFAULT_CONFIG = {
   moduledir: '/data/adb/modules',
   tempdir: '',
   mountsource: 'KSU',
-  logfile: RUST_PATHS.DAEMON_LOG || '/data/adb/hymo/daemon.log',
+  logfile: C_PATHS.DAEMON_LOG || '/data/adb/hymo/daemon.log',
   verbose: false,
   partitions: [],
   force_ext4: false,
@@ -18,7 +18,7 @@ export const DEFAULT_CONFIG = {
 
 // File system paths
 export const PATHS = {
-  ...RUST_PATHS,
+  ...C_PATHS,
   BINARY: '/data/adb/modules/hymo/hymo'
 };
 
