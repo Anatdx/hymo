@@ -18,12 +18,14 @@
 
 ## **Core Architecture**
 
+### This project is based on [Meta-Hybrid Mount](https://github.com/YuzakiKokuban/meta-hybrid_mount), with core code refactored in C++
+
 * **True Hybrid Engine**:
-  * **Logic**: Rewritten in C++ with direct Linux syscalls (fsopen, fsconfig, fsmount) for robust OverlayFS support.
+  * **Implementation**: Written in C++ with direct Linux syscalls (fsopen, fsconfig, fsmount) for robust OverlayFS support.
   * **Mechanism**: Intelligently mixes **OverlayFS** and **Magic Mount**. It prioritizes OverlayFS for performance but automatically falls back to Magic Mount for specific modules or partitions if needed.
   * **Compatibility**: Fully supports modern Android partition layouts, including resolving symlinked partitions (e.g., `/vendor` -> `/system/vendor`) to ensure OverlayFS works correctly on Treble devices.
 
-* **Smart Sync (New)**:
+* **Smart Sync**:
   * **Performance**: Implements an incremental synchronization strategy on boot. Instead of wiping and re-copying everything, it checks for changes in `module.prop`.
   * **Speed**: Only modified or new modules are synced, drastically reducing boot time I/O overhead.
 

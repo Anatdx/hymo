@@ -12,7 +12,7 @@
 namespace hymo {
 
 static bool try_setup_tmpfs(const fs::path& target) {
-    LOG_INFO("Attempting Tmpfs mode...");
+    LOG_DEBUG("Attempting Tmpfs mode...");
     
     if (!mount_tmpfs(target)) {
         LOG_WARN("Tmpfs mount failed. Falling back to Image.");
@@ -30,7 +30,7 @@ static bool try_setup_tmpfs(const fs::path& target) {
 }
 
 static std::string setup_ext4_image(const fs::path& target, const fs::path& image_path) {
-    LOG_INFO("Falling back to Ext4 Image mode...");
+    LOG_DEBUG("Falling back to Ext4 Image mode...");
     
     if (!fs::exists(image_path)) {
         throw std::runtime_error("modules.img not found at " + image_path.string());
@@ -41,7 +41,7 @@ static std::string setup_ext4_image(const fs::path& target, const fs::path& imag
     }
     
     // Repair root permissions
-    LOG_INFO("Repairing storage root permissions...");
+    LOG_DEBUG("Repairing storage root permissions...");
     
     // chmod 0755
     chmod(target.c_str(), 0755);
@@ -57,7 +57,7 @@ static std::string setup_ext4_image(const fs::path& target, const fs::path& imag
 }
 
 StorageHandle setup_storage(const fs::path& mnt_dir, const fs::path& image_path, bool force_ext4) {
-    LOG_INFO("Setting up storage at " + mnt_dir.string());
+    LOG_DEBUG("Setting up storage at " + mnt_dir.string());
     
     // Clean up previous mounts
     if (fs::exists(mnt_dir)) {

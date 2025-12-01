@@ -3,6 +3,7 @@
 #include "../defs.hpp"
 #include "../utils.hpp"
 #include <fstream>
+#include <sstream>
 #include <iostream>
 
 namespace hymo {
@@ -54,6 +55,19 @@ Config Config::from_file(const fs::path& path) {
             else if (key == "force_ext4") config.force_ext4 = (value == "true");
             else if (key == "disable_umount") config.disable_umount = (value == "true");
             else if (key == "enable_nuke") config.enable_nuke = (value == "true");
+            else if (key == "partitions") {
+                // Parse comma-separated partitions
+                std::stringstream ss(value);
+                std::string part;
+                while (std::getline(ss, part, ',')) {
+                    // Trim whitespace
+                    part.erase(0, part.find_first_not_of(" \t"));
+                    part.erase(part.find_last_not_of(" \t") + 1);
+                    if (!part.empty()) {
+                        config.partitions.push_back(part);
+                    }
+                }
+            }
         }
     }
     
@@ -77,6 +91,16 @@ bool Config::save_to_file(const fs::path& path) const {
     file << "force_ext4 = " << (force_ext4 ? "true" : "false") << "\n";
     file << "disable_umount = " << (disable_umount ? "true" : "false") << "\n";
     file << "enable_nuke = " << (enable_nuke ? "true" : "false") << "\n";
+    
+    // Write partitions
+    if (!partitions.empty()) {
+        file << "partitions = \"";
+        for (size_t i = 0; i < partitions.size(); ++i) {
+            file << partitions[i];
+            if (i < partitions.size() - 1) file << ",";
+        }
+        file << "\"\n";
+    }
     
     return true;
 }

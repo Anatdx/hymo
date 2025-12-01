@@ -18,6 +18,8 @@
 
 ## **核心架构**
 
+### 本项目基于[Meta-Hybrid Mount](https://github.com/YuzakiKokuban/meta-hybrid_mount)修改而来，使用C++重构了核心代码
+
 * **真·混合引擎**:
   * **实现**: 使用 C++ 编写，通过直接 Linux 系统调用（fsopen、fsconfig、fsmount）实现强大的 OverlayFS 支持。
   * **机制**: 智能结合 **OverlayFS** 和 **Magic Mount**。优先使用 OverlayFS 以保证性能，对于不支持的情况或特定模块配置，自动回退到 Magic Mount。

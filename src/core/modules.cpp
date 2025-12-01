@@ -28,9 +28,9 @@ static bool has_files_recursive(const fs::path& path) {
     return false;
 }
 
-// Helper: Check if module has content for any builtin partition
-static bool has_content(const fs::path& module_path) {
-    for (const auto& partition : BUILTIN_PARTITIONS) {
+// Helper: Check if module has content for any partition (builtin or extra)
+static bool has_content(const fs::path& module_path, const std::vector<std::string>& all_partitions) {
+    for (const auto& partition : all_partitions) {
         fs::path part_path = module_path / partition;
         if (has_files_recursive(part_path)) {
             return true;
@@ -40,6 +40,7 @@ static bool has_content(const fs::path& module_path) {
 }
 
 void update_module_description(
+    bool success,
     const std::string& storage_mode,
     bool nuke_active,
     size_t overlay_count,
@@ -51,14 +52,13 @@ void update_module_description(
     }
     
     std::ostringstream desc;
-    desc << "Hymo";
+    desc << (success ? "😋" : "😭") << " Hymo";
     if (nuke_active) {
         desc << " 🐾";
     }
     desc << " | ";
     desc << "Storage: " << storage_mode << " | ";
-    desc << "Overlay: " << overlay_count << " | ";
-    desc << "Magic: " << magic_count;
+    desc << "Modules: " << overlay_count << " Overlay + " << magic_count << " Magic";
     
     // Read current file
     std::ifstream infile(MODULE_PROP_FILE);
@@ -85,16 +85,22 @@ void update_module_description(
     outfile << content;
     outfile.close();
     
-    LOG_INFO("Updated module description");
+    LOG_DEBUG("Updated module description");
 }
 
 void print_module_list(const Config& config) {
     auto modules = scan_modules(config.moduledir, config);
     
-    // Filter modules with actual content
+    // Build complete partition list (builtin + extra)
+    std::vector<std::string> all_partitions = BUILTIN_PARTITIONS;
+    for (const auto& part : config.partitions) {
+        all_partitions.push_back(part);
+    }
+    
+    // Filter modules with actual content (including extra partitions)
     std::vector<Module> filtered_modules;
     for (const auto& module : modules) {
-        if (has_content(module.source_path)) {
+        if (has_content(module.source_path, all_partitions)) {
             filtered_modules.push_back(module);
         }
     }

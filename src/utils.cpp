@@ -33,6 +33,11 @@ void Logger::init(bool verbose, const fs::path& log_path) {
 }
 
 void Logger::log(const std::string& level, const std::string& message) {
+    // Skip DEBUG messages if not in verbose mode
+    if (level == "DEBUG" && !verbose_) {
+        return;
+    }
+    
     auto now = std::time(nullptr);
     char time_buf[64];
     std::strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M:%S", std::localtime(&now));
@@ -124,8 +129,39 @@ bool mount_image(const fs::path& image_path, const fs::path& target) {
         return false;
     }
     
-    if (mount(image_path.c_str(), target.c_str(), "ext4", MS_NOATIME, "loop,rw") != 0) {
-        LOG_ERROR("Failed to mount image " + image_path.string() + ": " + strerror(errno));
+    // Setup loop device first
+    std::string losetup_cmd = "losetup -f " + image_path.string();
+    int ret = system(losetup_cmd.c_str());
+    if (ret != 0) {
+        LOG_ERROR("Failed to setup loop device for " + image_path.string());
+        return false;
+    }
+    
+    // Find the loop device
+    std::string find_cmd = "losetup -j " + image_path.string() + " | cut -d: -f1";
+    FILE* pipe = popen(find_cmd.c_str(), "r");
+    if (!pipe) {
+        LOG_ERROR("Failed to find loop device");
+        return false;
+    }
+    
+    char loop_dev[256];
+    if (!fgets(loop_dev, sizeof(loop_dev), pipe)) {
+        pclose(pipe);
+        LOG_ERROR("No loop device found for " + image_path.string());
+        return false;
+    }
+    pclose(pipe);
+    
+    // Remove trailing newline
+    size_t len = strlen(loop_dev);
+    if (len > 0 && loop_dev[len-1] == '\n') {
+        loop_dev[len-1] = '\0';
+    }
+    
+    // Mount the loop device
+    if (mount(loop_dev, target.c_str(), "ext4", MS_NOATIME, "") != 0) {
+        LOG_ERROR("Failed to mount image " + image_path.string() + " via " + loop_dev + ": " + strerror(errno));
         return false;
     }
     

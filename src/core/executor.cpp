@@ -35,7 +35,7 @@ ExecutionResult execute_plan(const MountPlan& plan, const Config& config) {
             lowerdir_strings.push_back(p.string());
         }
         
-        LOG_INFO("Mounting " + op.target + " [OVERLAY] (" + std::to_string(lowerdir_strings.size()) + " layers)");
+        LOG_DEBUG("Mounting " + op.target + " [OVERLAY] (" + std::to_string(lowerdir_strings.size()) + " layers)");
         
         if (!mount_overlay(op.target, lowerdir_strings, std::nullopt, std::nullopt, config.disable_umount)) {
             LOG_WARN("OverlayFS failed for " + op.target + ". Triggering fallback.");

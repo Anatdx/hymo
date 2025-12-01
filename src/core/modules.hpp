@@ -7,6 +7,7 @@
 namespace hymo {
 
 void update_module_description(
+    bool success,
     const std::string& storage_mode,
     bool nuke_active,
     size_t overlay_count,

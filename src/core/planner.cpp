@@ -62,12 +62,16 @@ MountPlan generate_plan(
             continue;
         }
         
+        // Check if module has any meaningful content (including extra partitions)
+        if (!has_meaningful_content(content_path, target_partitions)) {
+            LOG_DEBUG("Planner: Module " + module.id + " content missing, skipping");
+            continue;
+        }
+        
         if (module.mode == "magic") {
             // Force Magic Mount
-            if (has_meaningful_content(content_path, target_partitions)) {
-                magic_paths.insert(content_path);
-                magic_ids.insert(module.id);
-            }
+            magic_paths.insert(content_path);
+            magic_ids.insert(module.id);
         } else {
             // Try OverlayFS ("auto" mode)
             bool participates_in_overlay = false;

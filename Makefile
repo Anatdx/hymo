@@ -29,9 +29,23 @@ SRC_FILES := $(SRC_DIR)/main.cpp \
              $(SRC_DIR)/mount/overlay.cpp \
              $(SRC_DIR)/mount/magic.cpp
 
-.PHONY: all clean distclean zip install help check webui arm64 armv7 x86_64 x86
+.PHONY: all clean distclean zip install help check webui arm64 armv7 x86_64 x86 testbuild testziptest
 
 all: check webui arm64 armv7 x86_64 x86
+
+testbuild: check webui arm64
+
+testzip: testbuild
+	@echo ""
+	@echo "📦 Creating test package (arm64 only)..."
+	@rm -rf $(BUILD_DIR)
+	@mkdir -p $(BUILD_DIR)
+	@cp -r $(MODULE_DIR)/* $(BUILD_DIR)/
+	@cp $(OUTPUT_DIR)/hymo-arm64-v8a $(BUILD_DIR)/
+	@chmod 755 $(BUILD_DIR)/hymo-arm64-v8a
+	@cd $(BUILD_DIR) && zip -r ../$(OUTPUT_DIR)/$(MODULE_ID)-$(VERSION).zip * >/dev/null
+	@echo "✅ Test package: $(OUTPUT_DIR)/$(MODULE_ID)-$(VERSION).zip"
+	@ls -lh $(OUTPUT_DIR)/$(MODULE_ID)-$(VERSION).zip
 
 check:
 	@echo "🔍 Checking build environment..."
@@ -102,6 +116,8 @@ help:
 	@echo ""
 	@echo "Targets:"
 	@echo "  all       - Build WebUI and all architectures"
+	@echo "  testbuild - Build WebUI and arm64 only (快速测试)"
+	@echo "  testzip   - Create test package (arm64 only)"
 	@echo "  webui     - Build WebUI only"
 	@echo "  arm64     - Build ARM 64-bit only"
 	@echo "  armv7     - Build ARM 32-bit only"

@@ -155,7 +155,7 @@ static std::vector<std::string> get_child_mounts(const std::string& target_root)
 }
 
 bool bind_mount(const fs::path& from, const fs::path& to, bool disable_umount) {
-    LOG_INFO("bind mount " + from.string() + " -> " + to.string());
+    LOG_DEBUG("bind mount " + from.string() + " -> " + to.string());
     
 #define OPEN_TREE_CLONE 1
 #define AT_RECURSIVE 0x8000
@@ -275,7 +275,7 @@ bool mount_overlay(
     }
     lowerdir_config += ":" + target_root;
     
-    LOG_INFO("lowerdir=" + lowerdir_config);
+    LOG_DEBUG("lowerdir=" + lowerdir_config);
     
     std::optional<std::string> upperdir_str;
     std::optional<std::string> workdir_str;

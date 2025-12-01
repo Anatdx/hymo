@@ -194,7 +194,7 @@ int main(int argc, char* argv[]) {
         LOG_INFO("Scanned " + std::to_string(module_list.size()) + " active modules.");
         
         // Sync module content
-        perform_sync(module_list, storage.mount_point);
+        perform_sync(module_list, storage.mount_point, config);
         
         // Generate mount plan
         LOG_INFO("Generating mount plan...");
@@ -220,6 +220,7 @@ int main(int argc, char* argv[]) {
         
         // Update module description
         update_module_description(
+            true,  // success
             storage.mode,
             nuke_active,
             exec_result.overlay_module_ids.size(),
@@ -243,6 +244,8 @@ int main(int argc, char* argv[]) {
     } catch (const std::exception& e) {
         std::cerr << "Fatal Error: " << e.what() << "\n";
         LOG_ERROR("Fatal Error: " + std::string(e.what()));
+        // Update with failure emoji
+        update_module_description(false, "error", false, 0, 0);
         return 1;
     }
     

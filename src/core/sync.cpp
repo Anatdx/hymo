@@ -27,9 +27,9 @@ static bool has_files_recursive(const fs::path& path) {
     return false;
 }
 
-// Helper: Check if module has content for any builtin partition
-static bool has_content(const fs::path& module_path) {
-    for (const auto& partition : BUILTIN_PARTITIONS) {
+// Helper: Check if module has content for any partition (builtin or extra)
+static bool has_content(const fs::path& module_path, const std::vector<std::string>& all_partitions) {
+    for (const auto& partition : all_partitions) {
         fs::path part_path = module_path / partition;
         if (has_files_recursive(part_path)) {
             return true;
@@ -102,8 +102,14 @@ static void prune_orphaned_modules(const std::vector<Module>& modules, const fs:
     }
 }
 
-void perform_sync(const std::vector<Module>& modules, const fs::path& storage_root) {
+void perform_sync(const std::vector<Module>& modules, const fs::path& storage_root, const Config& config) {
     LOG_INFO("Starting smart module sync to " + storage_root.string());
+    
+    // Build complete partition list (builtin + extra)
+    std::vector<std::string> all_partitions = BUILTIN_PARTITIONS;
+    for (const auto& part : config.partitions) {
+        all_partitions.push_back(part);
+    }
     
     // 1. Prune orphaned directories (cleanup disabled/removed modules)
     prune_orphaned_modules(modules, storage_root);
@@ -112,14 +118,14 @@ void perform_sync(const std::vector<Module>& modules, const fs::path& storage_ro
     for (const auto& module : modules) {
         fs::path dst = storage_root / module.id;
         
-        // Check if module has actual content for known partitions
-        if (!has_content(module.source_path)) {
+        // Check if module has actual content for any partition (including extra)
+        if (!has_content(module.source_path, all_partitions)) {
             LOG_DEBUG("Skipping empty module: " + module.id);
             continue;
         }
         
         if (should_sync(module.source_path, dst)) {
-            LOG_INFO("Syncing module: " + module.id + " (Updated/New)");
+            LOG_DEBUG("Syncing module: " + module.id + " (Updated/New)");
             
             // Clean target directory before copying
             if (fs::exists(dst)) {

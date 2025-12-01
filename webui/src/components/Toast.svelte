@@ -36,19 +36,19 @@
   
   /* Info (Default) */
   .toast-info {
-    background: var(--md-sys-color-inverse-surface);
-    color: var(--md-sys-color-inverse-on-surface);
+    background: #ffffff;
+    color: #1c1b1f;
   }
   
   /* Error */
   .toast-error {
-    background: var(--md-sys-color-error-container);
-    color: var(--md-sys-color-on-error-container);
+    background: #ffffff;
+    color: #ba1a1a;
   }
   
   /* Success */
   .toast-success {
-    background: var(--md-sys-color-primary-container);
-    color: var(--md-sys-color-on-primary-container);
+    background: #ffffff;
+    color: #006c4c;
   }
 </style>
