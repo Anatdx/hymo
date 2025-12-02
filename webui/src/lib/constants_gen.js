@@ -4,7 +4,7 @@
 // Standard Android partitions
 export const BUILTIN_PARTITIONS = ['system', 'vendor', 'product', 'system_ext', 'odm', 'oem'];
 
-export const RUST_PATHS = {
+export const C_PATHS = {
   // Directories
   FALLBACK_CONTENT_DIR: '/data/adb/hymo/img_mnt/',
   BASE_DIR: '/data/adb/hymo/',

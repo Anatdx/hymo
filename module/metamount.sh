@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# Hybrid Mount Startup Script
+# Hymo Startup Script
 
 MODDIR="${0%/*}"
 BASE_DIR="/data/adb/hymo"

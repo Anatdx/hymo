@@ -17,7 +17,9 @@
   let activeTab = $state('status');
   let transitionDirection = $state(1);
   let touchStartX = 0;
+  let touchStartY = 0;
   let touchEndX = 0;
+  let touchEndY = 0;
 
   const TABS = ['status', 'config', 'modules', 'logs'];
 
@@ -31,19 +33,28 @@
 
   function handleTouchStart(e) {
     touchStartX = e.changedTouches[0].screenX;
+    touchStartY = e.changedTouches[0].screenY;
   }
 
   function handleTouchEnd(e) {
     touchEndX = e.changedTouches[0].screenX;
+    touchEndY = e.changedTouches[0].screenY;
+    
     const threshold = 50;
-    const diff = touchStartX - touchEndX;
+    const diffX = touchStartX - touchEndX;
+    const diffY = touchStartY - touchEndY;
+    
+    // 如果垂直滑动距离大于水平滑动距离,则不翻页(用户是在滚动内容)
+    if (Math.abs(diffY) > Math.abs(diffX)) return;
+    
+    // 水平滑动距离太小也不翻页
+    if (Math.abs(diffX) < threshold) return;
+    
     const currentIndex = TABS.indexOf(activeTab);
     
-    if (Math.abs(diff) < threshold) return;
-    
-    if (diff > 0 && currentIndex < TABS.length - 1) {
+    if (diffX > 0 && currentIndex < TABS.length - 1) {
       switchTab(TABS[currentIndex + 1]);
-    } else if (diff < 0 && currentIndex > 0) {
+    } else if (diffX < 0 && currentIndex > 0) {
       switchTab(TABS[currentIndex - 1]);
     }
   }
