@@ -2,6 +2,8 @@
 # Hymo Startup Script
 
 MODDIR="${0%/*}"
+cd "$MODDIR"
+
 BASE_DIR="/data/adb/hymo"
 LOG_FILE="$BASE_DIR/daemon.log"
 
@@ -19,38 +21,16 @@ log() {
 
 log "Starting Hymo..."
 
-# Detect architecture and select correct binary
-ARCH=$(uname -m)
-case "$ARCH" in
-    aarch64)
-        BINARY="$MODDIR/hymo-arm64-v8a"
-        ;;
-    armv7l|armv8l)
-        BINARY="$MODDIR/hymo-armeabi-v7a"
-        ;;
-    x86_64)
-        BINARY="$MODDIR/hymo-x86_64"
-        ;;
-    i686|x86)
-        BINARY="$MODDIR/hymo-x86"
-        ;;
-    *)
-        log "ERROR: Unsupported architecture: $ARCH"
-        exit 1
-        ;;
-esac
-
-if [ ! -f "$BINARY" ]; then
-    log "ERROR: Binary not found at $BINARY"
+if [ ! -f "hymod" ]; then
+    log "ERROR: Binary not found at hymo"
     exit 1
 fi
 
-chmod 755 "$BINARY"
-
-log "Using binary: $BINARY"
+chmod 755 "hymod"
+log "Using binary: hymod"
 
 # Execute C++ Binary
-"$BINARY" >> "$LOG_FILE" 2>&1
+"./hymod" >> "$LOG_FILE" 2>&1
 EXIT_CODE=$?
 
 log "Hymo exited with code $EXIT_CODE"

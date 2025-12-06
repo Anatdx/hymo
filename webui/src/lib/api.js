@@ -3,7 +3,7 @@ import { DEFAULT_CONFIG, PATHS } from './constants';
 
 function serializeKvConfig(cfg) {
   const q = s => `"${s}"`;
-  const lines = ['# Hybrid Mount Config', ''];
+  const lines = ['# Hymo Config', ''];
   lines.push(`moduledir = ${q(cfg.moduledir)}`);
   if (cfg.tempdir) lines.push(`tempdir = ${q(cfg.tempdir)}`);
   lines.push(`mountsource = ${q(cfg.mountsource)}`);

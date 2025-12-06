@@ -1,9 +1,10 @@
-// core/storage.cpp - Storage backend implementation
+// core/storage.cpp - Storage backend implementation (FIXED)
 #include "storage.hpp"
 #include "state.hpp"
 #include "../defs.hpp"
 #include "../utils.hpp"
 #include <iostream>
+#include <cstring>
 #include <sys/mount.h>
 #include <sys/vfs.h>
 #include <sys/stat.h>
@@ -29,6 +30,32 @@ static bool try_setup_tmpfs(const fs::path& target) {
     }
 }
 
+// **FIX 1: 延迟权限修复,添加独立函数**
+static void repair_storage_root_permissions(const fs::path& target) {
+    LOG_DEBUG("Repairing storage root permissions...");
+    
+    try {
+        // 1. chmod 0755
+        if (chmod(target.c_str(), 0755) != 0) {
+            LOG_WARN("Failed to chmod storage root: " + std::string(strerror(errno)));
+        }
+        
+        // 2. chown 0:0
+        if (chown(target.c_str(), 0, 0) != 0) {
+            LOG_WARN("Failed to chown storage root: " + std::string(strerror(errno)));
+        }
+        
+        // 3. Set SELinux context
+        if (!lsetfilecon(target, DEFAULT_SELINUX_CONTEXT)) {
+            LOG_WARN("Failed to set SELinux context on storage root");
+        }
+        
+        LOG_DEBUG("Storage root permissions repaired successfully");
+    } catch (const std::exception& e) {
+        LOG_ERROR("Exception during permission repair: " + std::string(e.what()));
+    }
+}
+
 static std::string setup_ext4_image(const fs::path& target, const fs::path& image_path) {
     LOG_DEBUG("Falling back to Ext4 Image mode...");
     
@@ -40,26 +67,17 @@ static std::string setup_ext4_image(const fs::path& target, const fs::path& imag
         throw std::runtime_error("Failed to mount modules.img");
     }
     
-    // Repair root permissions
-    LOG_DEBUG("Repairing storage root permissions...");
+    // **FIX 2: 不要在这里修复权限,等待同步完成后再修复**
+    // repair_storage_root_permissions(target);  // 移除此行
     
-    // chmod 0755
-    chmod(target.c_str(), 0755);
-    
-    // chown 0:0
-    chown(target.c_str(), 0, 0);
-    
-    // Set SELinux context
-    lsetfilecon(target, DEFAULT_SELINUX_CONTEXT);
-    
-    LOG_INFO("Image mode active and secured.");
+    LOG_INFO("Image mode active.");
     return "ext4";
 }
 
 StorageHandle setup_storage(const fs::path& mnt_dir, const fs::path& image_path, bool force_ext4) {
     LOG_DEBUG("Setting up storage at " + mnt_dir.string());
     
-    // Clean up previous mounts
+    // 清理之前的挂载
     if (fs::exists(mnt_dir)) {
         umount2(mnt_dir.c_str(), MNT_DETACH);
     }
@@ -73,6 +91,11 @@ StorageHandle setup_storage(const fs::path& mnt_dir, const fs::path& image_path,
     }
     
     return StorageHandle{mnt_dir, mode};
+}
+
+// **FIX 3: 添加公共函数供 main.cpp 调用**
+void finalize_storage_permissions(const fs::path& storage_root) {
+    repair_storage_root_permissions(storage_root);
 }
 
 static std::string format_size(uint64_t bytes) {

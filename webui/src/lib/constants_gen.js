@@ -20,7 +20,7 @@ export const C_PATHS = {
   MODE_CONFIG: '/data/adb/hymo/module_mode.conf',
   
   // Binary path
-  BINARY: '/data/adb/modules/hymo/hymo',
+  BINARY: '/data/adb/modules/hymo/hymod',
 
   // Marker files
   DISABLE_FILE_NAME: 'disable',

@@ -9,16 +9,16 @@ ui_print "- Detected ABI: $ABI"
 # Select appropriate binary based on ABI
 case "$ABI" in
     arm64-v8a)
-        BINARY_NAME="hymo-arm64-v8a"
+        BINARY_NAME="hymod-arm64-v8a"
         ;;
     armeabi-v7a|armeabi)
-        BINARY_NAME="hymo-armeabi-v7a"
+        BINARY_NAME="hymod-armeabi-v7a"
         ;;
     x86_64)
-        BINARY_NAME="hymo-x86_64"
+        BINARY_NAME="hymod-x86_64"
         ;;
     x86)
-        BINARY_NAME="hymo-x86"
+        BINARY_NAME="hymod-x86"
         ;;
     *)
         abort "! Unsupported architecture: $ABI"
@@ -32,19 +32,17 @@ if [ ! -f "$MODPATH/$BINARY_NAME" ]; then
     abort "! Binary not found: $BINARY_NAME"
 fi
 
-# Create symlink for easy access (optional)
-ln -sf "$BINARY_NAME" "$MODPATH/hymo" 2>/dev/null
+# Copy selected binary to standard name
+cp "$MODPATH/$BINARY_NAME" "$MODPATH/hymod"
 
 # Set permissions for the selected binary
-chmod 755 "$MODPATH/$BINARY_NAME"
+chmod 755 "$MODPATH/hymod"
 
 # Remove unused architecture binaries to save space
 ui_print "- Cleaning unused binaries..."
-for binary in hymo-arm64-v8a hymo-armeabi-v7a hymo-x86_64 hymo-x86; do
-    if [ "$binary" != "$BINARY_NAME" ] && [ -f "$MODPATH/$binary" ]; then
-        rm -f "$MODPATH/$binary"
-        ui_print "  Removed: $binary"
-    fi
+for binary in hymod-arm64-v8a hymod-armeabi-v7a hymod-x86_64 hymod-x86; do
+    rm -f "$MODPATH/$binary"
+    ui_print "  Removed: $binary"
 done
 
 # Base directory setup

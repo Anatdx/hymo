@@ -41,8 +41,8 @@ testzip: testbuild
 	@rm -rf $(BUILD_DIR)
 	@mkdir -p $(BUILD_DIR)
 	@cp -r $(MODULE_DIR)/* $(BUILD_DIR)/
-	@cp $(OUTPUT_DIR)/hymo-arm64-v8a $(BUILD_DIR)/
-	@chmod 755 $(BUILD_DIR)/hymo-arm64-v8a
+	@cp $(OUTPUT_DIR)/hymod-arm64-v8a $(BUILD_DIR)/
+	@chmod 755 $(BUILD_DIR)/hymod-arm64-v8a
 	@cd $(BUILD_DIR) && zip -r ../$(OUTPUT_DIR)/$(MODULE_ID)-$(VERSION).zip * >/dev/null
 	@echo "✅ Test package: $(OUTPUT_DIR)/$(MODULE_ID)-$(VERSION).zip"
 	@ls -lh $(OUTPUT_DIR)/$(MODULE_ID)-$(VERSION).zip
@@ -62,27 +62,27 @@ webui:
 
 arm64: $(OUTPUT_DIR)
 	@echo "🔨 Compiling arm64-v8a..."
-	@$(NDK_LLVM)/aarch64-linux-android$(ANDROID_API)-clang++ $(CXXFLAGS) -o $(OUTPUT_DIR)/hymo-arm64-v8a $(SRC_FILES)
-	@$(NDK_LLVM)/llvm-strip $(OUTPUT_DIR)/hymo-arm64-v8a
-	@echo "✅ arm64: $$(du -h $(OUTPUT_DIR)/hymo-arm64-v8a | cut -f1)"
+	@$(NDK_LLVM)/aarch64-linux-android$(ANDROID_API)-clang++ $(CXXFLAGS) -o $(OUTPUT_DIR)/hymod-arm64-v8a $(SRC_FILES)
+	@$(NDK_LLVM)/llvm-strip $(OUTPUT_DIR)/hymod-arm64-v8a
+	@echo "✅ arm64: $$(du -h $(OUTPUT_DIR)/hymod-arm64-v8a | cut -f1)"
 
 armv7: $(OUTPUT_DIR)
 	@echo "🔨 Compiling armeabi-v7a..."
-	@$(NDK_LLVM)/armv7a-linux-androideabi$(ANDROID_API)-clang++ $(CXXFLAGS) -o $(OUTPUT_DIR)/hymo-armeabi-v7a $(SRC_FILES)
-	@$(NDK_LLVM)/llvm-strip $(OUTPUT_DIR)/hymo-armeabi-v7a
-	@echo "✅ armv7: $$(du -h $(OUTPUT_DIR)/hymo-armeabi-v7a | cut -f1)"
+	@$(NDK_LLVM)/armv7a-linux-androideabi$(ANDROID_API)-clang++ $(CXXFLAGS) -o $(OUTPUT_DIR)/hymod-armeabi-v7a $(SRC_FILES)
+	@$(NDK_LLVM)/llvm-strip $(OUTPUT_DIR)/hymod-armeabi-v7a
+	@echo "✅ armv7: $$(du -h $(OUTPUT_DIR)/hymod-armeabi-v7a | cut -f1)"
 
 x86_64: $(OUTPUT_DIR)
 	@echo "🔨 Compiling x86_64..."
-	@$(NDK_LLVM)/x86_64-linux-android$(ANDROID_API)-clang++ $(CXXFLAGS) -o $(OUTPUT_DIR)/hymo-x86_64 $(SRC_FILES)
-	@$(NDK_LLVM)/llvm-strip $(OUTPUT_DIR)/hymo-x86_64
-	@echo "✅ x86_64: $$(du -h $(OUTPUT_DIR)/hymo-x86_64 | cut -f1)"
+	@$(NDK_LLVM)/x86_64-linux-android$(ANDROID_API)-clang++ $(CXXFLAGS) -o $(OUTPUT_DIR)/hymod-x86_64 $(SRC_FILES)
+	@$(NDK_LLVM)/llvm-strip $(OUTPUT_DIR)/hymod-x86_64
+	@echo "✅ x86_64: $$(du -h $(OUTPUT_DIR)/hymod-x86_64 | cut -f1)"
 
 x86: $(OUTPUT_DIR)
 	@echo "🔨 Compiling x86..."
-	@$(NDK_LLVM)/i686-linux-android$(ANDROID_API)-clang++ $(CXXFLAGS) -o $(OUTPUT_DIR)/hymo-x86 $(SRC_FILES)
-	@$(NDK_LLVM)/llvm-strip $(OUTPUT_DIR)/hymo-x86
-	@echo "✅ x86: $$(du -h $(OUTPUT_DIR)/hymo-x86 | cut -f1)"
+	@$(NDK_LLVM)/i686-linux-android$(ANDROID_API)-clang++ $(CXXFLAGS) -o $(OUTPUT_DIR)/hymod-x86 $(SRC_FILES)
+	@$(NDK_LLVM)/llvm-strip $(OUTPUT_DIR)/hymod-x86
+	@echo "✅ x86: $$(du -h $(OUTPUT_DIR)/hymod-x86 | cut -f1)"
 
 clean:
 	@echo "🧹 Cleaning..."
@@ -100,8 +100,8 @@ zip: all
 	@rm -rf $(BUILD_DIR)
 	@mkdir -p $(BUILD_DIR)
 	@cp -r $(MODULE_DIR)/* $(BUILD_DIR)/
-	@cp $(OUTPUT_DIR)/hymo-* $(BUILD_DIR)/
-	@chmod 755 $(BUILD_DIR)/hymo-*
+	@cp $(OUTPUT_DIR)/hymod-* $(BUILD_DIR)/
+	@chmod 755 $(BUILD_DIR)/hymod-*
 	@cd $(BUILD_DIR) && zip -r ../$(OUTPUT_DIR)/$(MODULE_ID)-$(VERSION).zip * >/dev/null
 	@echo "✅ Package: $(OUTPUT_DIR)/$(MODULE_ID)-$(VERSION).zip"
 	@ls -lh $(OUTPUT_DIR)/$(MODULE_ID)-$(VERSION).zip

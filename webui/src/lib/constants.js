@@ -19,7 +19,7 @@ export const DEFAULT_CONFIG = {
 // File system paths
 export const PATHS = {
   ...C_PATHS,
-  BINARY: '/data/adb/modules/hymo/hymo'
+  BINARY: '/data/adb/modules/hymo/hymod'
 };
 
 export const DEFAULT_SEED = '#6750A4';

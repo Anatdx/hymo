@@ -1,4 +1,4 @@
-// core/storage.hpp - Storage backend management
+// core/storage.hpp - Storage backend management (FIXED)
 #pragma once
 
 #include <string>
@@ -14,6 +14,10 @@ struct StorageHandle {
 };
 
 StorageHandle setup_storage(const fs::path& mnt_dir, const fs::path& image_path, bool force_ext4);
+
+// **新增: 完成存储权限修复(在同步后调用)**
+void finalize_storage_permissions(const fs::path& storage_root);
+
 void print_storage_status();
 
 } // namespace hymo

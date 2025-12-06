@@ -1,4 +1,4 @@
-// main.cpp - Main entry point
+// main.cpp - Main entry point (FIXED)
 #include "defs.hpp"
 #include "utils.hpp"
 #include "conf/config.hpp"
@@ -95,7 +95,6 @@ static CliOptions parse_args(int argc, char* argv[]) {
         }
     }
     
-    // Get command if present
     if (optind < argc) {
         opts.command = argv[optind];
     }
@@ -123,7 +122,7 @@ int main(int argc, char* argv[]) {
     try {
         CliOptions cli = parse_args(argc, argv);
         
-        // Handle commands
+        // 处理命令
         if (!cli.command.empty()) {
             if (cli.command == "gen-config") {
                 std::string output = cli.output.empty() ? "config.toml" : cli.output;
@@ -132,7 +131,6 @@ int main(int argc, char* argv[]) {
                 return 0;
             } else if (cli.command == "show-config") {
                 Config config = load_config(cli);
-                // Output as JSON for WebUI compatibility
                 std::cout << "{\n";
                 std::cout << "  \"moduledir\": \"" << config.moduledir.string() << "\",\n";
                 std::cout << "  \"tempdir\": \"" << config.tempdir.string() << "\",\n";
@@ -162,14 +160,14 @@ int main(int argc, char* argv[]) {
             }
         }
         
-        // Load and merge config
+        // 加载并合并配置
         Config config = load_config(cli);
         config.merge_with_cli(cli.moduledir, cli.tempdir, cli.mountsource, cli.verbose, cli.partitions);
         
-        // Initialize logging
+        // 初始化日志
         Logger::getInstance().init(config.verbose, DAEMON_LOG_FILE);
         
-        // Camouflage process
+        // 伪装进程
         if (!camouflage_process("kworker/u9:1")) {
             LOG_WARN("Failed to camouflage process");
         }
@@ -180,33 +178,38 @@ int main(int argc, char* argv[]) {
             LOG_WARN("Namespace Detach (try_umount) is DISABLED.");
         }
         
-        // Ensure run directory exists
+        // 确保运行目录存在
         ensure_dir_exists(RUN_DIR);
         
-        // Setup storage
+        // **步骤 1: 设置存储**
         fs::path mnt_base(FALLBACK_CONTENT_DIR);
         fs::path img_path = fs::path(BASE_DIR) / "modules.img";
         
         StorageHandle storage = setup_storage(mnt_base, img_path, config.force_ext4);
         
-        // Scan modules
+        // **步骤 2: 扫描模块**
         auto module_list = scan_modules(config.moduledir, config);
         LOG_INFO("Scanned " + std::to_string(module_list.size()) + " active modules.");
         
-        // Sync module content
+        // **步骤 3: 同步模块内容**
         perform_sync(module_list, storage.mount_point, config);
         
-        // Generate mount plan
+        // **FIX 1: 在同步完成后修复存储根权限**
+        if (storage.mode == "ext4") {
+            finalize_storage_permissions(storage.mount_point);
+        }
+        
+        // **步骤 4: 生成挂载计划**
         LOG_INFO("Generating mount plan...");
         MountPlan plan = generate_plan(config, module_list, storage.mount_point);
         
         LOG_INFO("Plan: " + std::to_string(plan.overlay_ops.size()) + " OverlayFS ops, " +
                  std::to_string(plan.magic_module_paths.size()) + " Magic modules");
         
-        // Execute plan
+        // **步骤 5: 执行计划**
         ExecutionResult exec_result = execute_plan(plan, config);
         
-        // KSU Nuke (Stealth)
+        // **步骤 6: KSU Nuke (隐蔽)**
         bool nuke_active = false;
         if (storage.mode == "ext4" && config.enable_nuke) {
             LOG_INFO("Attempting to deploy Paw Pad (Stealth) via KernelSU...");
@@ -218,7 +221,7 @@ int main(int argc, char* argv[]) {
             }
         }
         
-        // Update module description
+        // **步骤 7: 更新模块描述**
         update_module_description(
             true,  // success
             storage.mode,
@@ -227,7 +230,7 @@ int main(int argc, char* argv[]) {
             exec_result.magic_module_ids.size()
         );
         
-        // Save runtime state
+        // **步骤 8: 保存运行时状态**
         RuntimeState state;
         state.storage_mode = storage.mode;
         state.mount_point = storage.mount_point.string();
@@ -244,7 +247,7 @@ int main(int argc, char* argv[]) {
     } catch (const std::exception& e) {
         std::cerr << "Fatal Error: " << e.what() << "\n";
         LOG_ERROR("Fatal Error: " + std::string(e.what()));
-        // Update with failure emoji
+        // 使用失败 emoji 更新
         update_module_description(false, "error", false, 0, 0);
         return 1;
     }
