@@ -25,11 +25,12 @@ Logger& Logger::getInstance() {
 void Logger::init(bool verbose, const fs::path& log_path) {
     verbose_ = verbose;
     
-    if (log_path.parent_path().empty() == false) {
-        fs::create_directories(log_path.parent_path());
+    if (!log_path.empty()) {
+        if (log_path.has_parent_path()) {
+            fs::create_directories(log_path.parent_path());
+        }
+        log_file_ = std::make_unique<std::ofstream>(log_path, std::ios::app);
     }
-    
-    log_file_ = std::make_unique<std::ofstream>(log_path, std::ios::app);
 }
 
 void Logger::log(const std::string& level, const std::string& message) {

@@ -11,7 +11,8 @@ void update_module_description(
     const std::string& storage_mode,
     bool nuke_active,
     size_t overlay_count,
-    size_t magic_count
+    size_t magic_count,
+    size_t hymofs_count = 0
 );
 
 void print_module_list(const Config& config);

@@ -34,6 +34,13 @@ bool RuntimeState::save() const {
         file << "\"" << magic_module_ids[i] << "\"";
         if (i < magic_module_ids.size() - 1) file << ", ";
     }
+    file << "],\n";
+
+    file << "  \"hymofs_module_ids\": [";
+    for (size_t i = 0; i < hymofs_module_ids.size(); ++i) {
+        file << "\"" << hymofs_module_ids[i] << "\"";
+        if (i < hymofs_module_ids.size() - 1) file << ", ";
+    }
     file << "]\n";
     
     file << "}\n";

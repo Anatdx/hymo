@@ -27,7 +27,8 @@ SRC_FILES := $(SRC_DIR)/main.cpp \
              $(SRC_DIR)/core/planner.cpp \
              $(SRC_DIR)/core/executor.cpp \
              $(SRC_DIR)/mount/overlay.cpp \
-             $(SRC_DIR)/mount/magic.cpp
+             $(SRC_DIR)/mount/magic.cpp \
+             $(SRC_DIR)/mount/hymofs.cpp
 
 .PHONY: all clean distclean zip install help check webui arm64 armv7 x86_64 x86 testbuild testziptest
 

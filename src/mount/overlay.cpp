@@ -30,7 +30,9 @@ namespace hymo {
 #define MOVE_MOUNT_F_EMPTY_PATH 0x00000004
 #define OPEN_TREE_CLONE 1
 #define AT_RECURSIVE 0x8000
+#ifndef OPEN_TREE_CLOEXEC
 #define OPEN_TREE_CLOEXEC 0x1
+#endif
 
 static int fsopen(const char* fsname, unsigned int flags) {
     return syscall(__NR_fsopen, fsname, flags);

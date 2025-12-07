@@ -11,6 +11,7 @@ struct RuntimeState {
     std::string mount_point;
     std::vector<std::string> overlay_module_ids;
     std::vector<std::string> magic_module_ids;
+    std::vector<std::string> hymofs_module_ids;
     bool nuke_active = false;
     
     bool save() const;
