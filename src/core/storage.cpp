@@ -56,15 +56,40 @@ static void repair_storage_root_permissions(const fs::path& target) {
     }
 }
 
+static bool create_image(const fs::path& base_dir) {
+    LOG_INFO("Creating modules.img...");
+    fs::path script = base_dir / "createimg.sh";
+    if (!fs::exists(script)) {
+        LOG_ERROR("createimg.sh not found at " + script.string());
+        return false;
+    }
+    
+    std::string cmd = "sh " + script.string() + " " + base_dir.string() + " 2048 >/dev/null 2>&1";
+    int ret = system(cmd.c_str());
+    return ret == 0;
+}
+
 static std::string setup_ext4_image(const fs::path& target, const fs::path& image_path) {
     LOG_DEBUG("Falling back to Ext4 Image mode...");
     
     if (!fs::exists(image_path)) {
-        throw std::runtime_error("modules.img not found at " + image_path.string());
+        LOG_WARN("modules.img not found. Attempting to create it...");
+        if (!create_image(image_path.parent_path())) {
+             throw std::runtime_error("Failed to create modules.img");
+        }
     }
     
     if (!mount_image(image_path, target)) {
-        throw std::runtime_error("Failed to mount modules.img");
+        LOG_WARN("Initial mount failed, attempting image repair...");
+        
+        if (repair_image(image_path)) {
+            LOG_INFO("Retrying mount after repair...");
+            if (!mount_image(image_path, target)) {
+                throw std::runtime_error("Failed to mount modules.img after repair");
+            }
+        } else {
+            throw std::runtime_error("Failed to repair modules.img");
+        }
     }
     
     // **FIX 2: 不要在这里修复权限,等待同步完成后再修复**

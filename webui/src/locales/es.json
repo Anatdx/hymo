@@ -29,7 +29,8 @@
     "kernel": "Núcleo",
     "selinux": "SELinux",
     "mountBase": "Base de montaje",
-    "activePartitions": "Particiones Activas"
+    "activePartitions": "Particiones Activas",
+    "notSupported": "❌"
   },
   "config": {
     "title": "Configuración",

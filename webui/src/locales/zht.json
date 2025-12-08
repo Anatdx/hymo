@@ -29,7 +29,8 @@
     "kernel": "核心版本",
     "selinux": "SELinux",
     "mountBase": "掛載基點 (Mount Base)",
-    "activePartitions": "活躍分區"
+    "activePartitions": "活躍分區",
+    "notSupported": "❌"
   },
   "config": {
     "title": "設定",

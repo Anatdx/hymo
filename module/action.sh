@@ -21,12 +21,12 @@ if [ -e "$HYMO_CTL" ]; then
         echo "[$(date "+%Y-%m-%d %H:%M:%S")] [ACTION] User triggered manual reset (clear rules)" >> "$LOG_FILE"
     else
         echo "❌ 失败: 无法写入内核接口"
-        echo "   请检查 Root 权限或内核模块状态"
+        echo "   请检查 Root 权限或内核接口状态"
     fi
 else
-    echo "⚠️ 警告: 未检测到 HymoFS 内核模块"
+    echo "⚠️ 警告: 未检测到 HymoFS 内核接口"
     echo "   (/proc/hymo_ctl 不存在)"
-    echo "   可能是模块未加载或已卸载"
+    echo "   可能是内核不支持 HymoFS"
 fi
 
 echo "----------------------------------------"

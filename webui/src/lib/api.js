@@ -13,6 +13,27 @@ const shouldUseMock = import.meta.env.DEV || !ksuExec;
 
 console.log(`[API Init] Mode: ${shouldUseMock ? '🛠️ MOCK (Dev/Browser)' : '🚀 REAL (Device)'}`);
 
+function serializeKvConfig(config) {
+  let output = "# Hymo Configuration\n";
+  
+  if (config.moduledir) output += `moduledir = "${config.moduledir}"\n`;
+  if (config.tempdir) output += `tempdir = "${config.tempdir}"\n`;
+  if (config.mountsource) output += `mountsource = "${config.mountsource}"\n`;
+  
+  output += `verbose = ${config.verbose ? 'true' : 'false'}\n`;
+  output += `force_ext4 = ${config.force_ext4 ? 'true' : 'false'}\n`;
+  output += `disable_umount = ${config.disable_umount ? 'true' : 'false'}\n`;
+  output += `enable_nuke = ${config.enable_nuke ? 'true' : 'false'}\n`;
+  
+  if (config.partitions && Array.isArray(config.partitions)) {
+    output += `partitions = "${config.partitions.join(',')}"\n`;
+  } else {
+    output += `partitions = ""\n`;
+  }
+  
+  return output;
+}
+
 const RealAPI = {
   loadConfig: async () => {
     // Use centralized binary path

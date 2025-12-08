@@ -1,5 +1,5 @@
 {
-  "lang": { "display": "中文" },
+  "lang": { "display": "简体中文" },
   "common": {
     "appName": "Hymo UI",
     "saving": "保存中...",
@@ -29,7 +29,8 @@
     "kernel": "内核版本",
     "selinux": "SELinux",
     "mountBase": "挂载基点 (Mount Base)",
-    "activePartitions": "活跃分区"
+    "activePartitions": "活跃分区",
+    "notSupported": "❌"
   },
   "config": {
     "title": "配置",

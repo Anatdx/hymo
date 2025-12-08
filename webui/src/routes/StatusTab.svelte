@@ -11,7 +11,14 @@
 
   // Combine built-in partitions with user configured ones
   let displayPartitions = $derived([...new Set([...BUILTIN_PARTITIONS, ...store.config.partitions])]);
-  let storageLabel = $derived(store.storage.type === 'tmpfs' ? store.systemInfo.mountBase : store.L.status.storageDesc);
+  let storageLabel = $derived((store.storage.type === 'tmpfs' || store.storage.type === 'hymofs') ? store.systemInfo.mountBase : store.L.status.storageDesc);
+  
+  // Check if HymoFS is supported (based on systemInfo or other indicators)
+  // Assuming if hymofsModules is undefined or null, it might mean not supported, 
+  // but let's use a more robust check if available. For now, we check if the array exists.
+  // Actually, if the kernel doesn't support it, the daemon might not even report it or report empty.
+  // Let's assume if systemInfo.hymofsModules is undefined, it's not supported.
+  let hymoFsCount = $derived(store.systemInfo.hymofsModules ? store.systemInfo.hymofsModules.length : store.L.status.notSupported);
 </script>
 
 <div class="dashboard-grid">
@@ -48,7 +55,7 @@
       <div class="stat-label">{store.L.status.moduleActive}</div>
     </div>
     <div class="stat-card">
-      <div class="stat-value">{store.modules.filter(m => m.strategy && m.strategy.includes('hymofs')).length}</div>
+      <div class="stat-value">{hymoFsCount}</div>
       <div class="stat-label">HymoFS</div>
     </div>
     <div class="stat-card">

@@ -205,49 +205,36 @@ int main(int argc, char* argv[]) {
                     update_hymofs_mappings(config, module_list, MIRROR_DIR, plan);
                     
                     // 5. Update Runtime State (daemon_state.json)
-                    // We need to read the existing state to preserve other fields (like storage_mode)
-                    // or just update the hymofs_module_ids and active_mounts.
-                    // Since we don't have a full read-modify-write for state easily accessible here without re-parsing everything,
-                    // let's try to load it if it exists.
-                    RuntimeState state;
-                    std::ifstream state_file(STATE_FILE);
-                    if (state_file.is_open()) {
-                        // Very basic JSON parsing to preserve fields would be ideal, but for now let's just
-                        // re-populate what we know. 
-                        // Actually, we can just update the fields we control in this reload.
-                        // But wait, 'state.save()' overwrites the file.
-                        // Let's assume storage mode hasn't changed (it's HymoFS).
-                        state.storage_mode = "hymofs"; 
-                        state.mount_point = MIRROR_DIR.string();
-                        state.hymofs_module_ids = plan.hymofs_module_ids;
-                        
-                        // Recalculate active mounts for HymoFS
-                        std::vector<std::string> all_parts = BUILTIN_PARTITIONS;
-                        for(const auto& p : config.partitions) all_parts.push_back(p);
-                        
-                        for (const auto& part : all_parts) {
-                            bool active = false;
-                            for (const auto& mod_id : plan.hymofs_module_ids) {
-                                for (const auto& m : module_list) {
-                                    if (m.id == mod_id) {
-                                        if (fs::exists(m.source_path / part)) {
-                                            active = true;
-                                            break;
-                                        }
+                    RuntimeState state = load_runtime_state();
+                    
+                    if (state.storage_mode.empty()) {
+                        state.storage_mode = "hymofs";
+                    }
+                    state.mount_point = MIRROR_DIR.string();
+                    state.hymofs_module_ids = plan.hymofs_module_ids;
+                    
+                    // Recalculate active mounts for HymoFS
+                    state.active_mounts.clear();
+                    std::vector<std::string> all_parts = BUILTIN_PARTITIONS;
+                    for(const auto& p : config.partitions) all_parts.push_back(p);
+                    
+                    for (const auto& part : all_parts) {
+                        bool active = false;
+                        for (const auto& mod_id : plan.hymofs_module_ids) {
+                            for (const auto& m : module_list) {
+                                if (m.id == mod_id) {
+                                    if (fs::exists(m.source_path / part)) {
+                                        active = true;
+                                        break;
                                     }
                                 }
-                                if (active) break;
                             }
-                            if (active) state.active_mounts.push_back(part);
+                            if (active) break;
                         }
-                        
-                        // We might lose 'nuke_active' or 'magic_module_ids' if we don't read them.
-                        // For a hot reload of HymoFS, we assume Magic Mounts and Nuke state don't change 
-                        // or are not relevant to the HymoFS reload context (since HymoFS is the active strategy).
-                        // However, to be safe, let's try to read the file content to a string and regex parse? 
-                        // No, let's just save what we have. The WebUI mainly cares about active_mounts and hymofs_module_ids.
-                        state.save();
+                        if (active) state.active_mounts.push_back(part);
                     }
+                    
+                    state.save();
 
                     LOG_INFO("Reload complete.");
                 } else {
@@ -301,8 +288,17 @@ int main(int argc, char* argv[]) {
             
             try {
                 // Reuse setup_storage to handle Tmpfs -> Ext4 fallback
-                // We pass force_ext4=false to prefer tmpfs
-                storage = setup_storage(MIRROR_DIR, img_path, false);
+                // We pass config.force_ext4 to respect user setting
+                try {
+                    storage = setup_storage(MIRROR_DIR, img_path, config.force_ext4);
+                } catch (const std::exception& e) {
+                    if (config.force_ext4) {
+                        LOG_WARN("Force Ext4 failed: " + std::string(e.what()) + ". Falling back to auto (Tmpfs/Ext4).");
+                        storage = setup_storage(MIRROR_DIR, img_path, false);
+                    } else {
+                        throw;
+                    }
+                }
                 LOG_INFO("Mirror storage setup successful. Mode: " + storage.mode);
 
                 // Scan modules from source to know what to copy
@@ -371,13 +367,39 @@ int main(int argc, char* argv[]) {
             }
             
             if (!mirror_success) {
-                LOG_WARN("Falling back to direct /data injection (Legacy HymoFS)");
-                storage.mode = "hymofs";
+                LOG_WARN("Mirror setup failed. Falling back to Magic Mount (skipping Legacy HymoFS to avoid SELinux issues).");
+                
+                // Fallback to Magic Mount using source directory directly
+                storage.mode = "magic_only";
                 storage.mount_point = config.moduledir;
                 
                 module_list = scan_modules(config.moduledir, config);
-                plan = generate_plan(config, module_list, config.moduledir);
-                update_hymofs_mappings(config, module_list, config.moduledir, plan);
+                
+                // Manually construct a Magic Mount plan
+                plan.overlay_ops.clear();
+                plan.hymofs_module_ids.clear();
+                plan.magic_module_paths.clear();
+                
+                for (const auto& mod : module_list) {
+                    // Check if module has content
+                    bool has_content = false;
+                    std::vector<std::string> all_partitions = BUILTIN_PARTITIONS;
+                    for (const auto& part : config.partitions) all_partitions.push_back(part);
+                    
+                    for (const auto& part : all_partitions) {
+                        if (has_files_recursive(mod.source_path / part)) {
+                            has_content = true;
+                            break;
+                        }
+                    }
+                    
+                    if (has_content) {
+                        plan.magic_module_paths.push_back(mod.source_path);
+                        exec_result.magic_module_ids.push_back(mod.id);
+                    }
+                }
+                
+                // Execute plan
                 exec_result = execute_plan(plan, config);
             }
             

@@ -181,10 +181,45 @@ bool mount_image(const fs::path& image_path, const fs::path& target) {
     // Mount the loop device
     if (mount(loop_dev, target.c_str(), "ext4", MS_NOATIME, "") != 0) {
         LOG_ERROR("Failed to mount image " + image_path.string() + " via " + loop_dev + ": " + strerror(errno));
+        // Detach loop device on failure
+        std::string detach_cmd = "losetup -d " + std::string(loop_dev);
+        system(detach_cmd.c_str());
         return false;
     }
     
     return true;
+}
+
+bool repair_image(const fs::path& image_path) {
+    LOG_INFO("Running e2fsck on " + image_path.string());
+    
+    // Use e2fsck -y -f to force check and auto-fix
+    std::string cmd = "e2fsck -y -f " + image_path.string() + " >/dev/null 2>&1";
+    int ret = system(cmd.c_str());
+    
+    // e2fsck exit codes:
+    // 0 - No errors
+    // 1 - File system errors corrected
+    // 2 - File system errors corrected, system should be rebooted
+    // 4 - File system errors left uncorrected
+    // 8 - Operational error
+    // 16 - Usage or syntax error
+    // 32 - E2fsck canceled by user request
+    // 128 - Shared library error
+    
+    if (WIFEXITED(ret)) {
+        int code = WEXITSTATUS(ret);
+        if (code <= 2) {
+            LOG_INFO("Image repair successful (code " + std::to_string(code) + ")");
+            return true;
+        } else {
+            LOG_ERROR("e2fsck failed with exit code: " + std::to_string(code));
+            return false;
+        }
+    }
+    
+    LOG_ERROR("e2fsck execution failed");
+    return false;
 }
 
 static bool native_cp_r(const fs::path& src, const fs::path& dst) {

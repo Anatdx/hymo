@@ -57,6 +57,26 @@ bool RuntimeState::save() const {
     return true;
 }
 
+static std::vector<std::string> parse_json_array(const std::string& line) {
+    std::vector<std::string> result;
+    auto start = line.find("[");
+    auto end = line.find("]");
+    if (start == std::string::npos || end == std::string::npos) return result;
+    
+    std::string content = line.substr(start + 1, end - start - 1);
+    std::stringstream ss(content);
+    std::string item;
+    while (std::getline(ss, item, ',')) {
+        // Remove quotes and whitespace
+        size_t first_quote = item.find("\"");
+        size_t last_quote = item.rfind("\"");
+        if (first_quote != std::string::npos && last_quote != std::string::npos && last_quote > first_quote) {
+            result.push_back(item.substr(first_quote + 1, last_quote - first_quote - 1));
+        }
+    }
+    return result;
+}
+
 RuntimeState load_runtime_state() {
     RuntimeState state;
     
@@ -89,6 +109,14 @@ RuntimeState load_runtime_state() {
             }
         } else if (line.find("\"nuke_active\"") != std::string::npos) {
             state.nuke_active = line.find("true") != std::string::npos;
+        } else if (line.find("\"overlay_module_ids\"") != std::string::npos) {
+            state.overlay_module_ids = parse_json_array(line);
+        } else if (line.find("\"magic_module_ids\"") != std::string::npos) {
+            state.magic_module_ids = parse_json_array(line);
+        } else if (line.find("\"hymofs_module_ids\"") != std::string::npos) {
+            state.hymofs_module_ids = parse_json_array(line);
+        } else if (line.find("\"active_mounts\"") != std::string::npos) {
+            state.active_mounts = parse_json_array(line);
         }
     }
     

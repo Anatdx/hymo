@@ -29,7 +29,8 @@
     "kernel": "カーネル",
     "selinux": "SELinux",
     "mountBase": "マウントベース",
-    "activePartitions": "アクティブパーティション"
+    "activePartitions": "アクティブパーティション",
+    "notSupported": "❌"
   },
   "config": {
     "title": "設定",

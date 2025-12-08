@@ -49,6 +49,10 @@ done
 BASE_DIR="/data/adb/hymo"
 mkdir -p "$BASE_DIR"
 
+# Install createimg.sh
+cp "$MODPATH/createimg.sh" "$BASE_DIR/createimg.sh"
+chmod 755 "$BASE_DIR/createimg.sh"
+
 # Handle Config
 if [ ! -f "$BASE_DIR/config.toml" ]; then
   ui_print "- Installing default config"
@@ -59,21 +63,30 @@ fi
 IMG_FILE="$BASE_DIR/modules.img"
 IMG_SIZE_MB=2048
 
+# Check if force_ext4 is enabled in config
+FORCE_EXT4=false
+if [ -f "$BASE_DIR/config.toml" ]; then
+    if grep -q "force_ext4 = true" "$BASE_DIR/config.toml"; then
+        FORCE_EXT4=true
+        ui_print "- Force Ext4 mode enabled in config"
+    fi
+fi
+
 if [ ! -f "$IMG_FILE" ]; then
     # Check if kernel supports tmpfs
-    if grep -q "tmpfs" /proc/filesystems; then
+    if grep -q "tmpfs" /proc/filesystems && [ "$FORCE_EXT4" = false ]; then
         ui_print "- Kernel supports tmpfs. Skipping ext4 image creation."
     else
-        ui_print "- Creating 2GB ext4 image for module storage..."
-        truncate -s ${IMG_SIZE_MB}M "$IMG_FILE"
+        if [ "$FORCE_EXT4" = true ]; then
+             ui_print "- Creating 2GB ext4 image (Forced Mode)..."
+        else
+             ui_print "- Creating 2GB ext4 image for module storage..."
+        fi
         
-        # [Stealth Update] Remove journal to prevent creating jbd2 sysfs node/threads
-        /system/bin/mke2fs -t ext4 -O ^has_journal -F "$IMG_FILE" >/dev/null 2>&1
+        sh "$BASE_DIR/createimg.sh" "$BASE_DIR" "$IMG_SIZE_MB"
         
         if [ $? -ne 0 ]; then
             ui_print "! Failed to format ext4 image"
-        else
-            ui_print "- Image created successfully (No Journal Mode)"
         fi
     fi
 else
