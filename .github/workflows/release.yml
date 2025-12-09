@@ -86,16 +86,41 @@ jobs:
       - name: Update Kernel Protocol
         id: protocol
         run: |
-          # Check if patch file was modified in the current commit (HEAD)
-          # We use git log to see if the latest commit touching the file is the current HEAD
-          LAST_PATCH_COMMIT=$(git log -1 --format="%H" patch/hymofs.patch || echo "none")
-          CURRENT_COMMIT=$(git rev-parse HEAD)
+          # Fetch tags to ensure we have history for git describe
+          git fetch --tags --force
           
-          echo "Last Patch Commit: $LAST_PATCH_COMMIT"
-          echo "Current Commit: $CURRENT_COMMIT"
+          # Get previous tag
+          if git rev-parse HEAD^ >/dev/null 2>&1; then
+            PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          else
+            PREV_TAG=""
+          fi
           
-          if [ "$LAST_PATCH_COMMIT" = "$CURRENT_COMMIT" ]; then
-            echo "Patch file modified in this commit. Bumping protocol version..."
+          echo "Previous Tag: $PREV_TAG"
+          
+          SHOULD_UPDATE="false"
+          
+          if [ -n "$PREV_TAG" ]; then
+            # Check for changes in patch file, ignoring the Protocol version line
+            # This prevents infinite bump loops caused by the previous release's bump
+            if git diff -I "HymoFS Protocol:" --name-only "$PREV_TAG" HEAD -- patch/hymofs.patch | grep -q "patch/hymofs.patch"; then
+              echo "Patch file logic changed since $PREV_TAG."
+              SHOULD_UPDATE="true"
+            else
+              echo "No logic changes in patch file since $PREV_TAG."
+            fi
+          else
+            # No previous tag. Fallback to checking if modified in current commit
+            LAST_PATCH_COMMIT=$(git log -1 --format="%H" patch/hymofs.patch || echo "none")
+            CURRENT_COMMIT=$(git rev-parse HEAD)
+            if [ "$LAST_PATCH_COMMIT" = "$CURRENT_COMMIT" ]; then
+               echo "Patch modified in initial release commit."
+               SHOULD_UPDATE="true"
+            fi
+          fi
+          
+          if [ "$SHOULD_UPDATE" = "true" ]; then
+            echo "Patch file modified. Bumping protocol version..."
             
             # Read current version from patch
             CURRENT_VER=$(grep -o "HymoFS Protocol: [0-9]*" patch/hymofs.patch | cut -d: -f2 | xargs)
@@ -122,7 +147,7 @@ jobs:
             grep "HymoFS Protocol:" patch/hymofs.patch
             grep "EXPECTED_PROTOCOL_VERSION" src/mount/hymofs.hpp
           else
-            echo "Patch file not modified in this commit. Keeping existing version."
+            echo "Patch file not modified (or only version bump). Keeping existing version."
             echo "updated=false" >> $GITHUB_OUTPUT
           fi
 
