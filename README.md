@@ -48,13 +48,13 @@ Hymo uses a standard Makefile build system and supports cross-compilation.
 **HymoFS Patch**
 If you need to use HymoFS, please add the following to your compilation script when compiling the kernel:
 ```bash
-wget https://raw.githubusercontent.com/Anatdx/hymo/refs/heads/master/patch/hymofs.patch
+wget https://raw.githubusercontent.com/Anatdx/HymoFS/refs/heads/main/patch/hymofs.patch
 patch -p1 -F 3 < hymofs.patch
 echo "CONFIG_HYMOFS=y" >> ./common/arch/arm64/configs/gki_defconfig # Write to defconfig
 ```
 Or if you are using susfs, add this **AFTER** the susfs patch：
 ```bash
-wget https://raw.githubusercontent.com/Anatdx/hymo/refs/heads/master/patch/dirtyhymofs.patch
+wget https://raw.githubusercontent.com/Anatdx/HymoFS/refs/heads/main/patch/dirtyhymofs.patch
 patch -p1 -F 3 < dirtyhymofs.patch
 echo "CONFIG_HYMOFS=y" >> ./common/arch/arm64/configs/gki_defconfig # Write to defconfig
 ```
