@@ -1,7 +1,7 @@
 id=hymo
 metamodule=1
 name=Hymo
-version=v1.1.0
+version=v1.1.1
 versionCode=4
 author=Anatdx
 updateJson=https://raw.githubusercontent.com/Anatdx/hymo/master/update.json

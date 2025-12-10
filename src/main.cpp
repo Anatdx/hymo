@@ -391,18 +391,23 @@ int main(int argc, char* argv[]) {
         HymoFSStatus hymofs_status = HymoFS::check_status();
         std::string warning_msg = "";
 
-        if (hymofs_status == HymoFSStatus::Available || config.ignore_protocol_mismatch) {
-            if (hymofs_status != HymoFSStatus::Available) {
+        bool can_use_hymofs = (hymofs_status == HymoFSStatus::Available);
+        
+        if (!can_use_hymofs && config.ignore_protocol_mismatch) {
+            if (hymofs_status == HymoFSStatus::KernelTooOld || hymofs_status == HymoFSStatus::ModuleTooOld) {
                 LOG_WARN("Forcing HymoFS despite protocol mismatch (ignore_protocol_mismatch=true)");
-                // Generate warning message but proceed
+                can_use_hymofs = true;
                 if (hymofs_status == HymoFSStatus::KernelTooOld) {
                     warning_msg = "⚠️Kernel version is lower than module version. Please update your kernel.";
                 } else if (hymofs_status == HymoFSStatus::ModuleTooOld) {
                     warning_msg = "⚠️Module version is lower than kernel version. Please update your module.";
                 }
+            } else {
+                LOG_WARN("Cannot force HymoFS: Kernel module not present or error state (Status: " + std::to_string((int)hymofs_status) + ")");
             }
+        }
 
-            LOG_INFO("Connected to HymoFS! Modules in auto mode will prioritize mounting via HymoFS.");
+        if (can_use_hymofs) {
              // **HymoFS Fast Path**
             LOG_INFO("Mode: HymoFS Fast Path");
             
