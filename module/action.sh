@@ -17,9 +17,6 @@ if [ -e "$HYMO_DEV" ]; then
         if "$HYMO_BIN" clear; then
             echo "✅ 成功: 所有 HymoFS 映射已清空"
             echo "   系统路径应已恢复原状"
-            
-            # 记录日志
-            echo "[$(date "+%Y-%m-%d %H:%M:%S")] [ACTION] User triggered manual reset (clear rules)" >> "$LOG_FILE"
         else
             echo "❌ 失败: hymod 执行失败"
         fi

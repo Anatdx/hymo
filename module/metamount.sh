@@ -30,7 +30,7 @@ chmod 755 "hymod"
 log "Using binary: hymod"
 
 # Execute C++ Binary
-"./hymod" mount >> "$LOG_FILE" 2>&1
+"./hymod" mount
 EXIT_CODE=$?
 
 log "Hymo exited with code $EXIT_CODE"
