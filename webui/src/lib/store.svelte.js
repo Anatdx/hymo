@@ -24,6 +24,7 @@ export const store = $state({
   theme: 'auto', // 'auto' | 'light' | 'dark'
   isSystemDark: false,
   lang: 'en',
+  showAdvanced: false, // Advanced options toggle
   seed: DEFAULT_SEED,
   loadedLocale: null, // Stores the content of the loaded JSON
 
@@ -52,8 +53,8 @@ export const store = $state({
         common: { appName: "Hymo UI", saving: "...", theme: "Theme", language: "Language", themeAuto: "Auto", themeLight: "Light", themeDark: "Dark" },
         lang: { display: "English" },
         tabs: { status: "Status", config: "Config", modules: "Modules", logs: "Logs", info: "Info" },
-        status: { storageTitle: "Storage", storageDesc: "", moduleTitle: "Modules", moduleActive: "Active", modeStats: "Stats", modeAuto: "Auto", modeMagic: "Magic", sysInfoTitle: "System Info", kernel: "Kernel", selinux: "SELinux", mountBase: "Mount Base", activePartitions: "Active Partitions" },
-        config: { title: "Config", verboseLabel: "Verbose", verboseOff: "Off", verboseOn: "On", forceExt4: "Force Ext4", enableNuke: "Nuke LKM", disableUmount: "Disable Umount", moduleDir: "Dir", tempDir: "Temp", mountSource: "Source", logFile: "Log", partitions: "Partitions", autoPlaceholder: "Auto", reload: "Reload", save: "Save", reset: "Reset to Auto", invalidPath: "Invalid path detected", loadSuccess: "", loadError: "", loadDefault: "", saveSuccess: "", saveFailed: "" },
+        status: { storageTitle: "Storage", storageDesc: "", moduleTitle: "Modules", moduleActive: "Active", modeStats: "Stats", modeAuto: "Auto", modeMagic: "Magic", sysInfoTitle: "System Info", kernel: "Kernel", selinux: "SELinux", mountBase: "Mount Base", activePartitions: "Active Partitions", notSupported: "❌" },
+        config: { title: "Config", verboseLabel: "Verbose", verboseOff: "Off", verboseOn: "On", forceExt4: "Force Ext4", enableNuke: "Nuke LKM", disableUmount: "Disable Umount", ignoreProtocolMismatch: "Ignore HymoFS Version Mismatch", showAdvanced: "Show Advanced Options", moduleDir: "Dir", tempDir: "Temp", mountSource: "Source", logFile: "Log", partitions: "Partitions", autoPlaceholder: "Auto", reload: "Reload", save: "Save", reset: "Reset to Auto", invalidPath: "Invalid path detected", loadSuccess: "", loadError: "", loadDefault: "", saveSuccess: "", saveFailed: "" },
         modules: { title: "Modules", desc: "", modeAuto: "Overlay", modeMagic: "Magic", scanning: "...", reload: "Refresh", save: "Save", empty: "Empty", scanError: "", saveSuccess: "", saveFailed: "", searchPlaceholder: "Search", filterLabel: "Filter", filterAll: "All" },
         logs: { title: "Logs", loading: "...", refresh: "Refresh", empty: "Empty", copy: "Copy", copySuccess: "Copied", copyFail: "Failed", searchPlaceholder: "Search", filterLabel: "Filter", levels: { all: "All", info: "Info", warn: "Warn", error: "Error" } },
         info: { title: "About", projectLink: "Repository", donate: "Donate", contributors: "Contributors", loading: "Loading...", loadFail: "Failed to load", noBio: "No bio available" }
@@ -92,6 +93,11 @@ export const store = $state({
     this.applyTheme();
   },
 
+  setShowAdvanced(show) {
+    this.showAdvanced = show;
+    localStorage.setItem('mm-show-advanced', show ? 'true' : 'false');
+  },
+
   async setLang(code) {
     const path = `../locales/${code}.json`;
     if (localeModules[path]) {
@@ -113,6 +119,7 @@ export const store = $state({
     
     // Theme Logic
     this.theme = localStorage.getItem('mm-theme') || 'auto';
+    this.showAdvanced = localStorage.getItem('mm-show-advanced') === 'true';
     
     // System dark mode listener
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');

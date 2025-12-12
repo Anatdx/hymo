@@ -41,6 +41,7 @@
     "enableNuke": "Включить Paw Pad (Скрытность)",
     "disableUmount": "Отключить разделение пространств имен",
     "ignoreProtocolMismatch": "Игнорировать несоответствие версии HymoFS",
+    "showAdvanced": "Показать расширенные настройки",
     "moduleDir": "Путь модулей",
     "tempDir": "Временная папка",
     "mountSource": "Источник монтирования",

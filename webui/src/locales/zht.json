@@ -41,6 +41,7 @@
     "enableNuke": "啟用肉墊 (隱蔽模式)",
     "disableUmount": "禁用命名空間分離",
     "ignoreProtocolMismatch": "忽略HymoFS版本不匹配",
+    "showAdvanced": "顯示進階選項",
     "moduleDir": "模組路徑",
     "tempDir": "臨時路徑",
     "mountSource": "掛載來源",

@@ -41,6 +41,7 @@
     "enableNuke": "肉球を有効化 (ステルス)",
     "disableUmount": "名前空間の分離を無効化",
     "ignoreProtocolMismatch": "HymoFS バージョンの不一致を無視",
+    "showAdvanced": "詳細オプションを表示",
     "moduleDir": "モジュールディレクトリ",
     "tempDir": "一時ディレクトリ",
     "mountSource": "マウントソース",

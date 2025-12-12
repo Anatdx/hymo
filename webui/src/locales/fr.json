@@ -41,6 +41,7 @@
     "enableNuke": "Activer Paw Pad (Furtif)",
     "disableUmount": "Désactiver Détachement Namespace",
     "ignoreProtocolMismatch": "Ignorer le Désaccord de Version HymoFS",
+    "showAdvanced": "Afficher les options avancées",
     "moduleDir": "Répertoire Modules",
     "tempDir": "Répertoire Temp",
     "mountSource": "Source de Montage",

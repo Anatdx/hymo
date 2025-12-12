@@ -41,6 +41,7 @@
     "enableNuke": "تفعيل Paw Pad (تخفي)",
     "disableUmount": "تعطيل فصل مساحة الأسماء",
     "ignoreProtocolMismatch": "تجاهل عدم تطابق إصدار HymoFS",
+    "showAdvanced": "إظهار الخيارات المتقدمة",
     "moduleDir": "دليل الوحدات",
     "tempDir": "دليل مؤقت",
     "mountSource": "مصدر التثبيت",

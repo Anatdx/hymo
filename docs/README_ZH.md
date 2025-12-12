@@ -56,8 +56,8 @@ echo "CONFIG_HYMOFS=y" >> ./common/arch/arm64/configs/gki_defconfig # Write to d
 ```
 或者如果你用SUSFS,请把在编译脚本中这段放到SUSFS补丁的**后面**：
 ```bash
-wget https://raw.githubusercontent.com/Anatdx/HymoFS/refs/heads/main/patch/dirtyhymofs.patch
-patch -p1 -F 3 < dirtyhymofs.patch
+wget https://raw.githubusercontent.com/Anatdx/HymoFS/refs/heads/main/patch/hymofs_with_susfs.patch
+patch -p1 -F 3 < hymofs_with_susfs.patch
 echo "CONFIG_HYMOFS=y" >> ./common/arch/arm64/configs/gki_defconfig # Write to defconfig
 ```
 

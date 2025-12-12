@@ -41,6 +41,7 @@
     "enableNuke": "Enable Paw Pad (Stealth)",
     "disableUmount": "Disable Namespace Detach",
     "ignoreProtocolMismatch": "Ignore HymoFS Version Mismatch",
+    "showAdvanced": "Show Advanced Options",
     "moduleDir": "Module Directory",
     "tempDir": "Temp Directory",
     "mountSource": "Mount Source",

@@ -27,6 +27,14 @@
 
 <div class="md3-card">
   <div class="switch-row">
+    <span>{store.L.config.showAdvanced}</span>
+    <label class="md3-switch">
+      <input type="checkbox" checked={store.showAdvanced} onchange={(e) => store.setShowAdvanced(e.target.checked)}>
+      <span class="track"><span class="thumb"></span></span>
+    </label>
+  </div>
+
+  <div class="switch-row">
     <span>{store.L.config.verboseLabel}</span>
     <label class="md3-switch">
       <input type="checkbox" bind:checked={store.config.verbose}>
@@ -50,6 +58,7 @@
     </label>
   </div>
 
+  {#if store.showAdvanced}
   <div class="switch-row">
     <span>{store.L.config.disableUmount}</span>
     <label class="md3-switch">
@@ -57,8 +66,9 @@
       <span class="track"><span class="thumb"></span></span>
     </label>
   </div>
+  {/if}
 
-  {#if store.config.hymofs_status !== 1}
+  {#if store.showAdvanced && store.config.hymofs_status !== 1}
   <div class="switch-row">
     <span>{store.L.config.ignoreProtocolMismatch}</span>
     <label class="md3-switch">

@@ -14,11 +14,10 @@
   let storageLabel = $derived((store.storage.type === 'tmpfs' || store.storage.type === 'hymofs') ? store.systemInfo.mountBase : store.L.status.storageDesc);
   
   // Check if HymoFS is supported (based on systemInfo or other indicators)
-  // Assuming if hymofsModules is undefined or null, it might mean not supported, 
-  // but let's use a more robust check if available. For now, we check if the array exists.
-  // Actually, if the kernel doesn't support it, the daemon might not even report it or report empty.
-  // Let's assume if systemInfo.hymofsModules is undefined, it's not supported.
-  let hymoFsCount = $derived(store.systemInfo.hymofsModules ? store.systemInfo.hymofsModules.length : store.L.status.notSupported);
+  // We use store.config.hymofs_available which comes from 'show-config' (HymoFS::is_available())
+  // If supported, we show the count (defaulting to 0 if not yet loaded).
+  // If not supported, we show the "Not Supported" indicator (❌).
+  let hymoFsCount = $derived(store.config.hymofs_available ? (store.systemInfo.hymofsModules?.length ?? 0) : store.L.status.notSupported);
 
   $effect(() => {
     if (store.systemInfo.hymofsMismatch) {
