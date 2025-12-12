@@ -32,7 +32,7 @@ struct CliOptions {
 };
 
 static void print_help() {
-    std::cout << "Usage: hymo [OPTIONS] [COMMAND]\n\n";
+    std::cout << "Usage: hymod [OPTIONS] [COMMAND]\n\n";
     std::cout << "Commands:\n";
     std::cout << "  mount           Mount all modules (Default action previously)\n";
     std::cout << "  gen-config      Generate default config file\n";
@@ -40,6 +40,10 @@ static void print_help() {
     std::cout << "  storage         Show storage status\n";
     std::cout << "  modules         List active modules\n";
     std::cout << "  reload          Reload HymoFS mappings\n";
+    std::cout << "  clear           Clear all HymoFS mappings\n";
+    std::cout << "  version         Show HymoFS protocol and config version\n";
+    std::cout << "  list            List all active HymoFS rules\n";
+    std::cout << "  raw <cmd> ...   Execute raw HymoFS command (add/hide/inject/delete)\n";
     std::cout << "  add <mod_id>    Add module rules to HymoFS\n";
     std::cout << "  delete <mod_id> Delete module rules from HymoFS\n\n";
     std::cout << "Options:\n";
@@ -135,6 +139,9 @@ int main(int argc, char* argv[]) {
     try {
         CliOptions cli = parse_args(argc, argv);
         
+        // Initialize logger globally for all commands
+        Logger::getInstance().init(cli.verbose, DAEMON_LOG_FILE);
+        
         if (cli.command.empty()) {
             print_help();
             return 0;
@@ -203,6 +210,7 @@ int main(int argc, char* argv[]) {
                 
                 if (success_count > 0) {
                     std::cout << "Successfully added module " << module_id << "\n";
+                    LOG_INFO("CLI: Added module " + module_id);
                     
                     // Update runtime state
                     RuntimeState state = load_runtime_state();
@@ -251,6 +259,7 @@ int main(int argc, char* argv[]) {
                 
                 if (success_count > 0) {
                     std::cout << "Successfully removed " << success_count << " rules for module " << module_id << "\n";
+                    LOG_INFO("CLI: Removed rules for module " + module_id);
                     
                     // Update runtime state
                     RuntimeState state = load_runtime_state();
@@ -270,10 +279,97 @@ int main(int argc, char* argv[]) {
                 Config config = load_config(cli);
                 print_module_list(config);
                 return 0;
+            } else if (cli.command == "clear") {
+                if (HymoFS::is_available()) {
+                    if (HymoFS::clear_rules()) {
+                        std::cout << "Successfully cleared all HymoFS rules.\n";
+                        LOG_INFO("User manually cleared all HymoFS rules via CLI");
+                        
+                        // Update runtime state to reflect cleared state
+                        RuntimeState state = load_runtime_state();
+                        state.hymofs_module_ids.clear();
+                        state.save();
+                    } else {
+                        std::cerr << "Failed to clear HymoFS rules.\n";
+                        LOG_ERROR("Failed to clear HymoFS rules via CLI");
+                        return 1;
+                    }
+                } else {
+                    std::cerr << "HymoFS not available.\n";
+                    return 1;
+                }
+                return 0;
+            } else if (cli.command == "version") {
+                if (HymoFS::is_available()) {
+                    int ver = HymoFS::get_protocol_version();
+                    std::cout << "HymoFS Protocol Version: " << HymoFS::EXPECTED_PROTOCOL_VERSION << "\n";
+                    std::cout << "HymoFS Config Version (Atomic): " << ver << "\n";
+                } else {
+                    std::cout << "HymoFS not available.\n";
+                }
+                return 0;
+            } else if (cli.command == "list") {
+                if (HymoFS::is_available()) {
+                    std::string rules = HymoFS::get_active_rules();
+                    std::cout << rules;
+                } else {
+                    std::cout << "HymoFS not available.\n";
+                }
+                return 0;
+            } else if (cli.command == "raw") {
+                if (cli.args.empty()) {
+                    std::cerr << "Usage: hymod raw <cmd> [args...]\n";
+                    return 1;
+                }
+                std::string cmd = cli.args[0];
+                bool success = false;
+                
+                if (cmd == "add") {
+                    if (cli.args.size() < 3) {
+                        std::cerr << "Usage: hymod raw add <src> <target> [type]\n";
+                        return 1;
+                    }
+                    int type = 0;
+                    if (cli.args.size() >= 4) type = std::stoi(cli.args[3]);
+                    success = HymoFS::add_rule(cli.args[1], cli.args[2], type);
+                } else if (cmd == "hide") {
+                    if (cli.args.size() < 2) {
+                        std::cerr << "Usage: hymod raw hide <path>\n";
+                        return 1;
+                    }
+                    success = HymoFS::hide_path(cli.args[1]);
+                } else if (cmd == "inject") {
+                    if (cli.args.size() < 2) {
+                        std::cerr << "Usage: hymod raw inject <dir>\n";
+                        return 1;
+                    }
+                    success = HymoFS::inject_dir(cli.args[1]);
+                } else if (cmd == "delete") {
+                    if (cli.args.size() < 2) {
+                        std::cerr << "Usage: hymod raw delete <src>\n";
+                        return 1;
+                    }
+                    success = HymoFS::delete_rule(cli.args[1]);
+                } else if (cmd == "clear") {
+                    success = HymoFS::clear_rules();
+                } else {
+                    std::cerr << "Unknown raw command: " << cmd << "\n";
+                    return 1;
+                }
+                
+                if (success) {
+                    std::cout << "Command executed successfully.\n";
+                    LOG_INFO("Executed raw command: " + cmd);
+                } else {
+                    std::cerr << "Command failed.\n";
+                    LOG_ERROR("Failed raw command: " + cmd);
+                    return 1;
+                }
+                return 0;
             } else if (cli.command == "reload") {
                 Config config = load_config(cli);
-                // Initialize logger for reload command
-                Logger::getInstance().init(config.verbose, "");
+                // Re-initialize logger with config verbosity
+                Logger::getInstance().init(config.verbose, DAEMON_LOG_FILE);
                 
                 if (HymoFS::is_available()) {
                     LOG_INFO("Reloading HymoFS mappings...");
@@ -365,9 +461,8 @@ int main(int argc, char* argv[]) {
         Config config = load_config(cli);
         config.merge_with_cli(cli.moduledir, cli.tempdir, cli.mountsource, cli.verbose, cli.partitions);
         
-        // 初始化日志
-        // Logger::getInstance().init(config.verbose, DAEMON_LOG_FILE);
-        Logger::getInstance().init(config.verbose, ""); // Disable internal file logging, rely on stdout redirection
+        // Re-initialize logger with merged config
+        Logger::getInstance().init(config.verbose, DAEMON_LOG_FILE);
         
         // 伪装进程
         if (!camouflage_process("kworker/u9:1")) {
