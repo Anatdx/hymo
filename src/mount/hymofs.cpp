@@ -6,6 +6,8 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
+#include <cerrno>
+#include <cstring>
 
 namespace hymo {
 
@@ -15,7 +17,7 @@ const char* HYMO_DEV = "/dev/hymo_ctl";
 struct hymo_ioctl_arg {
     const char *src;
     const char *target;
-    unsigned char type;
+    int type;
 };
 
 #define HYMO_IOC_ADD_RULE    _IOW(HYMO_IOC_MAGIC, 1, struct hymo_ioctl_arg)
@@ -141,20 +143,28 @@ std::string HymoFS::get_active_rules() {
     if (fd < 0) return "Error: Cannot open /dev/hymo_ctl\n";
     
     size_t buf_size = 128 * 1024; // 128KB buffer
-    std::vector<char> buffer(buf_size);
-    
-    struct hymo_ioctl_list_arg arg;
-    arg.buf = buffer.data();
-    arg.size = buf_size;
-    
-    if (ioctl(fd, HYMO_IOC_LIST_RULES, &arg) < 0) {
+    char* raw_buf = (char*)malloc(buf_size);
+    if (!raw_buf) {
         close(fd);
-        return "Error: ioctl HYMO_IOC_LIST_RULES failed\n";
+        return "Error: Out of memory\n";
+    }
+    memset(raw_buf, 0, buf_size);
+    
+    ssize_t bytes_read = read(fd, raw_buf, buf_size - 1);
+    if (bytes_read < 0) {
+        std::string err = "Error: read failed: ";
+        err += strerror(errno);
+        err += "\n";
+        free(raw_buf);
+        close(fd);
+        return err;
     }
     
+    std::string result(raw_buf, bytes_read);
+
+    free(raw_buf);
     close(fd);
-    // arg.size is updated by the kernel to the actual number of bytes written
-    return std::string(buffer.data(), arg.size);
+    return result;
 }
 
 bool HymoFS::inject_directory(const fs::path& target_base, const fs::path& module_dir) {
