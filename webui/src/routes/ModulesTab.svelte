@@ -33,6 +33,18 @@
     expandedMap = { ...expandedMap };
   }
 
+  function addRule(mod) {
+    if (!mod.rules) mod.rules = [];
+    mod.rules.push({ path: '', mode: 'hymofs' });
+    // Trigger reactivity
+    store.modules = [...store.modules];
+  }
+
+  function removeRule(mod, index) {
+    mod.rules.splice(index, 1);
+    store.modules = [...store.modules];
+  }
+
   function handleKeydown(e, id) {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -147,6 +159,46 @@
                     <option value="magic">{store.L.modules.modeMagic}</option>
                   </select>
                 </div>
+              </div>
+
+              <!-- Custom Rules Section -->
+              <div class="rules-section">
+                <div class="rules-header">
+                  <span class="config-label">{store.L.modules.customRules}</span>
+                  <button class="btn-icon small" onclick={(e) => { e.stopPropagation(); addRule(mod); }} title={store.L.modules.addRule}>
+                    <svg viewBox="0 0 24 24" width="18" height="18"><path d={ICONS.add} fill="currentColor"/></svg>
+                  </button>
+                </div>
+                
+                {#if mod.rules && mod.rules.length > 0}
+                  <div class="rules-list-container">
+                    {#each mod.rules as rule, i}
+                      <div class="rule-item">
+                        <input 
+                            type="text" 
+                            class="rule-path" 
+                            bind:value={rule.path} 
+                            placeholder="/system/..." 
+                            onclick={(e) => e.stopPropagation()} 
+                            onkeydown={(e) => e.stopPropagation()}
+                        />
+                        <select 
+                            class="rule-mode" 
+                            bind:value={rule.mode} 
+                            onclick={(e) => e.stopPropagation()}
+                            onkeydown={(e) => e.stopPropagation()}
+                        >
+                          <option value="hymofs">HymoFS</option>
+                          <option value="overlay">Overlay</option>
+                          <option value="magic">Magic</option>
+                        </select>
+                        <button class="btn-icon small delete" onclick={(e) => { e.stopPropagation(); removeRule(mod, i); }} title={store.L.modules.removeRule}>
+                          <svg viewBox="0 0 24 24" width="16" height="16"><path d={ICONS.delete} fill="currentColor"/></svg>
+                        </button>
+                      </div>
+                    {/each}
+                  </div>
+                {/if}
               </div>
 
               {#if mod.strategy === 'hymofs' || (mod.mode === 'auto' && store.activeHymoModules.length > 0)}

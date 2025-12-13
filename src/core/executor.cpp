@@ -22,19 +22,16 @@ static fs::path extract_module_root(const fs::path& partition_path) {
 }
 
 ExecutionResult execute_plan(const MountPlan& plan, const Config& config) {
-    // 0. Execute HymoFS Operations
-    // HymoFS mappings are now handled in main.cpp via update_hymofs_mappings()
     if (!plan.hymofs_module_ids.empty()) {
         LOG_INFO("HymoFS modules handled by Fast Path controller.");
     }
 
     std::vector<fs::path> magic_queue = plan.magic_module_paths;
     
-    // Tracking active IDs
     std::vector<std::string> final_overlay_ids = plan.overlay_module_ids;
     std::vector<std::string> fallback_ids;
     
-    // 1. Execute Overlay Operations
+    // Execute Overlay Operations
     for (const auto& op : plan.overlay_ops) {
         std::vector<std::string> lowerdir_strings;
         for (const auto& p : op.lowerdirs) {
@@ -72,8 +69,7 @@ ExecutionResult execute_plan(const MountPlan& plan, const Config& config) {
         LOG_INFO(std::to_string(fallback_ids.size()) + " modules fell back to Magic Mount.");
     }
     
-    // 2. Execute Magic Mounts
-    // Deduplicate queue
+    // Execute Magic Mounts
     std::sort(magic_queue.begin(), magic_queue.end());
     magic_queue.erase(std::unique(magic_queue.begin(), magic_queue.end()), magic_queue.end());
     

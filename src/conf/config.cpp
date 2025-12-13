@@ -24,8 +24,7 @@ Config Config::load_default() {
 
 Config Config::from_file(const fs::path& path) {
     Config config;
-    // Simple TOML-like parser (basic implementation)
-    // In production, you'd use a proper TOML library
+    
     std::ifstream file(path);
     if (!file.is_open()) {
         throw std::runtime_error("Cannot open config file");
@@ -33,16 +32,13 @@ Config Config::from_file(const fs::path& path) {
     
     std::string line;
     while (std::getline(file, line)) {
-        // Skip comments and empty lines
         if (line.empty() || line[0] == '#') continue;
         
-        // Simple key=value parsing
         auto eq_pos = line.find('=');
         if (eq_pos != std::string::npos) {
             std::string key = line.substr(0, eq_pos);
             std::string value = line.substr(eq_pos + 1);
             
-            // Trim whitespace and quotes
             key.erase(0, key.find_first_not_of(" \t"));
             key.erase(key.find_last_not_of(" \t") + 1);
             value.erase(0, value.find_first_not_of(" \t\""));
@@ -56,12 +52,11 @@ Config Config::from_file(const fs::path& path) {
             else if (key == "disable_umount") config.disable_umount = (value == "true");
             else if (key == "enable_nuke") config.enable_nuke = (value == "true");
             else if (key == "ignore_protocol_mismatch") config.ignore_protocol_mismatch = (value == "true");
+            else if (key == "enable_kernel_debug") config.enable_kernel_debug = (value == "true");
             else if (key == "partitions") {
-                // Parse comma-separated partitions
                 std::stringstream ss(value);
                 std::string part;
                 while (std::getline(ss, part, ',')) {
-                    // Trim whitespace
                     part.erase(0, part.find_first_not_of(" \t"));
                     part.erase(part.find_last_not_of(" \t") + 1);
                     if (!part.empty()) {
@@ -73,6 +68,7 @@ Config Config::from_file(const fs::path& path) {
     }
     
     config.module_modes = load_module_modes();
+    config.module_rules = load_module_rules();
     return config;
 }
 
@@ -93,6 +89,7 @@ bool Config::save_to_file(const fs::path& path) const {
     file << "disable_umount = " << (disable_umount ? "true" : "false") << "\n";
     file << "enable_nuke = " << (enable_nuke ? "true" : "false") << "\n";
     file << "ignore_protocol_mismatch = " << (ignore_protocol_mismatch ? "true" : "false") << "\n";
+    file << "enable_kernel_debug = " << (enable_kernel_debug ? "true" : "false") << "\n";
     
     // Write partitions
     if (!partitions.empty()) {
@@ -134,16 +131,13 @@ void Config::merge_with_cli(
 std::map<std::string, std::string> load_module_modes() {
     std::map<std::string, std::string> modes;
     
-    // Load from config file if exists
     fs::path mode_file = fs::path(BASE_DIR) / "module_mode.conf";
     if (fs::exists(mode_file)) {
         std::ifstream file(mode_file);
         std::string line;
         while (std::getline(file, line)) {
-            // Skip empty lines and comments
             if (line.empty() || line[0] == '#') continue;
             
-            // Trim leading whitespace
             size_t start = line.find_first_not_of(" \t");
             if (start == std::string::npos) continue;
             if (line[start] == '#') continue;
@@ -153,13 +147,11 @@ std::map<std::string, std::string> load_module_modes() {
                 std::string module_id = line.substr(0, eq_pos);
                 std::string mode = line.substr(eq_pos + 1);
                 
-                // Trim whitespace
                 module_id.erase(0, module_id.find_first_not_of(" \t"));
                 module_id.erase(module_id.find_last_not_of(" \t") + 1);
                 mode.erase(0, mode.find_first_not_of(" \t"));
                 mode.erase(mode.find_last_not_of(" \t") + 1);
                 
-                // Convert mode to lowercase
                 for (char& c : mode) {
                     c = std::tolower(c);
                 }
@@ -170,6 +162,50 @@ std::map<std::string, std::string> load_module_modes() {
     }
     
     return modes;
+}
+
+std::map<std::string, std::vector<ModuleRuleConfig>> load_module_rules() {
+    std::map<std::string, std::vector<ModuleRuleConfig>> rules;
+    
+    fs::path rules_file = fs::path(BASE_DIR) / "module_rules.conf";
+    if (fs::exists(rules_file)) {
+        std::ifstream file(rules_file);
+        std::string line;
+        while (std::getline(file, line)) {
+            if (line.empty() || line[0] == '#') continue;
+            
+            size_t start = line.find_first_not_of(" \t");
+            if (start == std::string::npos) continue;
+            if (line[start] == '#') continue;
+            
+            auto colon_pos = line.find(':');
+            if (colon_pos == std::string::npos) continue;
+            
+            auto eq_pos = line.find('=', colon_pos);
+            if (eq_pos == std::string::npos) continue;
+            
+            std::string module_id = line.substr(0, colon_pos);
+            std::string path = line.substr(colon_pos + 1, eq_pos - (colon_pos + 1));
+            std::string mode = line.substr(eq_pos + 1);
+            
+            module_id.erase(0, module_id.find_first_not_of(" \t"));
+            module_id.erase(module_id.find_last_not_of(" \t") + 1);
+            
+            path.erase(0, path.find_first_not_of(" \t"));
+            path.erase(path.find_last_not_of(" \t") + 1);
+            
+            mode.erase(0, mode.find_first_not_of(" \t"));
+            mode.erase(mode.find_last_not_of(" \t") + 1);
+            
+            for (char& c : mode) {
+                c = std::tolower(c);
+            }
+            
+            rules[module_id].push_back({path, mode});
+        }
+    }
+    
+    return rules;
 }
 
 } // namespace hymo

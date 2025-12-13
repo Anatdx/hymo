@@ -226,3 +226,112 @@
   padding: 40px;
   opacity: 0.6;
 }
+.rules-section {
+  margin-top: 16px;
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+  padding-top: 12px;
+}
+
+.rules-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.rules-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rule-item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.rule-path {
+  flex: 1;
+  background: var(--md-sys-color-surface-container-high);
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: var(--md-sys-color-on-surface);
+  font-family: var(--md-ref-typeface-mono);
+  font-size: 13px;
+}
+
+.rule-mode {
+  background: var(--md-sys-color-surface-container-high);
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: 8px;
+  padding: 8px;
+  color: var(--md-sys-color-on-surface);
+  font-size: 13px;
+}
+
+.btn-icon.small {
+  width: 32px;
+  height: 32px;
+  padding: 6px;
+}
+
+.btn-icon.delete {
+  color: var(--md-sys-color-error);
+}
+
+.rules-section {
+  margin-top: 16px;
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+  padding-top: 12px;
+}
+
+.rules-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.rules-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rule-item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.rule-path {
+  flex: 1;
+  background: var(--md-sys-color-surface-container-high);
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: var(--md-sys-color-on-surface);
+  font-family: var(--md-ref-typeface-mono);
+  font-size: 13px;
+}
+
+.rule-mode {
+  background: var(--md-sys-color-surface-container-high);
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: 8px;
+  padding: 8px;
+  color: var(--md-sys-color-on-surface);
+  font-size: 13px;
+}
+
+.btn-icon.small {
+  width: 32px;
+  height: 32px;
+  padding: 6px;
+}
+
+.btn-icon.delete {
+  color: var(--md-sys-color-error);
+}

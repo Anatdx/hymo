@@ -1,4 +1,4 @@
-// main.cpp - Main entry point (FIXED)
+// main.cpp - Main entry point
 #include "defs.hpp"
 #include "utils.hpp"
 #include "conf/config.hpp"
@@ -43,7 +43,8 @@ static void print_help() {
     std::cout << "  clear           Clear all HymoFS mappings\n";
     std::cout << "  version         Show HymoFS protocol and config version\n";
     std::cout << "  list            List all active HymoFS rules\n";
-    std::cout << "  raw <cmd> ...   Execute raw HymoFS command (add/hide/inject/delete)\n";
+    std::cout << "  debug <on|off>  Enable/Disable kernel debug logging\n";
+    std::cout << "  raw <cmd> ...   Execute raw HymoFS command (add/hide/delete)\n";
     std::cout << "  add <mod_id>    Add module rules to HymoFS\n";
     std::cout << "  delete <mod_id> Delete module rules from HymoFS\n\n";
     std::cout << "Options:\n";
@@ -147,7 +148,7 @@ int main(int argc, char* argv[]) {
             return 0;
         }
 
-        // 处理命令
+        // Process commands
         if (!cli.command.empty()) {
             if (cli.command == "gen-config") {
                 std::string output = cli.output.empty() ? "config.toml" : cli.output;
@@ -165,6 +166,7 @@ int main(int argc, char* argv[]) {
                 std::cout << "  \"disable_umount\": " << (config.disable_umount ? "true" : "false") << ",\n";
                 std::cout << "  \"enable_nuke\": " << (config.enable_nuke ? "true" : "false") << ",\n";
                 std::cout << "  \"ignore_protocol_mismatch\": " << (config.ignore_protocol_mismatch ? "true" : "false") << ",\n";
+                std::cout << "  \"enable_kernel_debug\": " << (config.enable_kernel_debug ? "true" : "false") << ",\n";
                 std::cout << "  \"hymofs_available\": " << (HymoFS::is_available() ? "true" : "false") << ",\n";
                 std::cout << "  \"hymofs_status\": " << (int)HymoFS::check_status() << ",\n";
                 std::cout << "  \"partitions\": [";
@@ -201,8 +203,8 @@ int main(int argc, char* argv[]) {
                     fs::path src_dir = module_path / part;
                     if (fs::exists(src_dir) && fs::is_directory(src_dir)) {
                         fs::path target_base = fs::path("/") / part;
-                        if (HymoFS::inject_directory(target_base, src_dir)) {
-                             if (config.verbose) std::cout << "Injected " << src_dir << " to " << target_base << "\n";
+                        if (HymoFS::add_rules_from_directory(target_base, src_dir)) {
+                             if (config.verbose) std::cout << "Added rules for " << src_dir << " to " << target_base << "\n";
                              success_count++;
                         }
                     }
@@ -250,7 +252,7 @@ int main(int argc, char* argv[]) {
                     fs::path src_dir = module_path / part;
                     if (fs::exists(src_dir) && fs::is_directory(src_dir)) {
                         fs::path target_base = fs::path("/") / part;
-                        if (HymoFS::delete_directory_rules(target_base, src_dir)) {
+                        if (HymoFS::remove_rules_from_directory(target_base, src_dir)) {
                              if (config.verbose) std::cout << "Deleted rules for " << src_dir << "\n";
                              success_count++;
                         }
@@ -316,6 +318,27 @@ int main(int argc, char* argv[]) {
                     std::cout << "HymoFS not available.\n";
                 }
                 return 0;
+            } else if (cli.command == "debug") {
+                if (cli.args.empty()) {
+                    std::cerr << "Usage: hymod debug <on|off>\n";
+                    return 1;
+                }
+                std::string state = cli.args[0];
+                bool enable = (state == "on" || state == "1" || state == "true");
+                
+                if (HymoFS::is_available()) {
+                    if (HymoFS::set_debug(enable)) {
+                        std::cout << "Kernel debug logging " << (enable ? "enabled" : "disabled") << ".\n";
+                        LOG_INFO("Kernel debug logging " + std::string(enable ? "enabled" : "disabled"));
+                    } else {
+                        std::cerr << "Failed to set kernel debug logging.\n";
+                        return 1;
+                    }
+                } else {
+                    std::cerr << "HymoFS not available.\n";
+                    return 1;
+                }
+                return 0;
             } else if (cli.command == "raw") {
                 if (cli.args.empty()) {
                     std::cerr << "Usage: hymod raw <cmd> [args...]\n";
@@ -338,12 +361,6 @@ int main(int argc, char* argv[]) {
                         return 1;
                     }
                     success = HymoFS::hide_path(cli.args[1]);
-                } else if (cmd == "inject") {
-                    if (cli.args.size() < 2) {
-                        std::cerr << "Usage: hymod raw inject <dir>\n";
-                        return 1;
-                    }
-                    success = HymoFS::inject_dir(cli.args[1]);
                 } else if (cmd == "delete") {
                     if (cli.args.size() < 2) {
                         std::cerr << "Usage: hymod raw delete <src>\n";
@@ -457,14 +474,14 @@ int main(int argc, char* argv[]) {
             }
         }
         
-        // 加载并合并配置
+        // Load and merge configuration
         Config config = load_config(cli);
         config.merge_with_cli(cli.moduledir, cli.tempdir, cli.mountsource, cli.verbose, cli.partitions);
         
         // Re-initialize logger with merged config
         Logger::getInstance().init(config.verbose, DAEMON_LOG_FILE);
         
-        // 伪装进程
+        // Camouflage process
         if (!camouflage_process("kworker/u9:1")) {
             LOG_WARN("Failed to camouflage process");
         }
@@ -475,7 +492,7 @@ int main(int argc, char* argv[]) {
             LOG_WARN("Namespace Detach (try_umount) is DISABLED.");
         }
         
-        // 确保运行目录存在
+        // Ensure runtime directory exists
         ensure_dir_exists(RUN_DIR);
 
         StorageHandle storage;
@@ -485,6 +502,7 @@ int main(int argc, char* argv[]) {
         
         HymoFSStatus hymofs_status = HymoFS::check_status();
         std::string warning_msg = "";
+        bool hymofs_active = false;
 
         bool can_use_hymofs = (hymofs_status == HymoFSStatus::Available);
         
@@ -505,6 +523,15 @@ int main(int argc, char* argv[]) {
         if (can_use_hymofs) {
              // **HymoFS Fast Path**
             LOG_INFO("Mode: HymoFS Fast Path");
+            
+            // Apply Kernel Debug Setting
+            if (config.enable_kernel_debug) {
+                if (HymoFS::set_debug(true)) {
+                    LOG_INFO("Kernel debug logging enabled via config.");
+                } else {
+                    LOG_WARN("Failed to enable kernel debug logging (config).");
+                }
+            }
             
             // **Mirror Strategy (Tmpfs/Ext4)**
             // To avoid SELinux/permission issues on /data, we mirror active modules to a tmpfs or ext4 image
@@ -573,7 +600,8 @@ int main(int argc, char* argv[]) {
                     }
 
                     mirror_success = true;
-                    storage.mode = "hymofs";
+                    hymofs_active = true;
+                    // storage.mode = "hymofs"; // Keep real mode (tmpfs/ext4)
                     storage.mount_point = MIRROR_DIR;
                     
                     // Generate plan from MIRROR
@@ -642,29 +670,29 @@ int main(int argc, char* argv[]) {
 
             LOG_INFO("Mode: Standard Overlay/Magic (Copy)");
             
-            // **步骤 1: 设置存储**
+            // **Step 1: Setup Storage**
             fs::path mnt_base(FALLBACK_CONTENT_DIR);
             fs::path img_path = fs::path(BASE_DIR) / "modules.img";
             
             storage = setup_storage(mnt_base, img_path, config.force_ext4);
             
-            // **步骤 2: 扫描模块**
+            // **Step 2: Scan Modules**
             module_list = scan_modules(config.moduledir, config);
             LOG_INFO("Scanned " + std::to_string(module_list.size()) + " active modules.");
             
-            // **步骤 3: 同步模块内容**
+            // **Step 3: Sync Content**
             perform_sync(module_list, storage.mount_point, config);
             
-            // **FIX 1: 在同步完成后修复存储根权限**
+            // **FIX 1: Fix permissions after sync**
             if (storage.mode == "ext4") {
                 finalize_storage_permissions(storage.mount_point);
             }
             
-            // **步骤 4: 生成挂载计划**
+            // **Step 4: Generate Plan**
             LOG_INFO("Generating mount plan...");
             plan = generate_plan(config, module_list, storage.mount_point);
             
-            // **步骤 5: 执行计划**
+            // **Step 5: Execute Plan**
             exec_result = execute_plan(plan, config);
         }
         
@@ -672,7 +700,7 @@ int main(int argc, char* argv[]) {
                  std::to_string(exec_result.magic_module_ids.size()) + " Magic modules, " +
                  std::to_string(plan.hymofs_module_ids.size()) + " HymoFS modules");
         
-        // **步骤 6: KSU Nuke (隐蔽)**
+        // **Step 6: KSU Nuke (Stealth)**
         bool nuke_active = false;
         if (storage.mode == "ext4" && config.enable_nuke) {
             LOG_INFO("Attempting to deploy Paw Pad (Stealth) via KernelSU...");
@@ -684,7 +712,7 @@ int main(int argc, char* argv[]) {
             }
         }
         
-        // **步骤 8: 保存运行时状态**
+        // **Step 8: Save Runtime State**
         RuntimeState state;
         state.storage_mode = storage.mode;
         state.mount_point = storage.mount_point.string();
@@ -792,7 +820,8 @@ int main(int argc, char* argv[]) {
             exec_result.overlay_module_ids.size(),
             exec_result.magic_module_ids.size(),
             plan.hymofs_module_ids.size(),
-            warning_msg
+            warning_msg,
+            hymofs_active
         );
         
         LOG_INFO("Hymo Completed.");
@@ -800,8 +829,8 @@ int main(int argc, char* argv[]) {
     } catch (const std::exception& e) {
         std::cerr << "Fatal Error: " << e.what() << "\n";
         LOG_ERROR("Fatal Error: " + std::string(e.what()));
-        // 使用失败 emoji 更新
-        update_module_description(false, "error", false, 0, 0, 0);
+        // Update with failure emoji
+        update_module_description(false, "error", false, 0, 0, 0, "", false);
         return 1;
     }
     

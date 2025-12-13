@@ -10,6 +10,11 @@ namespace fs = std::filesystem;
 
 namespace hymo {
 
+struct ModuleRule {
+    std::string path;
+    std::string mode; // "hymofs", "overlay", "magic", "none"
+};
+
 struct Module {
     std::string id;
     fs::path source_path;
@@ -18,6 +23,7 @@ struct Module {
     std::string version = "";
     std::string author = "";
     std::string description = "";
+    std::vector<ModuleRule> rules;
 };
 
 std::vector<Module> scan_modules(const fs::path& source_dir, const Config& config);

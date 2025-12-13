@@ -97,6 +97,22 @@ button:active {
   background-color: rgba(128,128,128, 0.1);
 }
 
+.btn-text {
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 20px;
+  background-color: transparent;
+  color: var(--md-sys-color-primary);
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-text:hover {
+  background-color: rgba(128,128,128, 0.05);
+}
+
 /* Cards */
 .md3-card {
   background-color: var(--md-sys-color-surface-container);
@@ -139,11 +155,34 @@ button:active {
   position: absolute;
   top: -9px;
   left: 12px;
-  background-color: var(--md-sys-color-surface-container);
+  background-color: transparent;
   padding: 0 4px;
   font-size: 12px;
   color: var(--md-sys-color-primary);
   z-index: 1;
+}
+
+/* Filled Style (for ConfigTab to avoid label overlap) */
+.text-field.filled input, .text-field.filled select {
+  background: var(--md-sys-color-surface-container-highest);
+  border: none;
+  border-bottom: 1px solid var(--md-sys-color-outline);
+  border-radius: 4px 4px 0 0;
+  padding: 20px 16px 4px 16px;
+}
+
+.text-field.filled input:focus, .text-field.filled select:focus {
+  border-bottom-color: var(--md-sys-color-primary);
+  border-bottom-width: 2px;
+  background: var(--md-sys-color-surface-container-high);
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+.text-field.filled label {
+  top: 8px;
+  left: 16px;
+  pointer-events: none;
 }
 
 /* Floating Actions Bar */
@@ -153,7 +192,7 @@ button:active {
   left: 0;
   right: 0;
   padding: 16px 24px calc(16px + env(safe-area-inset-bottom)) 24px;
-  background: linear-gradient(to top, var(--md-sys-color-surface) 80%, transparent);
+  background: transparent;
   display: flex;
   justify-content: flex-end;
   gap: 12px;

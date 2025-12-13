@@ -7,11 +7,7 @@
 
 namespace hymo {
 
-// Helper: 递归检查目录是否有文件
-// Moved to utils.cpp
-// static bool has_files_recursive(const fs::path& path) { ... }
-
-// Helper: 检查模块是否对任何分区有内容(内置或额外)
+// Helper: Check if module has content for any partition (builtin or extra)
 static bool has_content(const fs::path& module_path, const std::vector<std::string>& all_partitions) {
     for (const auto& partition : all_partitions) {
         fs::path part_path = module_path / partition;
@@ -22,20 +18,20 @@ static bool has_content(const fs::path& module_path, const std::vector<std::stri
     return false;
 }
 
-// Helper: 通过比较 module.prop 检查模块是否需要同步
+// Helper: Check if module needs sync by comparing module.prop
 static bool should_sync(const fs::path& src, const fs::path& dst) {
     if (!fs::exists(dst)) {
-        return true; // 新模块
+        return true; // New module
     }
     
     fs::path src_prop = src / "module.prop";
     fs::path dst_prop = dst / "module.prop";
     
     if (!fs::exists(src_prop) || !fs::exists(dst_prop)) {
-        return true; // 缺少 prop 文件,强制同步
+        return true; // Missing prop file, force sync
     }
     
-    // 比较文件内容
+    // Compare file content
     try {
         std::ifstream src_file(src_prop, std::ios::binary);
         std::ifstream dst_file(dst_prop, std::ios::binary);
@@ -47,17 +43,17 @@ static bool should_sync(const fs::path& src, const fs::path& dst) {
         
         return src_content != dst_content;
     } catch (...) {
-        return true; // 读取错误,强制同步
+        return true; // Read error, force sync
     }
 }
 
-// Helper: 移除孤立的模块目录
+// Helper: Remove orphaned module directories
 static void prune_orphaned_modules(const std::vector<Module>& modules, const fs::path& storage_root) {
     if (!fs::exists(storage_root)) {
         return;
     }
     
-    // 构建活动模块 ID 集合
+    // Build active module ID set
     std::set<std::string> active_ids;
     for (const auto& module : modules) {
         active_ids.insert(module.id);
@@ -67,7 +63,7 @@ static void prune_orphaned_modules(const std::vector<Module>& modules, const fs:
         for (const auto& entry : fs::directory_iterator(storage_root)) {
             std::string name = entry.path().filename().string();
             
-            // 跳过内部目录
+            // Skip internal directories
             if (name == "lost+found" || name == "hymo") {
                 continue;
             }
@@ -86,7 +82,7 @@ static void prune_orphaned_modules(const std::vector<Module>& modules, const fs:
     }
 }
 
-// **FIX 1: 改进 SELinux Context 修复逻辑**
+// Improve SELinux Context repair logic
 static void recursive_context_repair(const fs::path& base, const fs::path& current) {
     if (!fs::exists(current)) {
         return;
@@ -95,7 +91,7 @@ static void recursive_context_repair(const fs::path& base, const fs::path& curre
     try {
         std::string file_name = current.filename().string();
         
-        // **关键修复: 对 upperdir/workdir 使用父目录的 context**
+        // Critical fix: Use parent directory context for upperdir/workdir
         if (file_name == "upperdir" || file_name == "workdir") {
             if (current.has_parent_path()) {
                 fs::path parent = current.parent_path();
@@ -107,7 +103,7 @@ static void recursive_context_repair(const fs::path& base, const fs::path& curre
                 }
             }
         } else {
-            // 对于正常文件/目录,尝试从系统路径获取 context
+            // For normal files/directories, try to get context from system path
             fs::path relative = fs::relative(current, base);
             fs::path system_path = fs::path("/") / relative;
             
@@ -116,7 +112,7 @@ static void recursive_context_repair(const fs::path& base, const fs::path& curre
             }
         }
         
-        // **递归处理子目录**
+        // Recursively process subdirectories
         if (fs::is_directory(current)) {
             for (const auto& entry : fs::directory_iterator(current)) {
                 recursive_context_repair(base, entry.path());
@@ -127,7 +123,7 @@ static void recursive_context_repair(const fs::path& base, const fs::path& curre
     }
 }
 
-// **FIX 2: 修复模块 SELinux Context**
+// Fix module SELinux Context
 static void repair_module_contexts(const fs::path& module_root, const std::string& module_id, const std::vector<std::string>& all_partitions) {
     LOG_DEBUG("Repairing SELinux contexts for module: " + module_id);
     
@@ -147,20 +143,20 @@ static void repair_module_contexts(const fs::path& module_root, const std::strin
 void perform_sync(const std::vector<Module>& modules, const fs::path& storage_root, const Config& config) {
     LOG_INFO("Starting smart module sync to " + storage_root.string());
     
-    // 构建完整的分区列表(内置 + 额外)
+    // Build complete partition list (builtin + extra)
     std::vector<std::string> all_partitions = BUILTIN_PARTITIONS;
     for (const auto& part : config.partitions) {
         all_partitions.push_back(part);
     }
     
-    // 1. 清理孤立目录(清理已禁用/移除的模块)
+    // 1. Prune orphaned directories (clean disabled/removed modules)
     prune_orphaned_modules(modules, storage_root);
     
-    // 2. 同步每个模块
+    // 2. Sync each module
     for (const auto& module : modules) {
         fs::path dst = storage_root / module.id;
         
-        // 检查模块是否对任何分区有实际内容(包括额外分区)
+        // Check if module has actual content for any partition (including extra partitions)
         if (!has_content(module.source_path, all_partitions)) {
             LOG_DEBUG("Skipping empty module: " + module.id);
             continue;
@@ -169,7 +165,7 @@ void perform_sync(const std::vector<Module>& modules, const fs::path& storage_ro
         if (should_sync(module.source_path, dst)) {
             LOG_DEBUG("Syncing module: " + module.id + " (Updated/New)");
             
-            // 同步前清理目标目录
+            // Clean target directory before sync
             if (fs::exists(dst)) {
                 try {
                     fs::remove_all(dst);
@@ -181,7 +177,7 @@ void perform_sync(const std::vector<Module>& modules, const fs::path& storage_ro
             if (!sync_dir(module.source_path, dst)) {
                 LOG_ERROR("Failed to sync module " + module.id);
             } else {
-                // **FIX 3: 同步成功后立即修复 SELinux Context**
+                // Fix SELinux Context immediately after successful sync
                 repair_module_contexts(dst, module.id, all_partitions);
             }
         } else {

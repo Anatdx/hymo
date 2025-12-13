@@ -14,6 +14,7 @@ export const store = $state({
   version: '', // App version from module.prop
   activePartitions: [], // List of currently mounted partitions
   activeHymoModules: [], // List of modules currently mounted via HymoFS
+  logSource: 'daemon', // 'daemon' | 'kernel'
 
   // UI State
   loading: { config: false, modules: false, logs: false, status: false },
@@ -22,6 +23,8 @@ export const store = $state({
   
   // Settings
   theme: 'auto', // 'auto' | 'light' | 'dark'
+  backgroundImage: '',
+  uiOpacity: 1.0,
   isSystemDark: false,
   lang: 'en',
   showAdvanced: false, // Advanced options toggle
@@ -54,7 +57,7 @@ export const store = $state({
         lang: { display: "English" },
         tabs: { status: "Status", config: "Config", modules: "Modules", logs: "Logs", info: "Info" },
         status: { storageTitle: "Storage", storageDesc: "", moduleTitle: "Modules", moduleActive: "Active", modeStats: "Stats", modeAuto: "Auto", modeMagic: "Magic", sysInfoTitle: "System Info", kernel: "Kernel", selinux: "SELinux", mountBase: "Mount Base", activePartitions: "Active Partitions", notSupported: "❌" },
-        config: { title: "Config", verboseLabel: "Verbose", verboseOff: "Off", verboseOn: "On", forceExt4: "Force Ext4", enableNuke: "Nuke LKM", disableUmount: "Disable Umount", ignoreProtocolMismatch: "Ignore HymoFS Version Mismatch", showAdvanced: "Show Advanced Options", moduleDir: "Dir", tempDir: "Temp", mountSource: "Source", logFile: "Log", partitions: "Partitions", autoPlaceholder: "Auto", reload: "Reload", save: "Save", reset: "Reset to Auto", invalidPath: "Invalid path detected", loadSuccess: "", loadError: "", loadDefault: "", saveSuccess: "", saveFailed: "" },
+        config: { title: "Config", verboseLabel: "Verbose", verboseOff: "Off", verboseOn: "On", forceExt4: "Force Ext4", enableNuke: "Nuke LKM", disableUmount: "Disable Umount", ignoreProtocolMismatch: "Ignore HymoFS Version Mismatch", enableKernelDebug: "Enable Kernel Debug Logging", showAdvanced: "Show Advanced Options", moduleDir: "Dir", tempDir: "Temp", mountSource: "Source", logFile: "Log", partitions: "Partitions", autoPlaceholder: "Auto", reload: "Reload", save: "Save", reset: "Reset to Auto", invalidPath: "Invalid path detected", loadSuccess: "", loadError: "", loadDefault: "", saveSuccess: "", saveFailed: "" },
         modules: { title: "Modules", desc: "", modeAuto: "Overlay", modeMagic: "Magic", scanning: "...", reload: "Refresh", save: "Save", empty: "Empty", scanError: "", saveSuccess: "", saveFailed: "", searchPlaceholder: "Search", filterLabel: "Filter", filterAll: "All" },
         logs: { title: "Logs", loading: "...", refresh: "Refresh", empty: "Empty", copy: "Copy", copySuccess: "Copied", copyFail: "Failed", searchPlaceholder: "Search", filterLabel: "Filter", levels: { all: "All", info: "Info", warn: "Warn", error: "Error" } },
         info: { title: "About", projectLink: "Repository", donate: "Donate", contributors: "Contributors", loading: "Loading...", loadFail: "Failed to load", noBio: "No bio available" }
@@ -84,13 +87,35 @@ export const store = $state({
     const isDark = this.theme === 'auto' ? this.isSystemDark : this.theme === 'dark';
     const attr = isDark ? 'dark' : 'light';
     document.documentElement.setAttribute('data-theme', attr);
-    Monet.apply(this.seed, isDark);
+    Monet.apply(this.seed, isDark, this.uiOpacity);
   },
 
   setTheme(newTheme) {
     this.theme = newTheme;
     localStorage.setItem('mm-theme', newTheme);
     this.applyTheme();
+  },
+
+  setUiOpacity(value) {
+    this.uiOpacity = value;
+    localStorage.setItem('mm-ui-opacity', value.toString());
+    document.documentElement.style.setProperty('--ui-opacity', value);
+    this.applyTheme();
+  },
+
+  setBackgroundImage(url) {
+    try {
+      if (!url) {
+        localStorage.removeItem('mm-bg-image');
+        this.backgroundImage = '';
+      } else {
+        localStorage.setItem('mm-bg-image', url);
+        this.backgroundImage = url;
+      }
+    } catch (e) {
+      console.error("Failed to save background image", e);
+      this.showToast(this.L.config.imageTooLarge || "Image too large to save", "error");
+    }
   },
 
   setShowAdvanced(show) {
@@ -119,6 +144,9 @@ export const store = $state({
     
     // Theme Logic
     this.theme = localStorage.getItem('mm-theme') || 'auto';
+    this.backgroundImage = localStorage.getItem('mm-bg-image') || '';
+    this.uiOpacity = parseFloat(localStorage.getItem('mm-ui-opacity') || '1.0');
+    document.documentElement.style.setProperty('--ui-opacity', this.uiOpacity);
     this.showAdvanced = localStorage.getItem('mm-show-advanced') === 'true';
     
     // System dark mode listener
@@ -186,6 +214,7 @@ export const store = $state({
     this.saving.modules = true;
     try {
       await API.saveModules(this.modules);
+      await API.saveRules(this.modules);
       this.showToast(this.L.modules.saveSuccess);
     } catch (e) {
       this.showToast(this.L.modules.saveFailed, 'error');
@@ -198,16 +227,17 @@ export const store = $state({
     if (!silent) this.logs = []; 
     
     try {
-      const raw = await API.readLogs(this.config.logfile, 1000);
+      const source = this.logSource === 'kernel' ? 'kernel' : this.config.logfile;
+      const raw = await API.readLogs(source, 1000);
       
       if (!raw) {
         this.logs = [{ text: this.L.logs.empty, type: 'debug' }];
       } else {
         this.logs = raw.split('\n').map(line => {
           let type = 'debug';
-          if (line.includes('[ERROR]')) type = 'error';
-          else if (line.includes('[WARN]')) type = 'warn';
-          else if (line.includes('[INFO]')) type = 'info';
+          if (line.includes('[ERROR]') || line.includes('error:')) type = 'error';
+          else if (line.includes('[WARN]') || line.includes('warning:')) type = 'warn';
+          else if (line.includes('[INFO]') || line.includes('hymofs:')) type = 'info';
           return { text: line, type };
         });
       }
@@ -217,6 +247,11 @@ export const store = $state({
       if (!silent) this.showToast(this.L.logs.readFailed, 'error');
     }
     this.loading.logs = false;
+  },
+
+  setLogSource(source) {
+    this.logSource = source;
+    this.loadLogs();
   },
 
   async loadStatus() {

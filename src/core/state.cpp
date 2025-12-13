@@ -16,7 +16,6 @@ bool RuntimeState::save() const {
         return false;
     }
     
-    // Simple JSON format
     file << "{\n";
     file << "  \"storage_mode\": \"" << storage_mode << "\",\n";
     file << "  \"mount_point\": \"" << mount_point << "\",\n";
@@ -67,7 +66,6 @@ static std::vector<std::string> parse_json_array(const std::string& line) {
     std::stringstream ss(content);
     std::string item;
     while (std::getline(ss, item, ',')) {
-        // Remove quotes and whitespace
         size_t first_quote = item.find("\"");
         size_t last_quote = item.rfind("\"");
         if (first_quote != std::string::npos && last_quote != std::string::npos && last_quote > first_quote) {
@@ -89,10 +87,8 @@ RuntimeState load_runtime_state() {
         return state;
     }
     
-    // Simple JSON parser (very basic)
     std::string line;
     while (std::getline(file, line)) {
-        // Remove whitespace
         line.erase(0, line.find_first_not_of(" \t"));
         
         if (line.find("\"storage_mode\"") != std::string::npos) {

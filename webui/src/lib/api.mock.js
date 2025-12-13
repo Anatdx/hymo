@@ -79,5 +79,28 @@ export const MockAPI = {
     fetchSystemColor: async () => {
         await delay(200);
         return '#8FBC8F'; 
+    },
+
+    listFiles: async (path) => {
+        await delay(300);
+        if (path === '/sdcard') {
+            return [
+                { name: 'Download', isDir: true, path: '/sdcard/Download' },
+                { name: 'DCIM', isDir: true, path: '/sdcard/DCIM' },
+                { name: 'test.png', isDir: false, path: '/sdcard/test.png' }
+            ];
+        }
+        if (path === '/sdcard/Download') {
+             return [
+                { name: 'wallpaper.jpg', isDir: false, path: '/sdcard/Download/wallpaper.jpg' }
+            ];
+        }
+        return [];
+    },
+
+    readFileBase64: async (path) => {
+        await delay(500);
+        // Return a 1x1 transparent pixel base64
+        return "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
     }
 };

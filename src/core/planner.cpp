@@ -53,6 +53,44 @@ static bool has_meaningful_content(const fs::path& base, const std::vector<std::
     return false;
 }
 
+// Helper: Resolve symlinks in directory path, but keep the filename as is.
+// This ensures that rules for /sdcard/foo (where /sdcard -> /storage/emulated/0)
+// are correctly mapped to /storage/emulated/0/foo, while preserving the ability
+// to target a symlink file itself (e.g. replacing a symlink).
+static std::string resolve_path_for_hymofs(const std::string& path_str) {
+    try {
+        fs::path p(path_str);
+        if (!p.has_parent_path()) return path_str;
+        
+        fs::path parent = p.parent_path();
+        fs::path filename = p.filename();
+        
+        fs::path curr = parent;
+        std::vector<fs::path> suffix;
+        
+        // Walk up until we find an existing path
+        while (!curr.empty() && curr != "/" && !fs::exists(curr)) {
+            suffix.push_back(curr.filename());
+            curr = curr.parent_path();
+        }
+        
+        // Resolve the existing base
+        if (fs::exists(curr)) {
+            curr = fs::canonical(curr);
+        }
+        
+        // Re-append the non-existing suffix
+        for (auto it = suffix.rbegin(); it != suffix.rend(); ++it) {
+            curr /= *it;
+        }
+        
+        curr /= filename;
+        return curr.string();
+    } catch (...) {
+        return path_str;
+    }
+}
+
 MountPlan generate_plan(
     const Config& config,
     const std::vector<Module>& modules,
@@ -80,30 +118,129 @@ MountPlan generate_plan(
         if (!fs::exists(content_path)) continue;
         if (!has_meaningful_content(content_path, target_partitions)) continue;
         
-        if (module.mode == "magic") {
-            magic_paths.insert(content_path);
-            magic_ids.insert(module.id);
-            continue;
-        }
-        
-        // If HymoFS is available, we use it for everything except magic modules.
-        // UNLESS the user explicitly requested "overlay" mode.
-        bool force_overlay = (module.mode == "overlay");
+        // Determine default mode
+        std::string default_mode = module.mode;
+        if (default_mode == "auto") default_mode = use_hymofs ? "hymofs" : "overlay";
 
-        if (use_hymofs && !force_overlay) {
-            plan.hymofs_module_ids.push_back(module.id);
-        } else {
-            // Fallback to OverlayFS or Forced OverlayFS
-            bool participates_in_overlay = false;
-            for (const auto& part : target_partitions) {
-                fs::path part_path = content_path / part;
-                if (fs::is_directory(part_path) && has_files(part_path)) {
-                    std::string part_root = "/" + part;
-                    overlay_layers[part_root].push_back(part_path);
-                    participates_in_overlay = true;
+        bool has_rules = !module.rules.empty();
+        
+        if (!has_rules) {
+            if (default_mode == "magic") {
+                magic_paths.insert(content_path);
+                magic_ids.insert(module.id);
+                continue;
+            }
+            
+            bool force_overlay = (default_mode == "overlay");
+
+            if (use_hymofs && !force_overlay) {
+                plan.hymofs_module_ids.push_back(module.id);
+            } else {
+                // Fallback to OverlayFS or Forced OverlayFS
+                bool participates_in_overlay = false;
+                for (const auto& part : target_partitions) {
+                    fs::path part_path = content_path / part;
+                    if (fs::is_directory(part_path) && has_files(part_path)) {
+                        std::string part_root = "/" + part;
+                        overlay_layers[part_root].push_back(part_path);
+                        participates_in_overlay = true;
+                    }
+                }
+                if (participates_in_overlay) {
+                    overlay_ids.insert(module.id);
                 }
             }
-            if (participates_in_overlay) {
+        } else {
+            // Mixed mode handling
+            bool hymofs_active = false;
+            bool overlay_active = false;
+            bool magic_active = false;
+
+            for (const auto& part : target_partitions) {
+                fs::path part_root = content_path / part;
+                if (!fs::exists(part_root)) continue;
+                
+                for (const auto& entry : fs::recursive_directory_iterator(part_root)) {
+                    fs::path rel = fs::relative(entry.path(), content_path);
+                    std::string path_str = "/" + rel.string();
+                    
+                    std::string mode = default_mode;
+                    size_t max_len = 0;
+                    bool rule_found = false;
+                    
+                    for (const auto& rule : module.rules) {
+                        if (path_str == rule.path || 
+                           (path_str.size() > rule.path.size() && path_str.compare(0, rule.path.size(), rule.path) == 0 && path_str[rule.path.size()] == '/')) {
+                            if (rule.path.size() > max_len) {
+                                max_len = rule.path.size();
+                                mode = rule.mode;
+                                rule_found = true;
+                            }
+                        }
+                    }
+                    
+                    if (entry.is_directory()) {
+                        if (mode == "overlay") {
+                            bool is_exact_rule = false;
+                            for (const auto& rule : module.rules) {
+                                if (rule.path == path_str && rule.mode == "overlay") {
+                                    is_exact_rule = true;
+                                    break;
+                                }
+                            }
+                            
+                            if (is_exact_rule) {
+                                overlay_layers[path_str].push_back(entry.path());
+                                overlay_active = true;
+                            } else if (!rule_found && default_mode == "overlay") {
+                                if (entry.path() == part_root) {
+                                    overlay_layers["/" + part].push_back(entry.path());
+                                    overlay_active = true;
+                                }
+                            }
+                        } else if (mode == "magic") {
+                            bool is_exact_rule = false;
+                            for (const auto& rule : module.rules) {
+                                if (rule.path == path_str && rule.mode == "magic") {
+                                    is_exact_rule = true;
+                                    break;
+                                }
+                            }
+                            if (is_exact_rule) {
+                                magic_paths.insert(entry.path());
+                                magic_active = true;
+                            }
+                        } else if (mode == "hymofs") {
+                            // Will be handled by update_hymofs_mappings
+                        }
+                    }
+                    
+                    if (mode == "hymofs") {
+                        hymofs_active = true;
+                    }
+                }
+            }
+            
+            if (default_mode == "magic" && !magic_active && module.rules.empty()) {
+                 // Should not happen as we are in has_rules block
+            } else if (default_mode == "magic" && !magic_active) {
+                // If default is magic but no specific magic rules found (and we have other rules),
+                // we might still want to magic mount the root?
+                // But if we have rules, we probably want specific behavior.
+                // Let's assume if default is magic, we add the root unless explicitly excluded?
+                // For now, let's stick to explicit rules or default behavior if no rules match.
+                // If default is magic, and we have a rule for /system/bin=hymofs.
+                // We probably want everything else to be magic.
+                // But magic mount is coarse.
+                // Let's just add the root to magic_paths if default is magic.
+                magic_paths.insert(content_path);
+                magic_ids.insert(module.id);
+            }
+
+            if (hymofs_active) {
+                plan.hymofs_module_ids.push_back(module.id);
+            }
+            if (overlay_active) {
                 overlay_ids.insert(module.id);
             }
         }
@@ -139,6 +276,12 @@ MountPlan generate_plan(
     return plan;
 }
 
+struct AddRule {
+    std::string src;
+    std::string target;
+    int type;
+};
+
 void update_hymofs_mappings(
     const Config& config,
     const std::vector<Module>& modules,
@@ -155,14 +298,23 @@ void update_hymofs_mappings(
         target_partitions.push_back(part);
     }
 
-    std::set<std::string> injected_dirs;
-    struct AddRule {
-        std::string src;
-        std::string target;
-        int type;
-    };
     std::vector<AddRule> add_rules;
     std::vector<std::string> hide_rules;
+
+    // Process explicit hide rules from module configuration
+    for (const auto& module : modules) {
+        bool is_hymofs = false;
+        for(const auto& id : plan.hymofs_module_ids) {
+            if(id == module.id) { is_hymofs = true; break; }
+        }
+        if (!is_hymofs) continue;
+
+        for (const auto& rule : module.rules) {
+            if (rule.mode == "hide") {
+                hide_rules.push_back(resolve_path_for_hymofs(rule.path));
+            }
+        }
+    }
 
     // Iterate in reverse (Lowest Priority -> Highest Priority)
     // Assuming "Last Write Wins" in kernel module
@@ -177,6 +329,10 @@ void update_hymofs_mappings(
 
         fs::path mod_path = storage_root / module.id;
         
+        // Determine default mode for this module
+        std::string default_mode = module.mode;
+        if (default_mode == "auto") default_mode = "hymofs"; // If it's in hymofs_module_ids, default is effectively hymofs unless overridden
+
         for (const auto& part : target_partitions) {
             fs::path part_root = mod_path / part;
             if (!fs::exists(part_root)) continue;
@@ -185,6 +341,25 @@ void update_hymofs_mappings(
                 for (const auto& entry : fs::recursive_directory_iterator(part_root)) {
                     fs::path rel = fs::relative(entry.path(), mod_path);
                     fs::path virtual_path = fs::path("/") / rel;
+                    std::string path_str = virtual_path.string();
+
+                    // Check rules
+                    std::string mode = default_mode;
+                    size_t max_len = 0;
+                    for (const auto& rule : module.rules) {
+                        if (path_str == rule.path || 
+                           (path_str.size() > rule.path.size() && path_str.compare(0, rule.path.size(), rule.path) == 0 && path_str[rule.path.size()] == '/')) {
+                            if (rule.path.size() > max_len) {
+                                max_len = rule.path.size();
+                                mode = rule.mode;
+                            }
+                        }
+                    }
+
+                    // If mode is NOT hymofs, skip this file
+                    if (mode != "hymofs" && mode != "auto") {
+                        continue;
+                    }
                     
                     if (plan.is_covered_by_overlay(virtual_path.string())) {
                         continue;
@@ -192,7 +367,6 @@ void update_hymofs_mappings(
                     
                     if (entry.is_regular_file() || entry.is_symlink()) {
                         // Safety Check: Do not replace existing directories with symlinks
-                        // This prevents modules from accidentally hiding /system_ext, /vendor, etc.
                         if (entry.is_symlink()) {
                             if (fs::exists(virtual_path) && fs::is_directory(virtual_path)) {
                                 LOG_WARN("Safety: Skipping symlink replacement for directory: " + virtual_path.string());
@@ -208,14 +382,14 @@ void update_hymofs_mappings(
                         else if (entry.is_fifo()) type = DT_FIFO;
                         else if (entry.is_socket()) type = DT_SOCK;
 
-                        add_rules.push_back({virtual_path.string(), entry.path().string(), type});
-                        injected_dirs.insert(virtual_path.parent_path().string());
+                        std::string final_virtual_path = resolve_path_for_hymofs(virtual_path.string());
+                        add_rules.push_back({final_virtual_path, entry.path().string(), type});
                     } else if (entry.is_character_file()) {
                         // Check for whiteout (0:0)
                         struct stat st;
                         if (stat(entry.path().c_str(), &st) == 0) {
                             if (major(st.st_rdev) == 0 && minor(st.st_rdev) == 0) {
-                                hide_rules.push_back(virtual_path.string());
+                                hide_rules.push_back(resolve_path_for_hymofs(virtual_path.string()));
                             }
                         }
                     }
@@ -226,10 +400,7 @@ void update_hymofs_mappings(
         }
     }
     
-    // Apply rules: Inject dirs first, then add files, then hide
-    for (const auto& dir : injected_dirs) {
-        HymoFS::inject_dir(dir);
-    }
+    // Apply rules: Add files first (auto-injects parents), then hide
     for (const auto& rule : add_rules) {
         HymoFS::add_rule(rule.src, rule.target, rule.type);
     }

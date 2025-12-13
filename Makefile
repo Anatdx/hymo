@@ -30,9 +30,9 @@ SRC_FILES := $(SRC_DIR)/main.cpp \
              $(SRC_DIR)/mount/magic.cpp \
              $(SRC_DIR)/mount/hymofs.cpp
 
-.PHONY: all clean distclean zip install help check webui arm64 armv7 x86_64 x86 testbuild testziptest
+.PHONY: all clean distclean zip install help check webui arm64 armv7 x86_64 testbuild testziptest
 
-all: check webui arm64 armv7 x86_64 x86
+all: check webui arm64 armv7 x86_64
 
 testbuild: check webui arm64
 
@@ -79,12 +79,6 @@ x86_64: $(OUTPUT_DIR)
 	@$(NDK_LLVM)/llvm-strip $(OUTPUT_DIR)/hymod-x86_64
 	@echo "✅ x86_64: $$(du -h $(OUTPUT_DIR)/hymod-x86_64 | cut -f1)"
 
-x86: $(OUTPUT_DIR)
-	@echo "🔨 Compiling x86..."
-	@$(NDK_LLVM)/i686-linux-android$(ANDROID_API)-clang++ $(CXXFLAGS) -o $(OUTPUT_DIR)/hymod-x86 $(SRC_FILES)
-	@$(NDK_LLVM)/llvm-strip $(OUTPUT_DIR)/hymod-x86
-	@echo "✅ x86: $$(du -h $(OUTPUT_DIR)/hymod-x86 | cut -f1)"
-
 clean:
 	@echo "🧹 Cleaning..."
 	@rm -rf $(OUTPUT_DIR) $(BUILD_DIR)
@@ -123,7 +117,6 @@ help:
 	@echo "  arm64     - Build ARM 64-bit only"
 	@echo "  armv7     - Build ARM 32-bit only"
 	@echo "  x86_64    - Build Intel 64-bit only"
-	@echo "  x86       - Build Intel 32-bit only"
 	@echo "  zip       - Create module package"
 	@echo "  install   - Push to device via adb"
 	@echo "  clean     - Clean build files"

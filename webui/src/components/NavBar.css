@@ -1,10 +1,9 @@
 .app-bar {
   flex-shrink: 0;
   background-color: var(--md-sys-color-surface);
-  border-bottom: 1px solid var(--md-sys-color-outline-variant);
   z-index: 20;
   padding-top: max(32px, env(safe-area-inset-top)); 
-  box-shadow: var(--md-sys-elevation-1);
+  /* box-shadow removed to blend with tabs */
   transition: background-color 0.3s ease;
   position: relative;
 }
@@ -32,12 +31,12 @@
 
 .nav-tabs {
   display: flex;
-  background-color: var(--md-sys-color-surface);
-  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  background-color: transparent;
   overflow-x: auto;
   flex-shrink: 0;
   scrollbar-width: none; 
-  -ms-overflow-style: none; 
+  -ms-overflow-style: none;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
 }
 .nav-tabs::-webkit-scrollbar {
   display: none;

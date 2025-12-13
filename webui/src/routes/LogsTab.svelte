@@ -75,6 +75,11 @@
 </script>
 
 <div class="logs-controls">
+  <select class="log-filter-select" value={store.logSource} onchange={(e) => store.setLogSource(e.target.value)} style="margin-right: 8px; width: auto;">
+    <option value="daemon">Daemon</option>
+    <option value="kernel">Kernel</option>
+  </select>
+
   <svg viewBox="0 0 24 24" width="20" height="20" style="fill: var(--md-sys-color-on-surface-variant)">
     <path d={ICONS.search} />
   </svg>

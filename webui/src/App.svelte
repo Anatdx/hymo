@@ -63,7 +63,11 @@
   });
 </script>
 
-<div class="app-root">
+<div class="app-root" 
+     style:background-image={store.backgroundImage ? `url('${store.backgroundImage}')` : 'none'} 
+     style:background-size="cover" 
+     style:background-position="center"
+     style:background-attachment="fixed">
   <NavBar {activeTab} onTabChange={switchTab} />
 
   <main class="main-content" ontouchstart={handleTouchStart} ontouchend={handleTouchEnd}>

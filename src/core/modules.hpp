@@ -13,7 +13,8 @@ void update_module_description(
     size_t overlay_count,
     size_t magic_count,
     size_t hymofs_count = 0,
-    const std::string& warning_msg = ""
+    const std::string& warning_msg = "",
+    bool hymofs_active = false
 );
 
 void print_module_list(const Config& config);

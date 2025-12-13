@@ -34,7 +34,11 @@ export const Monet = {
   getTone: (baseHsl, lAdjust, sAdjust = 0, hAdjust = 0) => {
     return Monet.hslToHex((baseHsl.h + hAdjust) % 360, Math.max(0, Math.min(100, baseHsl.s + sAdjust)), lAdjust);
   },
-  apply: (seedHex, isDark) => {
+  hexToRgba: (hex, alpha) => {
+    const rgb = Monet.hexToRgb(hex);
+    return rgb ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})` : hex;
+  },
+  apply: (seedHex, isDark, opacity = 1.0) => {
     if (!seedHex) return;
     const rgb = Monet.hexToRgb(seedHex);
     if (!rgb) return;
@@ -85,6 +89,14 @@ export const Monet = {
     const root = document.documentElement.style;
     for (const [key, value] of Object.entries(tones)) {
       let cssVar = '';
+      let finalValue = value;
+
+      // Apply opacity to surface containers and surface (NavBar)
+      // Removed primaryCont and secondaryCont to keep buttons opaque
+      if (['surf', 'surfCont', 'surfContLow', 'surfContHigh', 'surfContHighest'].includes(key)) {
+        finalValue = Monet.hexToRgba(value, opacity);
+      }
+
       if(key === 'bg') cssVar = '--md-sys-color-background';
       else if(key === 'onBg') cssVar = '--md-sys-color-on-background';
       else if(key === 'surf') cssVar = '--md-sys-color-surface';
@@ -113,8 +125,13 @@ export const Monet = {
       else if(key === 'surfCont') cssVar = '--md-sys-color-surface-container';
       else if(key === 'surfContHigh') cssVar = '--md-sys-color-surface-container-high';
       else if(key === 'surfContHighest') cssVar = '--md-sys-color-surface-container-highest';
+
+      // Inject opaque version for specific use cases (like FilePicker)
+      if (cssVar && ['surf', 'surfCont', 'surfContLow', 'surfContHigh', 'surfContHighest', 'primaryCont', 'secondaryCont'].includes(key)) {
+         root.setProperty(cssVar + '-opaque', value);
+      }
       
-      if (cssVar) root.setProperty(cssVar, value);
+      if (cssVar) root.setProperty(cssVar, finalValue);
     }
   }
 };

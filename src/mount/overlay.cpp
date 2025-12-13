@@ -125,7 +125,7 @@ static bool mount_overlayfs_legacy(
     return true;
 }
 
-// **FIX 1: 添加获取子挂载点的函数**
+// FIX 1: Add function to get child mount points
 static std::vector<std::string> get_child_mounts(const std::string& target_root) {
     std::vector<std::string> mounts;
     
@@ -136,18 +136,18 @@ static std::vector<std::string> get_child_mounts(const std::string& target_root)
     
     std::string line;
     while (std::getline(mountinfo, line)) {
-        // 解析 mountinfo 格式: mount_id parent_id major:minor root mount_point ...
+        // Parse mountinfo format: mount_id parent_id major:minor root mount_point ...
         std::istringstream iss(line);
         std::string mount_id, parent_id, dev, root, mount_point;
         iss >> mount_id >> parent_id >> dev >> root >> mount_point;
         
-        // 检查挂载点是否在 target_root 下且不等于 target_root
+        // Check if mount point is under target_root and not equal to target_root
         if (mount_point.find(target_root) == 0 && mount_point != target_root) {
             mounts.push_back(mount_point);
         }
     }
     
-    // 排序并去重
+    // Sort and deduplicate
     std::sort(mounts.begin(), mounts.end());
     mounts.erase(std::unique(mounts.begin(), mounts.end()), mounts.end());
     
@@ -178,7 +178,7 @@ bool bind_mount(const fs::path& from, const fs::path& to, bool disable_umount) {
     return success;
 }
 
-// **FIX 2: 修复子挂载恢复逻辑**
+// FIX 2: Fix child mount restoration logic
 static bool mount_overlay_child(
     const std::string& mount_point,
     const std::string& relative,
@@ -186,10 +186,10 @@ static bool mount_overlay_child(
     const std::string& stock_root,
     bool disable_umount
 ) {
-    // 检查是否有模块修改了这个子路径
+    // Check if any module modified this subpath
     bool has_modification = false;
     for (const auto& lower : module_roots) {
-        fs::path path = fs::path(lower) / relative.substr(1); // 移除前导 /
+        fs::path path = fs::path(lower) / relative.substr(1); // Remove leading /
         if (fs::exists(path)) {
             has_modification = true;
             break;
@@ -197,7 +197,7 @@ static bool mount_overlay_child(
     }
     
     if (!has_modification) {
-        // 没有修改,直接绑定挂载原始路径
+        // No modification, directly bind mount original path
         return bind_mount(stock_root, mount_point, disable_umount);
     }
     
@@ -205,26 +205,26 @@ static bool mount_overlay_child(
         return true;
     }
     
-    // 收集这个子路径的 lowerdirs
+    // Collect lowerdirs for this subpath
     std::vector<std::string> lower_dirs;
     for (const auto& lower : module_roots) {
         fs::path path = fs::path(lower) / relative.substr(1);
         if (fs::is_directory(path)) {
             lower_dirs.push_back(path.string());
         } else if (fs::exists(path)) {
-            // 文件覆盖目录 - overlay 无效
-            // 这种情况下，我们应该恢复原始挂载点，否则它会被隐藏
+            // File overwrites directory - overlay invalid
+            // In this case, we should restore the original mount point, otherwise it will be hidden
             LOG_WARN("File modification found at mount point " + mount_point + ", falling back to bind mount");
             return bind_mount(stock_root, mount_point, disable_umount);
         }
     }
     
     if (lower_dirs.empty()) {
-        // 如果没有目录修改（只有文件修改或无修改），恢复原始挂载
+        // If no directory modification (only file modification or no modification), restore original mount
         return bind_mount(stock_root, mount_point, disable_umount);
     }
     
-    // 构建 lowerdir 字符串
+    // Build lowerdir string
     std::string lowerdir_config;
     for (size_t i = 0; i < lower_dirs.size(); ++i) {
         lowerdir_config += lower_dirs[i];
@@ -234,9 +234,9 @@ static bool mount_overlay_child(
     }
     lowerdir_config += ":" + std::string(stock_root);
     
-    // 尝试现代 API
+    // Try modern API
     if (!mount_overlayfs_modern(lowerdir_config, std::nullopt, std::nullopt, mount_point)) {
-        // 回退到传统方式
+        // Fallback to legacy method
         if (!mount_overlayfs_legacy(lowerdir_config, std::nullopt, std::nullopt, mount_point)) {
             LOG_WARN("failed to overlay child " + mount_point + ", fallback to bind mount");
             return bind_mount(stock_root, mount_point, disable_umount);
@@ -259,7 +259,7 @@ bool mount_overlay(
 ) {
     LOG_INFO("Starting robust overlay mount for " + target_root);
     
-    // **FIX 3: 确保在挂载前正确 chdir**
+    // FIX 3: Ensure correct chdir before mounting
     if (chdir(target_root.c_str()) != 0) {
         LOG_ERROR("failed to chdir to " + target_root + ": " + strerror(errno));
         return false;
@@ -267,14 +267,14 @@ bool mount_overlay(
     
     std::string stock_root = ".";
     
-    // **FIX 4: 在 overlay 挂载前扫描子挂载点**
+    // FIX 4: Scan child mount points before overlay mount
     auto mount_seq = get_child_mounts(target_root);
     
     if (!mount_seq.empty()) {
         LOG_DEBUG("Found " + std::to_string(mount_seq.size()) + " child mounts under " + target_root);
     }
     
-    // 构建 lowerdir 配置
+    // Build lowerdir config
     std::string lowerdir_config;
     for (size_t i = 0; i < module_roots.size(); ++i) {
         lowerdir_config += module_roots[i];
@@ -296,7 +296,7 @@ bool mount_overlay(
         workdir_str = workdir->string();
     }
     
-    // 挂载根 overlay
+    // Mount root overlay
     bool success = mount_overlayfs_modern(lowerdir_config, upperdir_str, workdir_str, target_root);
     if (!success) {
         LOG_WARN("fsopen mount failed, fallback to legacy mount");
@@ -312,9 +312,9 @@ bool mount_overlay(
         send_unmountable(target_root);
     }
     
-    // **FIX 5: 恢复所有子挂载点**
+    // FIX 5: Restore all child mount points
     for (const auto& mount_point : mount_seq) {
-        // 计算相对路径
+        // Calculate relative path
         std::string relative = mount_point;
         if (mount_point.find(target_root) == 0) {
             relative = mount_point.substr(target_root.length());
@@ -334,25 +334,25 @@ bool mount_overlay(
         }
     }
 
-    // **FIX 6: 修复被模块目录覆盖的系统分区软链接 (如 /system/vendor -> /vendor)**
-    // 当模块包含 system/vendor 目录时，overlayfs 会覆盖原有的软链接，导致 /system/vendor 变成一个不包含原系统文件的目录。
-    // 我们需要检测这种情况，并将根目录下的对应分区 bind mount 回去。
+    // FIX 6: Fix system partition symlinks covered by module directories (e.g. /system/vendor -> /vendor)
+    // When a module contains system/vendor directory, overlayfs will cover the original symlink, causing /system/vendor to become a directory without original system files.
+    // We need to detect this situation and bind mount the corresponding partition from root directory back.
     std::vector<std::string> partitions = {"vendor", "product", "system_ext", "odm", "oem"};
     for (const auto& part : partitions) {
         std::string root_part = "/" + part;
         std::string target_part = target_root + "/" + part;
         
-        // 1. 检查根分区是否存在且是目录
+        // 1. Check if root partition exists and is a directory
         if (!fs::exists(root_part) || !fs::is_directory(root_part)) {
             continue;
         }
 
-        // 2. 检查目标路径是否存在且是目录 (如果是软链接，说明没被覆盖，无需处理)
+        // 2. Check if target path exists and is a directory (if symlink, it's not covered, no need to handle)
         if (!fs::exists(target_part) || fs::is_symlink(target_part) || !fs::is_directory(target_part)) {
             continue;
         }
 
-        // 3. 检查是否已经在 mount_seq 中恢复过 (避免重复挂载)
+        // 3. Check if already restored in mount_seq (avoid duplicate mount)
         bool already_restored = false;
         for (const auto& mp : mount_seq) {
             if (mp == target_part) {
@@ -364,7 +364,7 @@ bool mount_overlay(
             continue;
         }
 
-        // 4. 执行 bind mount
+        // 4. Execute bind mount
         LOG_INFO("Restoring partition symlink/mount: " + root_part + " -> " + target_part);
         if (!bind_mount(root_part, target_part, disable_umount)) {
             LOG_ERROR("Failed to restore partition " + part);

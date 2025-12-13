@@ -21,12 +21,36 @@ static void parse_module_prop(const fs::path& module_path, Module& module) {
         std::string key = line.substr(0, eq);
         std::string value = line.substr(eq + 1);
 
-        // Trim whitespace if needed (though usually module.prop is strict)
-        // Simple key matching
         if (key == "name") module.name = value;
         else if (key == "version") module.version = value;
         else if (key == "author") module.author = value;
         else if (key == "description") module.description = value;
+    }
+}
+
+static void parse_module_rules(const fs::path& module_path, Module& module) {
+    fs::path rules_file = module_path / "hymo_rules.conf";
+    if (!fs::exists(rules_file)) return;
+
+    std::ifstream file(rules_file);
+    std::string line;
+    while (std::getline(file, line)) {
+        if (line.empty() || line[0] == '#') continue;
+        
+        auto eq_pos = line.find('=');
+        if (eq_pos != std::string::npos) {
+            std::string path = line.substr(0, eq_pos);
+            std::string mode = line.substr(eq_pos + 1);
+            
+            path.erase(0, path.find_first_not_of(" \t"));
+            path.erase(path.find_last_not_of(" \t") + 1);
+            mode.erase(0, mode.find_first_not_of(" \t"));
+            mode.erase(mode.find_last_not_of(" \t") + 1);
+            
+            for (char& c : mode) c = std::tolower(c);
+            
+            module.rules.push_back({path, mode});
+        }
     }
 }
 
@@ -45,26 +69,35 @@ std::vector<Module> scan_modules(const fs::path& source_dir, const Config& confi
             
             std::string id = entry.path().filename().string();
             
-            // Skip internal/system directories
             if (id == "hymo" || id == "lost+found" || id == ".git") {
                 continue;
             }
             
-            // Check for disable flags
             if (fs::exists(entry.path() / DISABLE_FILE_NAME) ||
                 fs::exists(entry.path() / REMOVE_FILE_NAME) ||
                 fs::exists(entry.path() / SKIP_MOUNT_FILE_NAME)) {
                 continue;
             }
             
-            // Determine mode
             std::string mode = "auto";
             auto it = config.module_modes.find(id);
             if (it != config.module_modes.end()) {
                 mode = it->second;
             }
             
-            Module mod{id, entry.path(), mode};
+            Module mod;
+            mod.id = id;
+            mod.source_path = entry.path();
+            mod.mode = mode;
+            auto rules_it = config.module_rules.find(id);
+            if (rules_it != config.module_rules.end()) {
+                for (const auto& rule_cfg : rules_it->second) {
+                    mod.rules.push_back({rule_cfg.path, rule_cfg.mode});
+                }
+            }
+            
+            parse_module_rules(entry.path(), mod);
+
             parse_module_prop(entry.path(), mod);
             modules.push_back(mod);
         }

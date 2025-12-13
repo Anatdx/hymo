@@ -17,9 +17,6 @@ case "$ABI" in
     x86_64)
         BINARY_NAME="hymod-x86_64"
         ;;
-    x86)
-        BINARY_NAME="hymod-x86"
-        ;;
     *)
         abort "! Unsupported architecture: $ABI"
         ;;
@@ -40,7 +37,7 @@ chmod 755 "$MODPATH/hymod"
 
 # Remove unused architecture binaries to save space
 ui_print "- Cleaning unused binaries..."
-for binary in hymod-arm64-v8a hymod-armeabi-v7a hymod-x86_64 hymod-x86; do
+for binary in hymod-arm64-v8a hymod-armeabi-v7a hymod-x86_64; do
     rm -f "$MODPATH/$binary"
     ui_print "  Removed: $binary"
 done

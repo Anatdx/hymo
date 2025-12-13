@@ -100,8 +100,8 @@ static Node* collect_all_modules(
     const std::vector<fs::path>& content_paths,
     const std::vector<std::string>& extra_partitions
 ) {
-    Node* root = new Node{"", NodeFileType::Directory};
-    Node system{"system", NodeFileType::Directory};
+    Node* root = new Node{"", NodeFileType::Directory, {}, {}, false, false};
+    Node system{"system", NodeFileType::Directory, {}, {}, false, false};
     system.module_path = "/system"; // Set source for attribute cloning
     
     bool has_file = false;

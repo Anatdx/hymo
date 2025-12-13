@@ -25,6 +25,7 @@ function serializeKvConfig(config) {
   output += `disable_umount = ${config.disable_umount ? 'true' : 'false'}\n`;
   output += `enable_nuke = ${config.enable_nuke ? 'true' : 'false'}\n`;
   output += `ignore_protocol_mismatch = ${config.ignore_protocol_mismatch ? 'true' : 'false'}\n`;
+  output += `enable_kernel_debug = ${config.enable_kernel_debug ? 'true' : 'false'}\n`;
   
   if (config.partitions && Array.isArray(config.partitions)) {
     output += `partitions = "${config.partitions.join(',')}"\n`;
@@ -77,7 +78,8 @@ const RealAPI = {
           description: m.description || '',
           mode: m.mode || 'auto',
           strategy: m.strategy || 'overlay',
-          path: m.path
+          path: m.path,
+          rules: m.rules || []
         }));
       }
     } catch (e) {
@@ -99,7 +101,29 @@ const RealAPI = {
     if (errno !== 0) throw new Error('Failed to save modes');
   },
 
+  saveRules: async (modules) => {
+    let content = "# Module Rules\n";
+    modules.forEach(m => {
+      if (m.rules && m.rules.length > 0) {
+        m.rules.forEach(r => {
+            content += `${m.id}:${r.path}=${r.mode}\n`;
+        });
+      }
+    });
+    
+    const data = content.replace(/'/g, "'\\''");
+    const { errno } = await ksuExec(`mkdir -p "$(dirname "${PATHS.RULES_CONFIG}")" && printf '%s\n' '${data}' > "${PATHS.RULES_CONFIG}"`);
+    if (errno !== 0) throw new Error('Failed to save rules');
+  },
+
   readLogs: async (logPath, lines = 1000) => {
+    if (logPath === 'kernel') {
+      const cmd = `dmesg | grep -i hymofs | tail -n ${lines}`;
+      const { errno, stdout } = await ksuExec(cmd);
+      // dmesg might return 1 if grep finds nothing, which is fine
+      return stdout || "";
+    }
+
     const f = logPath || DEFAULT_CONFIG.logfile;
     const cmd = `[ -f "${f}" ] && tail -n ${lines} "${f}" || echo ""`;
     const { errno, stdout, stderr } = await ksuExec(cmd);
@@ -242,6 +266,38 @@ const RealAPI = {
         }
       }
     } catch (e) {}
+    return null;
+  },
+
+  listFiles: async (path) => {
+    try {
+      // ls -p adds / to directories
+      const cmd = `ls -1p "${path}"`;
+      const { errno, stdout } = await ksuExec(cmd);
+      if (errno === 0 && stdout) {
+        return stdout.split('\n').filter(Boolean).map(name => ({
+          name: name.replace(/\/$/, ''),
+          isDir: name.endsWith('/'),
+          path: path.replace(/\/$/, '') + '/' + name.replace(/\/$/, '')
+        }));
+      }
+    } catch (e) {
+      console.error("List files failed:", e);
+    }
+    return [];
+  },
+
+  readFileBase64: async (path) => {
+    try {
+      // Use base64 command to read file
+      const cmd = `cat "${path}" | base64 -w 0`;
+      const { errno, stdout } = await ksuExec(cmd);
+      if (errno === 0 && stdout) {
+        return stdout.trim();
+      }
+    } catch (e) {
+      console.error("Read file failed:", e);
+    }
     return null;
   }
 };

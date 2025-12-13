@@ -75,7 +75,7 @@ The generated zip package can be flashed directly in KernelSU Manager.
 
 ## Credits
 
-*   **Meta-Hybrid Mount**: Inspiration and prototype basis for this project.
+*   **[Meta-Hybrid Mount](https://github.com/YuzakiKokuban/meta-hybrid_mount)**: Inspiration and prototype basis for this project.
 *   **KernelSU**: Powerful Root solutions.
 *   **Libcxx**: Android NDK C++ standard library.
 *   **All contributors to this project**: Thank you for your efforts.

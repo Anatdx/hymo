@@ -10,6 +10,11 @@ namespace fs = std::filesystem;
 
 namespace hymo {
 
+struct ModuleRuleConfig {
+    std::string path;
+    std::string mode;
+};
+
 struct Config {
     fs::path moduledir = "/data/adb/modules";
     fs::path tempdir;
@@ -19,8 +24,10 @@ struct Config {
     bool disable_umount = false;
     bool enable_nuke = true;
     bool ignore_protocol_mismatch = false;
+    bool enable_kernel_debug = false;
     std::vector<std::string> partitions;
     std::map<std::string, std::string> module_modes;
+    std::map<std::string, std::vector<ModuleRuleConfig>> module_rules;
     
     static Config load_default();
     static Config from_file(const fs::path& path);
@@ -36,5 +43,6 @@ struct Config {
 };
 
 std::map<std::string, std::string> load_module_modes();
+std::map<std::string, std::vector<ModuleRuleConfig>> load_module_rules();
 
 } // namespace hymo

@@ -30,7 +30,6 @@ static std::string json_escape(const std::string& s) {
     return o.str();
 }
 
-// Helper: Check if module has content for any partition (builtin or extra)
 static bool has_content(const fs::path& module_path, const std::vector<std::string>& all_partitions) {
     for (const auto& partition : all_partitions) {
         fs::path part_path = module_path / partition;
@@ -48,7 +47,8 @@ void update_module_description(
     size_t overlay_count,
     size_t magic_count,
     size_t hymofs_count,
-    const std::string& warning_msg
+    const std::string& warning_msg,
+    bool hymofs_active
 ) {
     if (!fs::exists(MODULE_PROP_FILE)) {
         LOG_WARN("module.prop not found, skipping update");
@@ -68,16 +68,21 @@ void update_module_description(
         desc << " " << warning_msg;
     }
 
-    // Read current file
     std::ifstream infile(MODULE_PROP_FILE);
     std::string content;
     std::string line;
     bool desc_updated = false;
+    bool name_updated = false;
     
+    std::string new_name = hymofs_active ? "Hymo - HymoFS Enabled" : "Hymo";
+
     while (std::getline(infile, line)) {
         if (line.find("description=") == 0) {
             content += "description=" + desc.str() + "\n";
             desc_updated = true;
+        } else if (line.find("name=") == 0) {
+            content += "name=" + new_name + "\n";
+            name_updated = true;
         } else {
             content += line + "\n";
         }
@@ -87,13 +92,16 @@ void update_module_description(
     if (!desc_updated) {
         content += "description=" + desc.str() + "\n";
     }
+    if (!name_updated) {
+        content += "name=" + new_name + "\n";
+    }
     
     // Write back
     std::ofstream outfile(MODULE_PROP_FILE);
     outfile << content;
     outfile.close();
     
-    LOG_DEBUG("Updated module description");
+    LOG_DEBUG("Updated module description and name");
 }
 
 void print_module_list(const Config& config) {
@@ -132,7 +140,17 @@ void print_module_list(const Config& config) {
         std::cout << "      \"name\": \"" << json_escape(filtered_modules[i].name) << "\",\n";
         std::cout << "      \"version\": \"" << json_escape(filtered_modules[i].version) << "\",\n";
         std::cout << "      \"author\": \"" << json_escape(filtered_modules[i].author) << "\",\n";
-        std::cout << "      \"description\": \"" << json_escape(filtered_modules[i].description) << "\"\n";
+        std::cout << "      \"description\": \"" << json_escape(filtered_modules[i].description) << "\",\n";
+        std::cout << "      \"rules\": [\n";
+        for (size_t j = 0; j < filtered_modules[i].rules.size(); ++j) {
+            std::cout << "        {\n";
+            std::cout << "          \"path\": \"" << json_escape(filtered_modules[i].rules[j].path) << "\",\n";
+            std::cout << "          \"mode\": \"" << json_escape(filtered_modules[i].rules[j].mode) << "\"\n";
+            std::cout << "        }";
+            if (j < filtered_modules[i].rules.size() - 1) std::cout << ",";
+            std::cout << "\n";
+        }
+        std::cout << "      ]\n";
         std::cout << "    }";
         if (i < filtered_modules.size() - 1) {
             std::cout << ",";

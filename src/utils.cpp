@@ -13,6 +13,7 @@
 #include <sys/syscall.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <set>
 
 namespace hymo {
 
@@ -147,43 +148,14 @@ bool mount_image(const fs::path& image_path, const fs::path& target) {
     if (!ensure_dir_exists(target)) {
         return false;
     }
+
+    // Use mount command directly which handles loop device setup automatically and robustly
+    // This avoids issues with manual losetup parsing on some Android devices
+    std::string cmd = "mount -t ext4 -o loop,rw,noatime " + image_path.string() + " " + target.string();
+    int ret = system(cmd.c_str());
     
-    // Setup loop device first
-    std::string losetup_cmd = "losetup -f " + image_path.string();
-    int ret = system(losetup_cmd.c_str());
     if (ret != 0) {
-        LOG_ERROR("Failed to setup loop device for " + image_path.string());
-        return false;
-    }
-    
-    // Find the loop device
-    std::string find_cmd = "losetup -j " + image_path.string() + " | cut -d: -f1";
-    FILE* pipe = popen(find_cmd.c_str(), "r");
-    if (!pipe) {
-        LOG_ERROR("Failed to find loop device");
-        return false;
-    }
-    
-    char loop_dev[256];
-    if (!fgets(loop_dev, sizeof(loop_dev), pipe)) {
-        pclose(pipe);
-        LOG_ERROR("No loop device found for " + image_path.string());
-        return false;
-    }
-    pclose(pipe);
-    
-    // Remove trailing newline
-    size_t len = strlen(loop_dev);
-    if (len > 0 && loop_dev[len-1] == '\n') {
-        loop_dev[len-1] = '\0';
-    }
-    
-    // Mount the loop device
-    if (mount(loop_dev, target.c_str(), "ext4", MS_NOATIME, "") != 0) {
-        LOG_ERROR("Failed to mount image " + image_path.string() + " via " + loop_dev + ": " + strerror(errno));
-        // Detach loop device on failure
-        std::string detach_cmd = "losetup -d " + std::string(loop_dev);
-        system(detach_cmd.c_str());
+        LOG_ERROR("Failed to mount image " + image_path.string() + " to " + target.string());
         return false;
     }
     
@@ -305,45 +277,60 @@ void cleanup_temp_dir(const fs::path& temp_dir) {
 
 // KSU utilities
 static int ksu_fd = -1;
+static bool ksu_checked = false;
 
 int grab_ksu_fd() {
-    if (ksu_fd < 0) {
+    if (!ksu_checked) {
         syscall(SYS_reboot, KSU_INSTALL_MAGIC1, KSU_INSTALL_MAGIC2, 0, &ksu_fd);
+        ksu_checked = true;
     }
     return ksu_fd;
 }
 
+#ifdef __ANDROID__
+struct KsuAddTryUmount {
+    uint64_t arg;
+    uint32_t flags;
+    uint8_t mode;
+};
+
+struct NukeExt4SysfsCmd {
+    uint64_t arg;
+};
+#endif
+
 bool send_unmountable(const fs::path& target) {
 #ifdef __ANDROID__
-    struct KsuAddTryUmount {
-        uint64_t arg;
-        uint32_t flags;
-        uint8_t mode;
-    };
+    static std::set<std::string> sent_unmounts;
+    
+    std::string path_str = target.string();
+    if (path_str.empty()) return true;
+
+    // Dedup check
+    if (sent_unmounts.find(path_str) != sent_unmounts.end()) {
+        return true;
+    }
     
     int fd = grab_ksu_fd();
     if (fd < 0) {
         return false;
     }
     
-    std::string path_str = target.string();
     KsuAddTryUmount cmd = {
         .arg = reinterpret_cast<uint64_t>(path_str.c_str()),
         .flags = 2,
         .mode = 1
     };
     
-    ioctl(fd, KSU_IOCTL_ADD_TRY_UMOUNT, &cmd);
+    if (ioctl(fd, KSU_IOCTL_ADD_TRY_UMOUNT, &cmd) == 0) {
+        sent_unmounts.insert(path_str);
+    }
 #endif
     return true;
 }
 
 bool ksu_nuke_sysfs(const std::string& target) {
 #ifdef __ANDROID__
-    struct NukeExt4SysfsCmd {
-        uint64_t arg;
-    };
-    
     int fd = grab_ksu_fd();
     if (fd < 0) {
         LOG_ERROR("KSU driver not available");

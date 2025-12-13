@@ -5,6 +5,8 @@
 #include "../utils.hpp"
 #include <iostream>
 #include <cstring>
+#include <cstdio>
+#include <sys/wait.h>
 #include <sys/mount.h>
 #include <sys/vfs.h>
 #include <sys/stat.h>
@@ -30,7 +32,7 @@ static bool try_setup_tmpfs(const fs::path& target) {
     }
 }
 
-// **FIX 1: 延迟权限修复,添加独立函数**
+// FIX 1: Delayed permission repair, added standalone function
 static void repair_storage_root_permissions(const fs::path& target) {
     LOG_DEBUG("Repairing storage root permissions...");
     
@@ -64,9 +66,28 @@ static bool create_image(const fs::path& base_dir) {
         return false;
     }
     
-    std::string cmd = "sh " + script.string() + " " + base_dir.string() + " 2048 >/dev/null 2>&1";
-    int ret = system(cmd.c_str());
-    return ret == 0;
+    // Capture output to debug creation issues
+    std::string cmd = "sh " + script.string() + " " + base_dir.string() + " 2048 2>&1";
+    FILE* pipe = popen(cmd.c_str(), "r");
+    if (!pipe) {
+        LOG_ERROR("Failed to execute createimg.sh");
+        return false;
+    }
+    
+    char buffer[256];
+    std::string output = "";
+    while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
+        output += buffer;
+    }
+    
+    int ret = pclose(pipe);
+    if (WEXITSTATUS(ret) != 0) {
+        LOG_ERROR("Failed to create image: " + output);
+        return false;
+    }
+    
+    LOG_INFO("Image creation output: " + output);
+    return true;
 }
 
 static std::string setup_ext4_image(const fs::path& target, const fs::path& image_path) {
@@ -92,8 +113,7 @@ static std::string setup_ext4_image(const fs::path& target, const fs::path& imag
         }
     }
     
-    // **FIX 2: 不要在这里修复权限,等待同步完成后再修复**
-    // repair_storage_root_permissions(target);  // 移除此行
+    // FIX 2: Do not repair permissions here, wait for sync to complete
     
     LOG_INFO("Image mode active.");
     return "ext4";
@@ -102,7 +122,7 @@ static std::string setup_ext4_image(const fs::path& target, const fs::path& imag
 StorageHandle setup_storage(const fs::path& mnt_dir, const fs::path& image_path, bool force_ext4) {
     LOG_DEBUG("Setting up storage at " + mnt_dir.string());
     
-    // 清理之前的挂载
+    // Clean up previous mounts
     if (fs::exists(mnt_dir)) {
         umount2(mnt_dir.c_str(), MNT_DETACH);
     }
@@ -118,7 +138,7 @@ StorageHandle setup_storage(const fs::path& mnt_dir, const fs::path& image_path,
     return StorageHandle{mnt_dir, mode};
 }
 
-// **FIX 3: 添加公共函数供 main.cpp 调用**
+// FIX 3: Add public function for main.cpp to call
 void finalize_storage_permissions(const fs::path& storage_root) {
     repair_storage_root_permissions(storage_root);
 }

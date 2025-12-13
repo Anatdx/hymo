@@ -77,7 +77,7 @@ make testzip
 
 ## 致谢 (Credits)
 
-*   **Meta-Hybrid Mount**: 本项目的灵感来源与原型基础。
+*   **[Meta-Hybrid Mount](https://github.com/YuzakiKokuban/meta-hybrid_mount)**: 本项目的灵感来源与原型基础。
 *   **KernelSU**: 强大的 Root 解决方案。
 *   **Libcxx**: Android NDK C++ 标准库。
 *   **所有本项目的贡献者**: 感谢你们的付出。
