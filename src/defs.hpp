@@ -1,9 +1,11 @@
-// defs.hpp - Constants and definitions
+// Constants and definitions
 #pragma once
 
 #include <string>
 #include <vector>
 #include <cstdint>
+
+#define HYMO_PROTOCOL_VERSION 4
 
 namespace hymo {
 

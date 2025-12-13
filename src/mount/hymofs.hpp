@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 #include <filesystem>
-#include <optional>
+#include "defs.hpp"
 
 namespace fs = std::filesystem;
 
@@ -18,7 +18,7 @@ enum class HymoFSStatus {
 
 class HymoFS {
 public:
-    static constexpr int EXPECTED_PROTOCOL_VERSION = 3;
+    static constexpr int EXPECTED_PROTOCOL_VERSION = HYMO_PROTOCOL_VERSION;
 
 
     static HymoFSStatus check_status();
@@ -35,6 +35,9 @@ public:
     // module_dir: The actual directory containing files (e.g., /data/adb/modules/mod1/system/app)
     static bool inject_directory(const fs::path& target_base, const fs::path& module_dir);
     static bool delete_directory_rules(const fs::path& target_base, const fs::path& module_dir);
+    
+    // New methods for inspection
+    static std::string get_active_rules();
 };
 
 } // namespace hymo
