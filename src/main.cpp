@@ -167,6 +167,7 @@ int main(int argc, char* argv[]) {
                 std::cout << "  \"enable_nuke\": " << (config.enable_nuke ? "true" : "false") << ",\n";
                 std::cout << "  \"ignore_protocol_mismatch\": " << (config.ignore_protocol_mismatch ? "true" : "false") << ",\n";
                 std::cout << "  \"enable_kernel_debug\": " << (config.enable_kernel_debug ? "true" : "false") << ",\n";
+                std::cout << "  \"enable_stealth\": " << (config.enable_stealth ? "true" : "false") << ",\n";
                 std::cout << "  \"hymofs_available\": " << (HymoFS::is_available() ? "true" : "false") << ",\n";
                 std::cout << "  \"hymofs_status\": " << (int)HymoFS::check_status() << ",\n";
                 std::cout << "  \"partitions\": [";
@@ -390,7 +391,7 @@ int main(int argc, char* argv[]) {
                 
                 if (HymoFS::is_available()) {
                     LOG_INFO("Reloading HymoFS mappings...");
-                    const fs::path MIRROR_DIR = "/dev/hymo_mirror";
+                    const fs::path MIRROR_DIR = hymo::HYMO_MIRROR_DEV;
                     
                     // 1. Scan modules
                     auto module_list = scan_modules(config.moduledir, config);
@@ -430,6 +431,13 @@ int main(int argc, char* argv[]) {
                     MountPlan plan = generate_plan(config, module_list, MIRROR_DIR);
                     update_hymofs_mappings(config, module_list, MIRROR_DIR, plan);
                     
+                    // Apply Stealth Mode
+                    if (HymoFS::set_stealth(config.enable_stealth)) {
+                        LOG_INFO("Stealth mode set to: " + std::string(config.enable_stealth ? "true" : "false"));
+                    } else {
+                        LOG_WARN("Failed to set stealth mode.");
+                    }
+
                     // 5. Update Runtime State (daemon_state.json)
                     RuntimeState state = load_runtime_state();
                     
@@ -532,11 +540,18 @@ int main(int argc, char* argv[]) {
                     LOG_WARN("Failed to enable kernel debug logging (config).");
                 }
             }
+
+            // Apply Stealth Mode
+            if (HymoFS::set_stealth(config.enable_stealth)) {
+                LOG_INFO("Stealth mode set to: " + std::string(config.enable_stealth ? "true" : "false"));
+            } else {
+                LOG_WARN("Failed to set stealth mode.");
+            }
             
             // **Mirror Strategy (Tmpfs/Ext4)**
             // To avoid SELinux/permission issues on /data, we mirror active modules to a tmpfs or ext4 image
             // and inject from there.
-            const fs::path MIRROR_DIR = "/dev/hymo_mirror";
+            const fs::path MIRROR_DIR = hymo::HYMO_MIRROR_DEV;
             fs::path img_path = fs::path(BASE_DIR) / "modules.img";
             bool mirror_success = false;
             

@@ -26,6 +26,7 @@ function serializeKvConfig(config) {
   output += `enable_nuke = ${config.enable_nuke ? 'true' : 'false'}\n`;
   output += `ignore_protocol_mismatch = ${config.ignore_protocol_mismatch ? 'true' : 'false'}\n`;
   output += `enable_kernel_debug = ${config.enable_kernel_debug ? 'true' : 'false'}\n`;
+  output += `enable_stealth = ${config.enable_stealth ? 'true' : 'false'}\n`;
   
   if (config.partitions && Array.isArray(config.partitions)) {
     output += `partitions = "${config.partitions.join(',')}"\n`;

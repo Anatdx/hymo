@@ -1,8 +1,8 @@
 id=hymo
 metamodule=1
 name=Hymo
-version=v1.2.0
-versionCode=8
+version=v1.3.0
+versionCode=9
 author=Anatdx
 updateJson=https://raw.githubusercontent.com/Anatdx/hymo/master/update.json
 description=A kernel based metamodule,powered by HymoFS

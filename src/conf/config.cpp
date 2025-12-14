@@ -53,6 +53,7 @@ Config Config::from_file(const fs::path& path) {
             else if (key == "enable_nuke") config.enable_nuke = (value == "true");
             else if (key == "ignore_protocol_mismatch") config.ignore_protocol_mismatch = (value == "true");
             else if (key == "enable_kernel_debug") config.enable_kernel_debug = (value == "true");
+            else if (key == "enable_stealth") config.enable_stealth = (value == "true");
             else if (key == "partitions") {
                 std::stringstream ss(value);
                 std::string part;
@@ -90,6 +91,7 @@ bool Config::save_to_file(const fs::path& path) const {
     file << "enable_nuke = " << (enable_nuke ? "true" : "false") << "\n";
     file << "ignore_protocol_mismatch = " << (ignore_protocol_mismatch ? "true" : "false") << "\n";
     file << "enable_kernel_debug = " << (enable_kernel_debug ? "true" : "false") << "\n";
+    file << "enable_stealth = " << (enable_stealth ? "true" : "false") << "\n";
     
     // Write partitions
     if (!partitions.empty()) {

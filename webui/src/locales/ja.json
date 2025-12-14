@@ -42,6 +42,7 @@
     "disableUmount": "名前空間の分離を無効化",
     "ignoreProtocolMismatch": "HymoFS バージョンの不一致を無視",
     "enableKernelDebug": "カーネルデバッグログを有効化",
+    "enableStealth": "ステルスモードを有効化",
     "showAdvanced": "詳細オプションを表示",
     "moduleDir": "モジュールディレクトリ",
     "tempDir": "一時ディレクトリ",

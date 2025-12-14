@@ -42,6 +42,7 @@
     "disableUmount": "Disable Namespace Detach",
     "ignoreProtocolMismatch": "Ignore HymoFS Version Mismatch",
     "enableKernelDebug": "Enable Kernel Debug Logging",
+    "enableStealth": "Enable Stealth Mode",
     "showAdvanced": "Show Advanced Options",
     "moduleDir": "Module Directory",
     "tempDir": "Temp Directory",

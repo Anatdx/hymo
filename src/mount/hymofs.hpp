@@ -36,6 +36,7 @@ public:
     // Inspection methods
     static std::string get_active_rules();
     static bool set_debug(bool enable);
+    static bool set_stealth(bool enable);
 };
 
 } // namespace hymo

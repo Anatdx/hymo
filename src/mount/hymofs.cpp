@@ -11,7 +11,7 @@
 
 namespace hymo {
 
-const char* HYMO_DEV = "/dev/hymo_ctl";
+const char* HYMO_DEV = HYMO_CTL_DEV;
 
 #define HYMO_IOC_MAGIC 0xE0
 struct hymo_ioctl_arg {
@@ -32,6 +32,8 @@ struct hymo_ioctl_list_arg {
 };
 #define HYMO_IOC_LIST_RULES  _IOWR(HYMO_IOC_MAGIC, 7, struct hymo_ioctl_list_arg)
 #define HYMO_IOC_SET_DEBUG   _IOW(HYMO_IOC_MAGIC, 8, int)
+#define HYMO_IOC_REORDER_MNT_ID _IO(HYMO_IOC_MAGIC, 9)
+#define HYMO_IOC_SET_STEALTH _IOW(HYMO_IOC_MAGIC, 10, int)
 
 int HymoFS::get_protocol_version() {
     int fd = open(HYMO_DEV, O_RDONLY);
@@ -168,7 +170,7 @@ bool HymoFS::remove_rules_from_directory(const fs::path& target_base, const fs::
 
 std::string HymoFS::get_active_rules() {
     int fd = open(HYMO_DEV, O_RDONLY);
-    if (fd < 0) return "Error: Cannot open /dev/hymo_ctl\n";
+    if (fd < 0) return "Error: Cannot open " + std::string(HYMO_CTL_DEV) + "\n";
     
     size_t buf_size = 128 * 1024; // 128KB buffer
     char* raw_buf = (char*)malloc(buf_size);
@@ -206,6 +208,22 @@ bool HymoFS::set_debug(bool enable) {
     int ret = ioctl(fd, HYMO_IOC_SET_DEBUG, &val);
     if (ret != 0) {
         perror("HymoFS: Failed to set debug mode");
+    }
+    close(fd);
+    return ret == 0;
+}
+
+bool HymoFS::set_stealth(bool enable) {
+    int fd = open(HYMO_DEV, O_RDWR);
+    if (fd < 0) {
+        perror("HymoFS: Failed to open device");
+        return false;
+    }
+    
+    int val = enable ? 1 : 0;
+    int ret = ioctl(fd, HYMO_IOC_SET_STEALTH, &val);
+    if (ret != 0) {
+        perror("HymoFS: Failed to set stealth mode");
     }
     close(fd);
     return ret == 0;
