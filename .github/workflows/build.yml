@@ -83,3 +83,16 @@ jobs:
             out/*.zip
             out/*.zip.asc
           if-no-files-found: error
+
+      - name: Send to Telegram
+        if: success()
+        run: |
+          cd out
+          ZIP_FILE=$(ls *.zip | head -n 1)
+          
+          curl -v -F "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+               -F "document=@$ZIP_FILE" \
+               -F "caption=Hymo Build ${{ env.MODULE_VERSION }} Success!
+               Commit: ${{ github.sha }}
+               Ref: ${{ github.ref }}" \
+               https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument
