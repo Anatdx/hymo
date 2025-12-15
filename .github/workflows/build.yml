@@ -78,6 +78,23 @@ jobs:
           VERSION=$(grep "^version=" module/module.prop | cut -d= -f2)
           echo "MODULE_VERSION=$VERSION" >> $GITHUB_ENV
 
+      - name: Import GPG Key
+        id: import_gpg
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Sign Module with GPG
+        run: |
+          cd out
+          ZIP_FILE=$(ls *.zip | head -n 1)
+          echo "Signing $ZIP_FILE..."
+          gpg --batch --yes --pinentry-mode loopback \
+            --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
+            -ab "$ZIP_FILE"
+          ls -lh "$ZIP_FILE.asc"
+
       # Zakosign signing temporarily disabled
       # - name: Sign Module (Optional)
       #   continue-on-error: true
@@ -99,5 +116,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Hymo-${{ env.MODULE_VERSION }}
-          path: out/*.zip
+          path: |
+            out/*.zip
+            out/*.zip.asc
           if-no-files-found: error

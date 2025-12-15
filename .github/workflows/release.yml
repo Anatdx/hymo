@@ -90,6 +90,23 @@ jobs:
           echo "Building C++ version..."
           make zip
 
+      - name: Import GPG Key
+        id: import_gpg
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Sign Module with GPG
+        run: |
+          cd out
+          ZIP_FILE=$(ls *.zip | head -n 1)
+          echo "Signing $ZIP_FILE..."
+          gpg --batch --yes --pinentry-mode loopback \
+            --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
+            -ab "$ZIP_FILE"
+          ls -lh "$ZIP_FILE.asc"
+
       # Zakosign signing temporarily disabled
       # - name: Sign Module
       #   env:
@@ -154,7 +171,9 @@ jobs:
         with:
           draft: false
           prerelease: false
-          files: out/*.zip
+          files: |
+            out/*.zip
+            out/*.zip.asc
           body_path: /tmp/changelog.md
 
       - name: Push Update Info to Master

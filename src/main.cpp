@@ -50,7 +50,8 @@ static void print_help() {
     std::cout << "  delete <mod_id> Delete module rules from HymoFS\n";
     std::cout << "  set-mode <mod_id> <mode>  Set mount mode for a module (auto, hymofs, overlay, magic, none)\n";
     std::cout << "  add-rule <mod_id> <path> <mode> Add a custom mount rule for a module\n";
-    std::cout << "  remove-rule <mod_id> <path> Remove a custom mount rule for a module\n\n";
+    std::cout << "  remove-rule <mod_id> <path> Remove a custom mount rule for a module\n";
+    std::cout << "  sync-partitions Scan modules and auto-add new partitions to config\n\n";
     std::cout << "Options:\n";
     std::cout << "  -c, --config FILE       Config file path\n";
     std::cout << "  -m, --moduledir DIR     Module directory\n";
@@ -245,6 +246,47 @@ int main(int argc, char* argv[]) {
                 }
                 std::cout << "]\n";
                 std::cout << "}\n";
+                return 0;
+            } else if (cli.command == "sync-partitions") {
+                Config config = load_config(cli);
+                std::vector<std::string> candidates = scan_partition_candidates(config.moduledir);
+                
+                int added = 0;
+                for (const auto& cand : candidates) {
+                    // Check if already in config
+                    bool exists = false;
+                    for (const auto& p : config.partitions) {
+                        if (p == cand) {
+                            exists = true;
+                            break;
+                        }
+                    }
+                    // Check if builtin
+                    for (const auto& p : BUILTIN_PARTITIONS) {
+                        if (p == cand) {
+                            exists = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!exists) {
+                        config.partitions.push_back(cand);
+                        std::cout << "Added partition: " << cand << "\n";
+                        added++;
+                    }
+                }
+                
+                if (added > 0) {
+                    fs::path config_path = cli.config_file.empty() ? (fs::path(BASE_DIR) / "config.toml") : fs::path(cli.config_file);
+                    if (config.save_to_file(config_path)) {
+                        std::cout << "Updated config with " << added << " new partitions.\n";
+                    } else {
+                        std::cerr << "Failed to save config to " << config_path << "\n";
+                        return 1;
+                    }
+                } else {
+                    std::cout << "No new partitions found.\n";
+                }
                 return 0;
             } else if (cli.command == "add") {
                 Config config = load_config(cli);

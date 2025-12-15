@@ -117,6 +117,21 @@ const RealAPI = {
     if (errno !== 0) throw new Error('Failed to save rules');
   },
 
+  syncPartitions: async () => {
+    const cmd = `${PATHS.BINARY} sync-partitions`;
+    try {
+      const { errno, stdout } = await ksuExec(cmd);
+      if (errno === 0) {
+        return stdout;
+      } else {
+        throw new Error("Sync failed");
+      }
+    } catch (e) {
+      console.error("Sync partitions failed:", e);
+      throw e;
+    }
+  },
+
   readLogs: async (logPath, lines = 1000) => {
     if (logPath === 'kernel') {
       const cmd = `dmesg | grep -i hymofs | tail -n ${lines}`;

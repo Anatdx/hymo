@@ -37,6 +37,7 @@ public:
     static std::string get_active_rules();
     static bool set_debug(bool enable);
     static bool set_stealth(bool enable);
+    static bool hide_overlay_xattrs(const std::string& path);
 };
 
 } // namespace hymo
