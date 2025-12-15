@@ -4,7 +4,7 @@
   import FilePicker from '../components/FilePicker.svelte';
   
   import './ConfigTab.css';
-  let partitionInput = $state(store.config.partitions.join(', '));
+  let partitionInput = $state("");
   let showFilePicker = $state(false);
 
   // Validation Helpers
@@ -18,8 +18,34 @@
       store.showToast(store.L.config.invalidPath, "error");
       return;
     }
-    store.config.partitions = partitionInput.split(',').map(s => s.trim()).filter(Boolean);
+    if (partitionInput.trim()) {
+       addPartition(partitionInput);
+       partitionInput = "";
+    }
     store.saveConfig();
+  }
+
+  function addPartition(name) {
+    const parts = name.split(/[, ]+/).map(s => s.trim()).filter(Boolean);
+    for (const p of parts) {
+      if (!store.config.partitions.includes(p)) {
+        store.config.partitions.push(p);
+      }
+    }
+  }
+
+  function removePartition(index) {
+    store.config.partitions.splice(index, 1);
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter' || e.key === ' ' || e.key === ',') {
+      e.preventDefault();
+      addPartition(partitionInput);
+      partitionInput = "";
+    } else if (e.key === 'Backspace' && partitionInput === "" && store.config.partitions.length > 0) {
+      removePartition(store.config.partitions.length - 1);
+    }
   }
   
   function resetTempDir() {
@@ -65,6 +91,14 @@
     <span>{store.L.config.enableNuke}</span>
     <label class="md3-switch">
       <input type="checkbox" bind:checked={store.config.enable_nuke}>
+      <span class="track"><span class="thumb"></span></span>
+    </label>
+  </div>
+
+  <div class="switch-row">
+    <span>{store.L.config.enableStealth}</span>
+    <label class="md3-switch">
+      <input type="checkbox" bind:checked={store.config.enable_stealth}>
       <span class="track"><span class="thumb"></span></span>
     </label>
   </div>
@@ -119,9 +153,35 @@
     <input type="text" id="c-mountsource" bind:value={store.config.mountsource} placeholder={DEFAULT_CONFIG.mountsource} />
     <label for="c-mountsource">{store.L.config.mountSource}</label>
   </div>
-  <div class="text-field filled">
-    <input type="text" id="c-partitions" bind:value={partitionInput} placeholder="mi_ext, my_stock" />
+  
+  <!-- Chip Input for Partitions -->
+  <div 
+    class="text-field filled chip-input-container" 
+    onclick={() => document.getElementById('c-partitions').focus()}
+    role="button"
+    tabindex="0"
+    onkeydown={(e) => e.key === 'Enter' && document.getElementById('c-partitions').focus()}
+  >
+    <div class="chip-wrapper">
+      {#each store.config.partitions as part, i}
+        <span class="chip">
+          {part}
+          <button class="chip-remove" onclick={(e) => { e.stopPropagation(); removePartition(i); }}>×</button>
+        </span>
+      {/each}
+      <input 
+        type="text" 
+        id="c-partitions" 
+        bind:value={partitionInput} 
+        onkeydown={handleKeyDown} 
+        placeholder={store.config.partitions.length === 0 ? "mi_ext, my_stock" : ""} 
+        autocomplete="off"
+      />
+    </div>
     <label for="c-partitions">{store.L.config.partitions}</label>
+    <button class="icon-scan" onclick={(e) => { e.stopPropagation(); store.syncPartitions(); }} title={store.L.config.syncPartitions || "Scan"}>
+      <svg viewBox="0 0 24 24" width="18" height="18"><path d={ICONS.refresh} fill="currentColor"/></svg>
+    </button>
   </div>
 </div>
 
@@ -170,3 +230,98 @@
     {store.saving.config ? store.L.common.saving : store.L.config.save}
   </button>
 </div>
+
+<style>
+  .chip-input-container {
+    height: auto;
+    min-height: 56px;
+    display: flex;
+    flex-direction: column;
+    cursor: text;
+    padding: 0 !important; /* Override default padding */
+  }
+
+  .chip-wrapper {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 24px 48px 8px 16px;
+    width: 100%;
+  }
+
+  .chip-wrapper input {
+    flex: 1;
+    min-width: 80px;
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    height: 24px !important;
+    font-size: 16px;
+    outline: none;
+    margin: 0;
+    border-radius: 0 !important;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    background: var(--md-sys-color-secondary-container);
+    color: var(--md-sys-color-on-secondary-container);
+    border-radius: 8px;
+    padding: 0 8px;
+    height: 24px;
+    font-size: 14px;
+    gap: 4px;
+    user-select: none;
+  }
+
+  .chip-remove {
+    background: none;
+    border: none;
+    padding: 0;
+    color: inherit;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    opacity: 0.6;
+    width: 16px;
+    height: 16px;
+    justify-content: center;
+    border-radius: 50%;
+  }
+  
+  .chip-remove:hover {
+    opacity: 1;
+    background-color: rgba(0,0,0,0.1);
+  }
+
+  /* Override label position */
+  :global(.text-field.filled.chip-input-container label) {
+    top: 8px;
+    left: 16px;
+    font-size: 12px;
+    color: var(--md-sys-color-primary);
+    pointer-events: none;
+  }
+
+  .icon-scan {
+    position: absolute;
+    right: 12px;
+    top: 12px;
+    background: none;
+    border: none;
+    color: var(--md-sys-color-primary);
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .icon-scan:hover {
+    background-color: rgba(128,128,128, 0.1);
+  }
+</style>

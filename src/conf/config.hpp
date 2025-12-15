@@ -25,6 +25,7 @@ struct Config {
     bool enable_nuke = true;
     bool ignore_protocol_mismatch = false;
     bool enable_kernel_debug = false;
+    bool enable_stealth = true; // Default to true
     std::vector<std::string> partitions;
     std::map<std::string, std::string> module_modes;
     std::map<std::string, std::vector<ModuleRuleConfig>> module_rules;
@@ -43,6 +44,8 @@ struct Config {
 };
 
 std::map<std::string, std::string> load_module_modes();
+bool save_module_modes(const std::map<std::string, std::string>& modes);
 std::map<std::string, std::vector<ModuleRuleConfig>> load_module_rules();
+bool save_module_rules(const std::map<std::string, std::vector<ModuleRuleConfig>>& rules);
 
 } // namespace hymo

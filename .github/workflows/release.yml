@@ -24,38 +24,6 @@ jobs:
           ndk-version: r25c
         id: setup-ndk
 
-      # Zakosign temporarily disabled due to compilation issues
-      # - name: Cache Zakosign Build
-      #   uses: actions/cache@v4
-      #   with:
-      #     path: |
-      #       zakosign/boringssl/build-host
-      #       zakosign/obj
-      #       zakosign/bin
-      #     key: ${{ runner.os }}-zakosign-host-${{ hashFiles('zakosign/Makefile', 'zakosign/.gitmodules') }}
-      #     restore-keys: |
-      #       ${{ runner.os }}-zakosign-host-
-
-      # - name: Install Zakosign Dependencies
-      #   run: |
-      #     sudo apt-get update
-      #     sudo apt-get install -y ninja-build clang cmake
-
-      # - name: Clone Zakosign
-      #   run: |
-      #     git clone --depth 1 https://github.com/Lama3L9R/zakosign.git
-      #     cd zakosign
-      #     git submodule update --init --recursive
-
-      # - name: Build Zakosign
-      #   env:
-      #     CC: clang
-      #   run: |
-      #     cd zakosign
-      #     tools/setupdep
-      #     tools/setupdep host
-      #     make
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -90,21 +58,34 @@ jobs:
           echo "Building C++ version..."
           make zip
 
-      # Zakosign signing temporarily disabled
-      # - name: Sign Module
-      #   env:
-      #     ZAKOSIGN_KEY: ${{ secrets.ZAKOSIGN_KEY }}
-      #   run: |
-      #     if [ -n "$ZAKOSIGN_KEY" ]; then
-      #       echo "$ZAKOSIGN_KEY" > /tmp/private.pem
-      #       chmod 600 /tmp/private.pem
-      #       cd zakosign
-      #       ./bin/zakosign esign /tmp/private.pem ../out/*.zip
-      #       rm /tmp/private.pem
-      #       echo "Module signed successfully"
-      #     else
-      #       echo "::warning::No signing key configured, module will not be signed"
-      #     fi
+      - name: Import GPG key
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          fingerprint: "D2640E18540E138974BC0669942F2C75D1DC540F"
+          trust_level: 5
+      
+      - name: Sign Module with GPG
+        run: |
+          
+          cd out
+          ZIP_FILE=$(ls *.zip | head -n 1)
+          echo "Signing $ZIP_FILE..."
+          
+          # Sign
+          gpg --detach-sign --local-user an@anatdx.com --batch --yes --pinentry-mode loopback \
+            --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
+            --output "$ZIP_FILE.asc" "$ZIP_FILE"
+            
+          # Verify output
+          if [ -f "$ZIP_FILE.asc" ]; then
+            echo "Signature created successfully:"
+            ls -lh "$ZIP_FILE.asc"
+          else
+            echo "Error: Signature file not created!"
+            exit 1
+          fi
 
       - name: Generate Update Files
         id: meta
@@ -154,7 +135,9 @@ jobs:
         with:
           draft: false
           prerelease: false
-          files: out/*.zip
+          files: |
+            out/*.zip
+            out/*.zip.asc
           body_path: /tmp/changelog.md
 
       - name: Push Update Info to Master

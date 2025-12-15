@@ -125,6 +125,10 @@ MountPlan generate_plan(
         bool has_rules = !module.rules.empty();
         
         if (!has_rules) {
+            if (default_mode == "none") {
+                continue;
+            }
+
             if (default_mode == "magic") {
                 magic_paths.insert(content_path);
                 magic_ids.insert(module.id);
@@ -179,6 +183,8 @@ MountPlan generate_plan(
                         }
                     }
                     
+                    if (mode == "none") continue;
+
                     if (entry.is_directory()) {
                         if (mode == "overlay") {
                             bool is_exact_rule = false;

@@ -1,5 +1,6 @@
 // mount/overlay.cpp - OverlayFS mounting implementation (FIXED)
 #include "overlay.hpp"
+#include "hymofs.hpp"
 #include "../defs.hpp"
 #include "../utils.hpp"
 #include <sys/mount.h>
@@ -98,6 +99,9 @@ static bool mount_overlayfs_modern(
     if (success) {
         if (move_mount(mnt_fd, "", AT_FDCWD, dest.c_str(), MOVE_MOUNT_F_EMPTY_PATH) < 0) {
             success = false;
+        } else {
+            // HymoFS: Hide overlay xattrs for this mount
+            HymoFS::hide_overlay_xattrs(dest);
         }
     }
     
@@ -122,6 +126,9 @@ static bool mount_overlayfs_legacy(
         return false;
     }
     
+    // HymoFS: Hide overlay xattrs for this mount
+    HymoFS::hide_overlay_xattrs(dest);
+
     return true;
 }
 

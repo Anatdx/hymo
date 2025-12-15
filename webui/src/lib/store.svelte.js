@@ -57,7 +57,7 @@ export const store = $state({
         lang: { display: "English" },
         tabs: { status: "Status", config: "Config", modules: "Modules", logs: "Logs", info: "Info" },
         status: { storageTitle: "Storage", storageDesc: "", moduleTitle: "Modules", moduleActive: "Active", modeStats: "Stats", modeAuto: "Auto", modeMagic: "Magic", sysInfoTitle: "System Info", kernel: "Kernel", selinux: "SELinux", mountBase: "Mount Base", activePartitions: "Active Partitions", notSupported: "❌" },
-        config: { title: "Config", verboseLabel: "Verbose", verboseOff: "Off", verboseOn: "On", forceExt4: "Force Ext4", enableNuke: "Nuke LKM", disableUmount: "Disable Umount", ignoreProtocolMismatch: "Ignore HymoFS Version Mismatch", enableKernelDebug: "Enable Kernel Debug Logging", showAdvanced: "Show Advanced Options", moduleDir: "Dir", tempDir: "Temp", mountSource: "Source", logFile: "Log", partitions: "Partitions", autoPlaceholder: "Auto", reload: "Reload", save: "Save", reset: "Reset to Auto", invalidPath: "Invalid path detected", loadSuccess: "", loadError: "", loadDefault: "", saveSuccess: "", saveFailed: "" },
+        config: { title: "Config", verboseLabel: "Verbose", verboseOff: "Off", verboseOn: "On", forceExt4: "Force Ext4", enableNuke: "Nuke LKM", disableUmount: "Disable Umount", ignoreProtocolMismatch: "Ignore HymoFS Version Mismatch", enableKernelDebug: "Enable Kernel Debug Logging", enableStealth: "Enable Stealth Mode", showAdvanced: "Show Advanced Options", moduleDir: "Dir", tempDir: "Temp", mountSource: "Source", logFile: "Log", partitions: "Partitions", autoPlaceholder: "Auto", reload: "Reload", save: "Save", reset: "Reset to Auto", invalidPath: "Invalid path detected", loadSuccess: "", loadError: "", loadDefault: "", saveSuccess: "", saveFailed: "", syncPartitions: "Scan Partitions", syncSuccess: "Partitions synced" },
         modules: { title: "Modules", desc: "", modeAuto: "Overlay", modeMagic: "Magic", scanning: "...", reload: "Refresh", save: "Save", empty: "Empty", scanError: "", saveSuccess: "", saveFailed: "", searchPlaceholder: "Search", filterLabel: "Filter", filterAll: "All" },
         logs: { title: "Logs", loading: "...", refresh: "Refresh", empty: "Empty", copy: "Copy", copySuccess: "Copied", copyFail: "Failed", searchPlaceholder: "Search", filterLabel: "Filter", levels: { all: "All", info: "Info", warn: "Warn", error: "Error" } },
         info: { title: "About", projectLink: "Repository", donate: "Donate", contributors: "Contributors", loading: "Loading...", loadFail: "Failed to load", noBio: "No bio available" }
@@ -177,6 +177,14 @@ export const store = $state({
     this.loading.config = true;
     try {
       this.config = await API.loadConfig();
+      
+      // Filter out brackets from partitions (fix for manual config edits)
+      if (this.config.partitions && Array.isArray(this.config.partitions)) {
+        this.config.partitions = this.config.partitions
+          .map(p => p.replace(/[\[\]]/g, '').trim())
+          .filter(Boolean);
+      }
+
       if (this.L && this.L.config) {
           this.showToast(this.L.config.loadSuccess);
       }
@@ -197,6 +205,18 @@ export const store = $state({
       this.showToast(this.L.config.saveFailed, 'error');
     }
     this.saving.config = false;
+  },
+
+  async syncPartitions() {
+    this.loading.config = true;
+    try {
+      await API.syncPartitions();
+      this.showToast(this.L.config.syncSuccess);
+      await this.loadConfig(); // Reload to show new partitions
+    } catch (e) {
+      this.showToast("Sync failed", 'error');
+    }
+    this.loading.config = false;
   },
 
   async loadModules() {

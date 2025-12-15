@@ -42,6 +42,7 @@
     "disableUmount": "禁用Umount",
     "ignoreProtocolMismatch": "忽略HymoFS版本不匹配",
     "enableKernelDebug": "启用内核调试日志",
+    "enableStealth": "启用隐身模式",
     "showAdvanced": "显示高级选项",
     "moduleDir": "模块路径",
     "tempDir": "临时路径",

@@ -94,6 +94,7 @@
       <option value="auto">{store.L.modules.modeAuto}</option>
       <option value="overlay">{store.L.modules.modeOverlay}</option>
       <option value="magic">{store.L.modules.modeMagic}</option>
+      <option value="none">None</option>
     </select>
   </div>
 </div>
@@ -135,8 +136,8 @@
             </div>
           </div>
           
-          <div class="mode-badge {mod.mode === 'magic' ? 'badge-magic' : (mod.mode === 'overlay' ? 'badge-overlay' : 'badge-auto')}">
-            {mod.mode === 'magic' ? store.L.modules.modeMagic : (mod.mode === 'overlay' ? store.L.modules.modeOverlay : store.L.modules.modeAuto)}
+          <div class="mode-badge {mod.mode === 'magic' ? 'badge-magic' : (mod.mode === 'overlay' ? 'badge-overlay' : (mod.mode === 'none' ? 'badge-none' : 'badge-auto'))}">
+            {mod.mode === 'magic' ? store.L.modules.modeMagic : (mod.mode === 'overlay' ? store.L.modules.modeOverlay : (mod.mode === 'none' ? 'None' : store.L.modules.modeAuto))}
           </div>
         </div>
         
@@ -157,6 +158,7 @@
                     <option value="auto">{store.L.modules.modeAuto}</option>
                     <option value="overlay">{store.L.modules.modeOverlay}</option>
                     <option value="magic">{store.L.modules.modeMagic}</option>
+                    <option value="none">None</option>
                   </select>
                 </div>
               </div>
@@ -191,6 +193,7 @@
                           <option value="hymofs">HymoFS</option>
                           <option value="overlay">Overlay</option>
                           <option value="magic">Magic</option>
+                          <option value="none">None</option>
                         </select>
                         <button class="btn-icon small delete" onclick={(e) => { e.stopPropagation(); removeRule(mod, i); }} title={store.L.modules.removeRule}>
                           <svg viewBox="0 0 24 24" width="16" height="16"><path d={ICONS.delete} fill="currentColor"/></svg>

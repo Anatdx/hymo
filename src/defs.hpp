@@ -44,4 +44,8 @@ constexpr uint32_t KSU_INSTALL_MAGIC2 = 0xCAFEBABE;
 constexpr uint32_t KSU_IOCTL_NUKE_EXT4_SYSFS = 0x40004b11;
 constexpr uint32_t KSU_IOCTL_ADD_TRY_UMOUNT = 0x40004b12;
 
+// HymoFS Devices
+constexpr const char* HYMO_CTL_DEV = "/dev/hymo_ctl";
+constexpr const char* HYMO_MIRROR_DEV = "/dev/hymo_mirror";
+
 } // namespace hymo

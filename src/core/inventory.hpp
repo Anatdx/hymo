@@ -27,5 +27,6 @@ struct Module {
 };
 
 std::vector<Module> scan_modules(const fs::path& source_dir, const Config& config);
+std::vector<std::string> scan_partition_candidates(const fs::path& source_dir);
 
 } // namespace hymo

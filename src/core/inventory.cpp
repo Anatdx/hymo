@@ -6,6 +6,8 @@
 #include <fstream>
 #include <sstream>
 
+#include <set>
+
 namespace hymo {
 
 static void parse_module_prop(const fs::path& module_path, Module& module) {
@@ -113,6 +115,63 @@ std::vector<Module> scan_modules(const fs::path& source_dir, const Config& confi
     }
     
     return modules;
+}
+
+static bool is_mountpoint(const std::string& path) {
+    std::ifstream mounts("/proc/mounts");
+    std::string line;
+    while (std::getline(mounts, line)) {
+        std::stringstream ss(line);
+        std::string device, mountpoint;
+        ss >> device >> mountpoint;
+        if (mountpoint == path) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::vector<std::string> scan_partition_candidates(const fs::path& source_dir) {
+    std::set<std::string> candidates;
+    
+    if (!fs::exists(source_dir)) {
+        return {};
+    }
+
+    // Standard module files/dirs to ignore
+    std::set<std::string> ignored = {
+        "META-INF", "common", "system", "vendor", "product", "system_ext", "odm", "oem",
+        ".git", ".github", "lost+found"
+    };
+
+    try {
+        for (const auto& mod_entry : fs::directory_iterator(source_dir)) {
+            if (!mod_entry.is_directory()) continue;
+            
+            for (const auto& entry : fs::directory_iterator(mod_entry.path())) {
+                if (!entry.is_directory()) continue;
+                
+                std::string name = entry.path().filename().string();
+                
+                // Skip if it's a standard partition or metadata
+                if (ignored.find(name) != ignored.end()) continue;
+                
+                // Check if it corresponds to a real directory in root AND is a mountpoint
+                std::string root_path_str = "/" + name;
+                fs::path root_path = root_path_str;
+                
+                if (fs::exists(root_path) && fs::is_directory(root_path)) {
+                    if (is_mountpoint(root_path_str)) {
+                        candidates.insert(name);
+                    }
+                }
+            }
+        }
+    } catch (...) {
+        // Ignore errors
+    }
+    
+    return std::vector<std::string>(candidates.begin(), candidates.end());
 }
 
 } // namespace hymo

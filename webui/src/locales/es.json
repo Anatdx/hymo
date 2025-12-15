@@ -42,6 +42,7 @@
     "disableUmount": "Desactivar Separación de Espacio de Nombres",
     "ignoreProtocolMismatch": "Ignorar Desajuste de Versión de HymoFS",
     "enableKernelDebug": "Habilitar depuración del kernel",
+    "enableStealth": "Habilitar modo sigiloso",
     "showAdvanced": "Mostrar opciones avanzadas",
     "moduleDir": "Dir. Módulos",
     "tempDir": "Dir. Temporal",
