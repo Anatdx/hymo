@@ -1,2 +1,28 @@
+# Build outputs
 /out
 /build
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+*.ninja
+.ninja_deps
+.ninja_log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Package
+*.zip
+
+# WebUI
+/webui/node_modules
+/webui/dist
+/module/webroot/*
+!module/webroot/.gitkeep

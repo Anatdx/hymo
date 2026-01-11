@@ -1,22 +1,23 @@
 // core/storage.hpp - Storage backend management (FIXED)
 #pragma once
 
-#include <string>
 #include <filesystem>
+#include <string>
 
 namespace fs = std::filesystem;
 
 namespace hymo {
 
 struct StorageHandle {
-    fs::path mount_point;
-    std::string mode; // "tmpfs" or "ext4"
+  fs::path mount_point;
+  std::string mode; // "tmpfs" or "ext4"
 };
 
-StorageHandle setup_storage(const fs::path& mnt_dir, const fs::path& image_path, bool force_ext4);
+StorageHandle setup_storage(const fs::path &mnt_dir, const fs::path &image_path,
+                            bool force_ext4);
 
 // New: Finalize storage permission repair (called after sync)
-void finalize_storage_permissions(const fs::path& storage_root);
+void finalize_storage_permissions(const fs::path &storage_root);
 
 void print_storage_status();
 

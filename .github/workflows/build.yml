@@ -46,6 +46,72 @@ jobs:
           VERSION=$(grep "^version=" module/module.prop | cut -d= -f2)
           echo "MODULE_VERSION=$VERSION" >> $GITHUB_ENV
 
+      - name: Sign Module (Internal)
+        if: github.actor == 'Anatdx'
+        env:
+          MODULE_PRIVATE_KEY: ${{ secrets.MODULE_PRIVATE_KEY }}
+        run: |
+          if [ -z "$MODULE_PRIVATE_KEY" ]; then
+            echo "⚠️ No MODULE_PRIVATE_KEY secret found. Skipping internal signing."
+          else
+            echo "🔐 Found private key, performing internal signing..."
+            
+            # Install dependencies
+            pip3 install cryptography
+            
+            # Write private key
+            echo "$MODULE_PRIVATE_KEY" > private.pem
+            
+            # Generate Certificate (Self-signed) from Private Key
+            openssl req -new -x509 -key private.pem -out certificate.pem -days 10000 \
+              -subj "/C=CN/ST=Hymo/L=Hymo/O=Hymo/OU=Hymo/CN=Hymo Module"
+              
+            # Locate Zip
+            ZIP_FILE=$(ls out/*.zip | head -n 1)
+            echo "Signing $ZIP_FILE..."
+            
+            # Run signing script
+            python3 script/sign_zip.py "$ZIP_FILE" "out/signed.zip" private.pem certificate.pem
+            
+            # Replace original with signed
+            mv "out/signed.zip" "$ZIP_FILE"
+            
+            # Cleanup
+            rm private.pem certificate.pem
+            echo "✅ Internal signing complete."
+          fi
+
+      - name: Import GPG key
+        if: github.actor == 'Anatdx'
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          fingerprint: "D2640E18540E138974BC0669942F2C75D1DC540F"
+          trust_level: 5
+      
+      - name: Sign Module with GPG
+        if: github.actor == 'Anatdx'
+        run: |
+          
+          cd out
+          ZIP_FILE=$(ls *.zip | head -n 1)
+          echo "Signing $ZIP_FILE..."
+          
+          # Sign
+          gpg --detach-sign --local-user an@anatdx.com --batch --yes --pinentry-mode loopback \
+            --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
+            --output "$ZIP_FILE.asc" "$ZIP_FILE"
+            
+          # Verify output
+          if [ -f "$ZIP_FILE.asc" ]; then
+            echo "Signature created successfully:"
+            ls -lh "$ZIP_FILE.asc"
+          else
+            echo "Error: Signature file not created!"
+            exit 1
+          fi
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:

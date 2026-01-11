@@ -58,6 +58,40 @@ jobs:
           echo "Building C++ version..."
           make zip
 
+      - name: Sign Module (Internal)
+        env:
+          MODULE_PRIVATE_KEY: ${{ secrets.MODULE_PRIVATE_KEY }}
+        run: |
+          if [ -z "$MODULE_PRIVATE_KEY" ]; then
+            echo "⚠️ No MODULE_PRIVATE_KEY secret found. Skipping internal signing."
+          else
+            echo "🔐 Found private key, performing internal signing..."
+            
+            # Install dependencies
+            pip3 install cryptography
+            
+            # Write private key
+            echo "$MODULE_PRIVATE_KEY" > private.pem
+            
+            # Generate Certificate (Self-signed) from Private Key
+            openssl req -new -x509 -key private.pem -out certificate.pem -days 10000 \
+              -subj "/C=CN/ST=Hymo/L=Hymo/O=Hymo/OU=Hymo/CN=Hymo Module"
+              
+            # Locate Zip
+            ZIP_FILE=$(ls out/*.zip | head -n 1)
+            echo "Signing $ZIP_FILE..."
+            
+            # Run signing script
+            python3 script/sign_zip.py "$ZIP_FILE" "out/signed.zip" private.pem certificate.pem
+            
+            # Replace original with signed
+            mv "out/signed.zip" "$ZIP_FILE"
+            
+            # Cleanup
+            rm private.pem certificate.pem
+            echo "✅ Internal signing complete."
+          fi
+
       - name: Import GPG key
         uses: crazy-max/ghaction-import-gpg@v6
         with:
@@ -91,6 +125,10 @@ jobs:
         id: meta
         run: |
           PROP_FILE="module/module.prop"
+          
+          # Backup updated module.prop
+          cp "$PROP_FILE" /tmp/module.prop
+          
           VERSION=$(grep "^version=" "$PROP_FILE" | cut -d= -f2)
           VERSION_CODE=$(grep "^versionCode=" "$PROP_FILE" | cut -d= -f2)
           
@@ -151,8 +189,9 @@ jobs:
           
           mv /tmp/update.json update.json
           mv /tmp/changelog.md changelog.md
+          mv /tmp/module.prop module/module.prop
           
-          git add update.json changelog.md
+          git add update.json changelog.md module/module.prop
           
           if git diff --staged --quiet; then
             echo "No changes to commit"
@@ -161,15 +200,20 @@ jobs:
             git push origin master
           fi
 
-      - name: Send to Telegram
-        if: success()
+      - name: "📤 Upload to telegram | 上传至Telegram群组"
+        if: github.repository == 'Anatdx/hymo'
         run: |
-          cd out
-          ZIP_FILE=$(ls *.zip | head -n 1)
-          
-          curl -v -F "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
-               -F "document=@$ZIP_FILE" \
-               -F "caption=Hymo Build ${{ env.MODULE_VERSION }} Success!
-               Commit: ${{ github.sha }}
-               Ref: ${{ github.ref }}" \
-               https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument
+          if [ ! -z "${{ secrets.TELEGRAM_BOT_TOKEN }}" ]; then
+            echo "📤 正在上传到Telegram..."
+            cd ${{ github.workspace }}
+            pip3 install telethon
+            python3 ${{ github.workspace }}/script/buildbot.py "./out/*.zip"
+            echo "✅ 文件已上传到Telegram"
+          fi
+        env:
+          CHATID: ${{secrets.TELEGRAM_CHAT_ID}}
+          MESSAGE_THREAD_ID: ${{secrets.MESSAGE_THREAD_ID}}
+          BOT_TOKEN: ${{secrets.TELEGRAM_BOT_TOKEN}}
+          MODULE_VER: ${{ github.ref_name }}
+          UPDATE: |
+            $(cat /tmp/changelog.md | sed '1d' | sed '/^$/d') 
