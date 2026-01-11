@@ -51,12 +51,18 @@ jobs:
           
           cat "$PROP_FILE"
 
+      - name: Setup CMake and Ninja
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build
+
       - name: Build Project
         env:
-          NDK_PATH: ${{ steps.setup-ndk.outputs.ndk-path }}
+          ANDROID_NDK: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
-          echo "Building C++ version..."
-          make zip
+          echo "Building with CMake + Ninja..."
+          ./build.sh init
+          ./build.sh package
 
       - name: Sign Module (Internal)
         env:
@@ -78,14 +84,14 @@ jobs:
               -subj "/C=CN/ST=Hymo/L=Hymo/O=Hymo/OU=Hymo/CN=Hymo Module"
               
             # Locate Zip
-            ZIP_FILE=$(ls out/*.zip | head -n 1)
+            ZIP_FILE=$(ls build/out/*.zip | head -n 1)
             echo "Signing $ZIP_FILE..."
             
             # Run signing script
-            python3 script/sign_zip.py "$ZIP_FILE" "out/signed.zip" private.pem certificate.pem
+            python3 script/sign_zip.py "$ZIP_FILE" "build/out/signed.zip" private.pem certificate.pem
             
             # Replace original with signed
-            mv "out/signed.zip" "$ZIP_FILE"
+            mv "build/out/signed.zip" "$ZIP_FILE"
             
             # Cleanup
             rm private.pem certificate.pem
@@ -103,7 +109,7 @@ jobs:
       - name: Sign Module with GPG
         run: |
           
-          cd out
+          cd build/out
           ZIP_FILE=$(ls *.zip | head -n 1)
           echo "Signing $ZIP_FILE..."
           
@@ -132,7 +138,7 @@ jobs:
           VERSION=$(grep "^version=" "$PROP_FILE" | cut -d= -f2)
           VERSION_CODE=$(grep "^versionCode=" "$PROP_FILE" | cut -d= -f2)
           
-          ZIP_FILE=$(cd out && ls *.zip | head -n 1)
+          ZIP_FILE=$(cd build/out && ls *.zip | head -n 1)
           
           REPO="${{ github.repository }}"
           TAG="${{ github.ref_name }}"
@@ -174,8 +180,8 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            out/*.zip
-            out/*.zip.asc
+            build/out/*.zip
+            build/out/*.zip.asc
           body_path: /tmp/changelog.md
 
       - name: Push Update Info to Master
@@ -207,7 +213,7 @@ jobs:
             echo "📤 正在上传到Telegram..."
             cd ${{ github.workspace }}
             pip3 install telethon
-            python3 ${{ github.workspace }}/script/buildbot.py "./out/*.zip"
+            python3 ${{ github.workspace }}/script/buildbot.py "./build/out/*.zip"
             echo "✅ 文件已上传到Telegram"
           fi
         env:

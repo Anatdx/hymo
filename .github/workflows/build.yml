@@ -36,11 +36,17 @@ jobs:
           cd webui
           npm install
 
+      - name: Setup CMake and Ninja
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build
+
       - name: Build Project
         env:
-          NDK_PATH: ${{ steps.setup-ndk.outputs.ndk-path }}
+          ANDROID_NDK: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
-          make zip
+          ./build.sh init
+          ./build.sh package
           
           # Extract version from module.prop
           VERSION=$(grep "^version=" module/module.prop | cut -d= -f2)
@@ -67,14 +73,14 @@ jobs:
               -subj "/C=CN/ST=Hymo/L=Hymo/O=Hymo/OU=Hymo/CN=Hymo Module"
               
             # Locate Zip
-            ZIP_FILE=$(ls out/*.zip | head -n 1)
+            ZIP_FILE=$(ls build/out/*.zip | head -n 1)
             echo "Signing $ZIP_FILE..."
             
             # Run signing script
-            python3 script/sign_zip.py "$ZIP_FILE" "out/signed.zip" private.pem certificate.pem
+            python3 script/sign_zip.py "$ZIP_FILE" "build/out/signed.zip" private.pem certificate.pem
             
             # Replace original with signed
-            mv "out/signed.zip" "$ZIP_FILE"
+            mv "build/out/signed.zip" "$ZIP_FILE"
             
             # Cleanup
             rm private.pem certificate.pem
@@ -94,7 +100,7 @@ jobs:
         if: github.actor == 'Anatdx'
         run: |
           
-          cd out
+          cd build/out
           ZIP_FILE=$(ls *.zip | head -n 1)
           echo "Signing $ZIP_FILE..."
           
@@ -117,6 +123,6 @@ jobs:
         with:
           name: Hymo-${{ env.MODULE_VERSION }}
           path: |
-            out/*.zip
-            out/*.zip.asc
+            build/out/*.zip
+            build/out/*.zip.asc
           if-no-files-found: error
