@@ -169,9 +169,9 @@ add_custom_target(package
     COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/build
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/build
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/module ${CMAKE_BINARY_DIR}/build
-    COMMAND bash -c "cp ${CMAKE_BINARY_DIR}/out/hymod-* ${CMAKE_BINARY_DIR}/build/ 2>/dev/null || true"
-    COMMAND bash -c "chmod 755 ${CMAKE_BINARY_DIR}/build/hymod-* 2>/dev/null || true"
-    COMMAND cd ${CMAKE_BINARY_DIR}/build && zip -r ../out/${MODULE_ID}-${MODULE_VERSION}.zip * > /dev/null
+    COMMAND bash -c "cp ${CMAKE_BINARY_DIR}/out/hymod-* ${CMAKE_BINARY_DIR}/build/ || true"
+    COMMAND bash -c "chmod 755 ${CMAKE_BINARY_DIR}/build/hymod-* || true"
+    COMMAND bash -c "cd ${CMAKE_BINARY_DIR}/build && zip -q -r ../out/${MODULE_ID}-${MODULE_VERSION}.zip *"
     COMMAND ${CMAKE_COMMAND} -E echo "✅ Package: ${CMAKE_BINARY_DIR}/out/${MODULE_ID}-${MODULE_VERSION}.zip"
     COMMAND ls -lh ${CMAKE_BINARY_DIR}/out/${MODULE_ID}-${MODULE_VERSION}.zip
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
