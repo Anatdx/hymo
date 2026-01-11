@@ -14,7 +14,7 @@ set(MODULE_VERSION ${CMAKE_MATCH_1})
 string(REGEX MATCH "id=([^\n]+)" _ ${MODULE_PROP_CONTENT})
 set(MODULE_ID ${CMAKE_MATCH_1})
 
-message(STATUS "Building ${MODULE_ID} v${MODULE_VERSION}")
+message(STATUS "Building ${MODULE_ID} ${MODULE_VERSION}")
 
 # Android settings
 set(ANDROID_API_LEVEL 30)
@@ -153,13 +153,18 @@ endif()
 if(BUILD_WEBUI)
     add_custom_target(webui
         COMMAND ${CMAKE_COMMAND} -E echo "🎨 Building WebUI..."
-        COMMAND cd ${CMAKE_SOURCE_DIR}/webui && npm install
-        COMMAND cd ${CMAKE_SOURCE_DIR}/webui && npm run build
-        COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_SOURCE_DIR}/module/webroot
-        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/webui/dist ${CMAKE_SOURCE_DIR}/module/webroot
-        COMMAND ${CMAKE_COMMAND} -E echo "✅ WebUI built -> module/webroot/"
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMAND npm install
+        COMMAND npm run build
+        COMMAND ${CMAKE_COMMAND} -E echo "Cleaning old webroot..."
+        COMMAND ${CMAKE_COMMAND} -E remove_directory "${CMAKE_SOURCE_DIR}/module/webroot"
+        COMMAND ${CMAKE_COMMAND} -E echo "Creating webroot..."
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/module/webroot"
+        COMMAND ${CMAKE_COMMAND} -E echo "Copying files..."
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/webui/dist" "${CMAKE_SOURCE_DIR}/module/webroot"
+        COMMAND ${CMAKE_COMMAND} -E echo "✅ WebUI built to module/webroot"
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/webui"
         COMMENT "Building WebUI with npm"
+        VERBATIM
     )
 endif()
 
@@ -171,26 +176,28 @@ add_custom_target(package
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/module ${CMAKE_BINARY_DIR}/build
     COMMAND bash -c "cp ${CMAKE_BINARY_DIR}/out/hymod-* ${CMAKE_BINARY_DIR}/build/ || /bin/true"
     COMMAND bash -c "chmod 755 ${CMAKE_BINARY_DIR}/build/hymod-* || /bin/true"
-    COMMAND bash -c "cd ${CMAKE_BINARY_DIR}/build && zip -q -r ../out/${MODULE_ID}-${MODULE_VERSION}.zip *"
+    COMMAND bash -c "cd ${CMAKE_BINARY_DIR}/build && zip -q -r ../out/${MODULE_ID}-${MODULE_VERSION}.zip ."
     COMMAND ${CMAKE_COMMAND} -E echo "✅ Package: ${CMAKE_BINARY_DIR}/out/${MODULE_ID}-${MODULE_VERSION}.zip"
     COMMAND ls -lh ${CMAKE_BINARY_DIR}/out/${MODULE_ID}-${MODULE_VERSION}.zip
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     COMMENT "Creating module package"
+    VERBATIM
 )
 
 # Test package (arm64 only)
 add_custom_target(testzip
-    COMMAND ${CMAKE_COMMAND} -E echo "📦 Creating test package (arm64 only)..."
+    COMMAND ${CMAKE_COMMAND} -E echo "📦 Creating test package arm64 only..."
     COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/build
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/build
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/module ${CMAKE_BINARY_DIR}/build
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_BINARY_DIR}/out/hymod-arm64-v8a ${CMAKE_BINARY_DIR}/build/
     COMMAND chmod 755 ${CMAKE_BINARY_DIR}/build/hymod-arm64-v8a
-    COMMAND cd ${CMAKE_BINARY_DIR}/build && zip -r ../out/${MODULE_ID}-${MODULE_VERSION}.zip * > /dev/null
+    COMMAND cd ${CMAKE_BINARY_DIR}/build && zip -q -r ../out/${MODULE_ID}-${MODULE_VERSION}.zip .
     COMMAND ${CMAKE_COMMAND} -E echo "✅ Test package: ${CMAKE_BINARY_DIR}/out/${MODULE_ID}-${MODULE_VERSION}.zip"
     COMMAND ls -lh ${CMAKE_BINARY_DIR}/out/${MODULE_ID}-${MODULE_VERSION}.zip
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     COMMENT "Creating test package"
+    VERBATIM
 )
 
 # Install target (push to device via adb)
