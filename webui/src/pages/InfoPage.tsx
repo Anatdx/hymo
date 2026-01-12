@@ -34,7 +34,6 @@ export function InfoPage() {
 
   return (
     <div className="space-y-6">
-      {/* Warning Modal */}
       {showWarning && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <Card className="max-w-lg border-red-500 bg-red-600/10">
@@ -73,85 +72,43 @@ export function InfoPage() {
         </div>
       )}
 
-      {/* About Card */}
       <Card>
         <div className="flex items-center gap-4 mb-6">
-          <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-primary-700 rounded-2xl flex items-center justify-center">
-            <span className="text-white font-bold text-3xl">H</span>
-          </div>
+          <img src="/icon.svg" className="w-16 h-16 rounded-2xl" alt="Logo" />
           <div>
-            <h1 className="text-3xl font-bold text-white">Hymo</h1>
-            <p className="text-gray-400">{t.info.description}</p>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Hymo</h1>
+            <p className="text-gray-500 dark:text-gray-400">{t.info.description}</p>
           </div>
         </div>
 
         <div className="space-y-3">
-          <div className="flex justify-between items-center py-2 border-b border-white/10">
-            <span className="text-gray-400">{t.info.version}</span>
-            <span className="text-white font-mono">1.0.0</span>
+          <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-white/10">
+            <span className="text-gray-500 dark:text-gray-400">{t.info.version}</span>
+            <span className="text-gray-900 dark:text-white font-mono">1.0.0</span>
           </div>
           <div className="flex justify-between items-center py-2">
-            <span className="text-gray-400">License</span>
-            <span className="text-white">GPL-3.0</span>
+            <span className="text-gray-500 dark:text-gray-400">License</span>
+            <span className="text-gray-900 dark:text-white">GPL-3.0</span>
           </div>
         </div>
       </Card>
 
-      {/* Warning Card */}
-      <Card className="border-yellow-500 bg-yellow-600/10">
-        <div className="flex items-start gap-3">
-          <AlertTriangle className="text-yellow-400 flex-shrink-0" size={24} />
-          <div>
-            <h4 className="text-yellow-400 font-semibold mb-2">{t.common.error}</h4>
-            <p className="text-gray-300 text-sm">{t.info.warning}</p>
-          </div>
-        </div>
-      </Card>
-
-      {/* Features */}
       <Card>
-        <h3 className="text-xl font-bold text-white mb-4">Core Features</h3>
-        <ul className="space-y-2 text-gray-300">
-          <li className="flex items-start gap-2">
-            <span className="text-primary-400">•</span>
-            <span>Native C++ Engine for optimal performance</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-primary-400">•</span>
-            <span>HymoFS kernel-level file system mapping</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-primary-400">•</span>
-            <span>Multi-mode mounting (HymoFS/OverlayFS/Magic)</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-primary-400">•</span>
-            <span>Tmpfs-based in-memory module storage</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-primary-400">•</span>
-            <span>Hot mount/unmount support</span>
-          </li>
-        </ul>
-      </Card>
-
-      {/* Links */}
-      <Card>
-        <h3 className="text-xl font-bold text-white mb-4">{t.info.links}</h3>
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">{t.info.links}</h3>
         <div className="space-y-3">
           <Button
-            variant="ghost"
-            className="w-full justify-start"
-            onClick={() => window.open('https://github.com/Anatdx/HymoFS', '_blank')}
+            variant="secondary"
+            className="w-full justify-start h-[50px]"
+            onClick={() => window.open('https://github.com/Anatdx/hymo', '_blank')}
           >
             <Github size={20} className="mr-3" />
             {t.info.github}
           </Button>
           
           <Button
-            variant="ghost"
-            className="w-full justify-start"
-            onClick={() => window.open('https://github.com/Anatdx/HymoFS/blob/main/README.md', '_blank')}
+            variant="secondary"
+            className="w-full justify-start h-[50px]"
+            onClick={() => window.open('https://github.com/Anatdx/hymo/blob/main/README.md', '_blank')}
           >
             <BookOpen size={20} className="mr-3" />
             {t.info.docs}
@@ -159,17 +116,31 @@ export function InfoPage() {
         </div>
       </Card>
 
-      {/* Tech Stack */}
       <Card>
-        <h3 className="text-xl font-bold text-white mb-4">Tech Stack</h3>
-        <div className="flex flex-wrap gap-2">
-          {['React', 'TypeScript', 'Tailwind CSS', 'Zustand', 'Vite', 'KernelSU'].map((tech) => (
-            <span
-              key={tech}
-              className="px-3 py-1 bg-primary-600/20 border border-primary-500/30 rounded-lg text-primary-300 text-sm"
-            >
-              {tech}
-            </span>
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">{t.info.acknowledgments}</h3>
+        <div className="flex flex-col gap-2">
+          {[
+              { name: 'KernelSU', url: 'https://kernelsu.org' },
+              { name: 'Magisk', url: 'https://github.com/topjohnwu/Magisk' },
+              { name: 'React', url: 'https://react.dev' },
+              { name: 'Vite', url: 'https://vitejs.dev' },
+              { name: 'Tailwind CSS', url: 'https://tailwindcss.com' },
+              { name: 'Zustand', url: 'https://github.com/pmndrs/zustand' },
+              { name: 'Lucide Icons', url: 'https://lucide.dev' }
+          ].map((item) => (
+             <Button
+                key={item.name}
+                variant="secondary"
+                className="w-full justify-between group h-[50px]"
+                onClick={() => window.open(item.url, '_blank')}
+              >
+                  <span className="font-medium text-gray-700 dark:text-gray-200 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
+                      {item.name}
+                  </span>
+                  <div className="text-gray-400 group-hover:text-primary-500 transition-colors">
+                      ↗
+                  </div>
+              </Button>
           ))}
         </div>
       </Card>

@@ -1,25 +1,24 @@
-// Constants for paths and defaults
 export const PATHS = {
   BINARY: '/data/adb/modules/hymo/hymod',
   CONFIG: '/data/adb/hymo/config.toml',
-  MODE_CONFIG: '/data/adb/hymo/mode.conf',
-  RULES_CONFIG: '/data/adb/hymo/rules.conf',
-  DEFAULT_LOG: '/data/adb/hymo/hymo.log',
+  MODE_CONFIG: '/data/adb/hymo/module_mode.conf',
+  RULES_CONFIG: '/data/adb/hymo/module_rules.conf',
+  DEFAULT_LOG: '/data/adb/hymo/daemon.log',
 } as const
 
 export const DEFAULT_CONFIG = {
   moduledir: '/data/adb/modules',
   tempdir: '',
-  mountsource: 'overlay',
+  mountsource: 'KSU',
   logfile: PATHS.DEFAULT_LOG,
   verbose: false,
   force_ext4: false,
+  prefer_erofs: false,
   disable_umount: false,
-  enable_nuke: false,
+  enable_nuke: true,
   ignore_protocol_mismatch: false,
   enable_kernel_debug: false,
-  enable_stealth: false,
-  avc_spoof: false,
+  enable_stealth: true,
   partitions: [] as string[],
   hymofs_available: false,
 }
@@ -30,6 +29,7 @@ export const BUILTIN_PARTITIONS = [
   'product',
   'system_ext',
   'odm',
+  'oem',
 ]
 
 export type Config = typeof DEFAULT_CONFIG
@@ -52,8 +52,8 @@ export type StorageInfo = {
   size: string
   used: string
   avail: string
-  percent: string
-  type: 'tmpfs' | 'ext4' | 'hymofs' | null
+  percent: number
+  mode: 'tmpfs' | 'ext4' | 'erofs' | 'hymofs' | null
 }
 
 export type SystemInfo = {

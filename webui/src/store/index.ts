@@ -12,13 +12,18 @@ interface Toast {
 }
 
 interface AppState {
-  // UI State
   activeTab: 'status' | 'config' | 'modules' | 'logs' | 'info'
   setActiveTab: (tab: AppState['activeTab']) => void
   
   language: Language
   setLanguage: (lang: Language) => void
   t: TranslationKey
+
+  theme: 'light' | 'dark' | 'system'
+  toggleTheme: () => void
+
+  useSystemFont: boolean
+  setUseSystemFont: (use: boolean) => void
   
   showAdvanced: boolean
   setShowAdvanced: (show: boolean) => void
@@ -26,12 +31,10 @@ interface AppState {
   backgroundImage: string | null
   setBackgroundImage: (url: string | null) => void
   
-  // Toast notifications
   toasts: Toast[]
   showToast: (message: string, type?: ToastType) => void
   removeToast: (id: string) => void
   
-  // Data State
   config: Config
   modules: Module[]
   storage: StorageInfo
@@ -41,13 +44,12 @@ interface AppState {
   
   loading: boolean
   
-  // Actions
   loadConfig: () => Promise<void>
-  saveConfig: () => Promise<void>
+  saveConfig: (silent?: boolean) => Promise<void>
   updateConfig: (updates: Partial<Config>) => void
   
   loadModules: () => Promise<void>
-  saveModules: () => Promise<void>
+  saveModules: (silent?: boolean) => Promise<void>
   updateModule: (id: string, updates: Partial<Module>) => void
   
   loadStatus: () => Promise<void>
@@ -56,7 +58,6 @@ interface AppState {
 }
 
 export const useStore = create<AppState>((set, get) => ({
-  // UI State
   activeTab: 'status',
   setActiveTab: (tab) => set({ activeTab: tab }),
   
@@ -66,6 +67,25 @@ export const useStore = create<AppState>((set, get) => ({
     localStorage.setItem('hymo_language', lang)
   },
   t: translations[getNavigatorLanguage()],
+
+  theme: (localStorage.getItem('hymo_theme') as 'light' | 'dark' | 'system') || 'system',
+  toggleTheme: () => {
+    set((state) => {
+      let newTheme: 'light' | 'dark' | 'system'
+      if (state.theme === 'light') newTheme = 'dark'
+      else if (state.theme === 'dark') newTheme = 'system'
+      else newTheme = 'light'
+      
+      localStorage.setItem('hymo_theme', newTheme)
+      return { theme: newTheme }
+    })
+  },
+
+  useSystemFont: localStorage.getItem('hymo_use_system_font') === 'true',
+  setUseSystemFont: (use) => {
+    set({ useSystemFont: use })
+    localStorage.setItem('hymo_use_system_font', String(use))
+  },
   
   showAdvanced: false,
   setShowAdvanced: (show) => {
@@ -83,7 +103,6 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
   
-  // Toast
   toasts: [],
   showToast: (message, type = 'info') => {
     const id = Math.random().toString(36).substr(2, 9)
@@ -100,15 +119,14 @@ export const useStore = create<AppState>((set, get) => ({
     }))
   },
   
-  // Data State
   config: DEFAULT_CONFIG,
   modules: [],
   storage: {
     size: '-',
     used: '-',
     avail: '-',
-    percent: '0%',
-    type: null,
+    percent: 0,
+    mode: null,
   },
   systemInfo: {
     kernel: 'Loading...',
@@ -120,7 +138,6 @@ export const useStore = create<AppState>((set, get) => ({
   
   loading: false,
   
-  // Actions
   loadConfig: async () => {
     try {
       set({ loading: true })
@@ -134,11 +151,11 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
   
-  saveConfig: async () => {
+  saveConfig: async (silent = false) => {
     try {
       set({ loading: true })
       await api.saveConfig(get().config)
-      get().showToast(get().t.config.saved, 'success')
+      if (!silent) get().showToast(get().t.config.saved, 'success')
     } catch (error) {
       get().showToast(get().t.config.saveFailed, 'error')
       console.error(error)
@@ -166,12 +183,12 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
   
-  saveModules: async () => {
+  saveModules: async (silent = false) => {
     try {
       set({ loading: true })
       await api.saveModules(get().modules)
       await api.saveRules(get().modules)
-      get().showToast('Modules saved', 'success')
+      if (!silent) get().showToast('Modules saved', 'success')
     } catch (error) {
       get().showToast('Failed to save modules', 'error')
       console.error(error)

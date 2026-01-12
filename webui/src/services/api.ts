@@ -1,12 +1,9 @@
 import { PATHS, DEFAULT_CONFIG, type Config, type Module, type StorageInfo, type SystemInfo } from '@/types'
 
-// Check if we're in development or production
 const isDev = import.meta.env.DEV
-
-// Try to import KernelSU exec
 let ksuExec: ((cmd: string) => Promise<{ errno: number; stdout: string; stderr: string }>) | null = null
 
-// Initialize KernelSU asynchronously
+// Initialize KernelSU API
 async function initKernelSU() {
   if (ksuExec !== null) return ksuExec
   
@@ -14,7 +11,6 @@ async function initKernelSU() {
     const ksu = await import('kernelsu').catch(() => null)
     ksuExec = ksu ? ksu.exec : null
   } catch (e) {
-    console.warn('KernelSU module not found, using mock mode')
     ksuExec = null
   }
   
@@ -23,11 +19,9 @@ async function initKernelSU() {
 
 const shouldUseMock = isDev
 
-console.log(`[API] Running in ${shouldUseMock ? 'MOCK' : 'REAL'} mode`)
-
-// Serialize config to TOML format
+// Serialize config to TOML
 function serializeConfig(config: Config): string {
-  let output = '# Hymo Configuration\n'
+  let output = '# Hymo Config\n'
   
   if (config.moduledir) output += `moduledir = "${config.moduledir}"\n`
   if (config.tempdir) output += `tempdir = "${config.tempdir}"\n`
@@ -40,7 +34,6 @@ function serializeConfig(config: Config): string {
   output += `ignore_protocol_mismatch = ${config.ignore_protocol_mismatch}\n`
   output += `enable_kernel_debug = ${config.enable_kernel_debug}\n`
   output += `enable_stealth = ${config.enable_stealth}\n`
-  output += `avc_spoof = ${config.avc_spoof}\n`
   
   if (config.partitions?.length) {
     output += `partitions = "${config.partitions.join(',')}"\n`
@@ -51,7 +44,6 @@ function serializeConfig(config: Config): string {
   return output
 }
 
-// Mock API for development
 const mockApi = {
   async loadConfig(): Promise<Config> {
     return { ...DEFAULT_CONFIG, partitions: ['system', 'vendor'] }
@@ -92,6 +84,10 @@ const mockApi = {
   async syncPartitions(): Promise<string> {
     return 'Sync completed (mock)'
   },
+  
+  async scanPartitionsFromModules(_moduledir: string): Promise<string[]> {
+      return ['system', 'product', 'my_custom_partition']
+  },
 
   async readLogs(_logPath: string, _lines?: number): Promise<string> {
     return 'Sample log line 1\nSample log line 2\nSample log line 3'
@@ -102,8 +98,8 @@ const mockApi = {
       size: '512M',
       used: '128M',
       avail: '384M',
-      percent: '25%',
-      type: 'tmpfs',
+      percent: 25,
+      mode: 'tmpfs',
     }
   },
 
@@ -126,7 +122,6 @@ const mockApi = {
   },
 }
 
-// Real API implementation
 const realApi = {
   async loadConfig(): Promise<Config> {
     await initKernelSU()
@@ -157,7 +152,6 @@ const realApi = {
     // Apply kernel settings
     await ksuExec!(`${PATHS.BINARY} debug ${config.enable_kernel_debug ? 'on' : 'off'}`)
     await ksuExec!(`${PATHS.BINARY} stealth ${config.enable_stealth ? 'on' : 'off'}`)
-    await ksuExec!(`${PATHS.BINARY} avc ${config.avc_spoof ? 'on' : 'off'}`)
   },
 
   async scanModules(): Promise<Module[]> {
@@ -250,6 +244,34 @@ const realApi = {
     throw new Error('Sync failed')
   },
 
+  async scanPartitionsFromModules(moduledir: string): Promise<string[]> {
+      await initKernelSU()
+      if (!ksuExec) return []
+      
+      // Find all 2nd level directories in module dir
+      const cmd = `find ${moduledir} -mindepth 2 -maxdepth 2 -type d`
+      try {
+        const { errno, stdout } = await ksuExec!(cmd)
+        if (errno === 0 && stdout) {
+            const paths = stdout.split('\n').filter(Boolean)
+            const partitions = new Set<string>()
+            for (const p of paths) {
+                const parts = p.split('/')
+                const name = parts[parts.length - 1]
+                // Filter out common non-partition folders if any?
+                // For now, accept everything that's not hidden
+                if (!name.startsWith('.')) {
+                    partitions.add(name)
+                }
+            }
+            return Array.from(partitions)
+        }
+      } catch(e) {
+          console.error("Failed to scan partitions", e)
+      }
+      return []
+  },
+
   async readLogs(logPath: string, lines = 1000): Promise<string> {
     await initKernelSU()
     if (!ksuExec) return ''
@@ -270,7 +292,7 @@ const realApi = {
 
   async getStorageUsage(): Promise<StorageInfo> {
     await initKernelSU()
-    if (!ksuExec) return { size: '-', used: '-', avail: '-', percent: '0%', type: null }
+    if (!ksuExec) return { size: '-', used: '-', avail: '-', percent: 0, mode: null }
     
     try {
       const cmd = `${PATHS.BINARY} storage`
@@ -282,14 +304,14 @@ const realApi = {
           size: data.size || '-',
           used: data.used || '-',
           avail: data.avail || '-',
-          percent: data.percent || '0%',
-          type: data.type || null,
+          percent: typeof data.percent === 'number' ? data.percent : 0,
+          mode: data.mode || null,
         }
       }
     } catch (e) {
       console.error('Storage check failed:', e)
     }
-    return { size: '-', used: '-', avail: '-', percent: '0%', type: null }
+    return { size: '-', used: '-', avail: '-', percent: 0, mode: null }
   },
 
   async getSystemInfo(): Promise<SystemInfo> {
@@ -298,26 +320,36 @@ const realApi = {
       return {
         kernel: 'Unknown',
         selinux: 'Unknown',
-        mountBase: '/dev/hymofs',
+        mountBase: '/dev/null',
       }
     }
     
     try {
-      const cmdSys = `echo "KERNEL:$(uname -r)"; echo "SELINUX:$(getenforce)"`
-      const { stdout: outSys } = await ksuExec!(cmdSys)
-      
-      const lines = outSys.split('\n')
-      const kernel = lines.find(l => l.startsWith('KERNEL:'))?.split(':')[1] || 'Unknown'
-      const selinux = lines.find(l => l.startsWith('SELINUX:'))?.split(':')[1] || 'Unknown'
+      // Fetch kernel version
+      let kernel = 'Unknown'
+      try {
+        const { stdout } = await ksuExec!('uname -r')
+        if (stdout) kernel = stdout.trim()
+      } catch (e) { console.warn('Failed to get kernel info', e) }
+
+      // Fetch SELinux status
+      let selinux = 'Unknown'
+      try {
+         const { stdout } = await ksuExec!('getenforce')
+         if (stdout) selinux = stdout.trim()
+      } catch (e) { console.warn('Failed to get selinux info', e) }
       
       const cmdMount = `${PATHS.BINARY} version`
-      const { stdout: outMount } = await ksuExec!(cmdMount)
-      const mountData = JSON.parse(outMount || '{}')
+      let mountData: any = {}
+      try {
+        const { stdout: outMount } = await ksuExec!(cmdMount)
+        mountData = JSON.parse(outMount || '{}')
+      } catch (e) { console.warn('Failed to get mount info', e) }
       
       return {
         kernel,
         selinux,
-        mountBase: mountData.mount_base || '/dev/hymofs',
+        mountBase: mountData.mount_base || '/dev/hymo_mirror',
         hymofsModules: mountData.active_modules || [],
         hymofsMismatch: mountData.protocol_mismatch || false,
         mismatchMessage: mountData.mismatch_message,
@@ -327,7 +359,7 @@ const realApi = {
       return {
         kernel: 'Unknown',
         selinux: 'Unknown',
-        mountBase: '/dev/hymofs',
+        mountBase: '/dev/hymo_mirror',
       }
     }
   },

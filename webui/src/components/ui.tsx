@@ -9,8 +9,10 @@ export function Card({ className, children, ...props }: CardProps) {
   return (
     <div
       className={cn(
-        'rounded-xl bg-white/5 backdrop-blur-md border border-white/10',
-        'shadow-lg p-6 transition-all hover:bg-white/10',
+        'rounded-xl backdrop-blur-md',
+        'bg-white dark:bg-white/5',
+        'border border-gray-200 dark:border-white/10',
+        'shadow-sm dark:shadow-lg p-6 transition-all',
         className
       )}
       {...props}
@@ -21,7 +23,7 @@ export function Card({ className, children, ...props }: CardProps) {
 }
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'danger' | 'ghost'
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'success'
   size?: 'sm' | 'md' | 'lg'
   children: ReactNode
 }
@@ -34,10 +36,11 @@ export function Button({
   ...props
 }: ButtonProps) {
   const variants = {
-    primary: 'bg-primary-600 hover:bg-primary-700 text-white',
-    secondary: 'bg-gray-600 hover:bg-gray-700 text-white',
-    danger: 'bg-red-600 hover:bg-red-700 text-white',
-    ghost: 'bg-transparent hover:bg-white/10 text-white border border-white/20',
+    primary: 'bg-primary-600 hover:bg-primary-700 text-white shadow-sm shadow-primary-500/20 active:scale-95',
+    secondary: 'bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white active:scale-95',
+    danger: 'bg-red-600 hover:bg-red-700 text-white active:scale-95',
+    success: 'bg-green-600 hover:bg-green-700 text-white active:scale-95',
+    ghost: 'bg-transparent hover:bg-gray-100 dark:hover:bg-white/10 text-gray-700 dark:text-white active:scale-95',
   }
 
   const sizes = {
@@ -49,7 +52,8 @@ export function Button({
   return (
     <button
       className={cn(
-        'rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed',
+        'inline-flex items-center justify-center gap-2',
+        'rounded-lg font-medium transition-all duration-200 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100',
         variants[variant],
         sizes[size],
         className
@@ -70,19 +74,19 @@ interface SwitchProps {
 
 export function Switch({ checked, onChange, label, disabled }: SwitchProps) {
   return (
-    <label className="flex items-center justify-between cursor-pointer group">
-      {label && <span className="text-sm text-gray-200">{label}</span>}
+    <label className="flex items-center justify-between cursor-pointer group active:scale-[0.99] transition-transform">
+      {label && <span className="text-sm text-gray-700 dark:text-gray-200">{label}</span>}
       <div
         className={cn(
-          'relative w-11 h-6 rounded-full transition-colors',
-          checked ? 'bg-primary-600' : 'bg-gray-600',
+          'relative w-11 h-6 rounded-full transition-colors duration-300',
+          checked ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-600',
           disabled && 'opacity-50 cursor-not-allowed'
         )}
         onClick={() => !disabled && onChange(!checked)}
       >
         <div
           className={cn(
-            'absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform',
+            'absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform duration-300 shadow-sm',
             checked && 'transform translate-x-5'
           )}
         />
@@ -99,13 +103,16 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 export function Input({ label, error, className, ...props }: InputProps) {
   return (
     <div className="space-y-1">
-      {label && <label className="block text-sm font-medium text-gray-200">{label}</label>}
+      {label && <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">{label}</label>}
       <input
         className={cn(
-          'w-full px-3 py-2 bg-white/5 border border-white/20 rounded-lg',
-          'text-white placeholder-gray-400',
+          'w-full px-3 py-2 rounded-lg',
+          'bg-white dark:bg-white/5',
+          'border border-gray-200 dark:border-white/20',
+          'text-gray-900 dark:text-white',
+          'placeholder-gray-400 dark:placeholder-gray-500',
           'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent',
-          'transition-all',
+          'transition-all duration-200',
           error && 'border-red-500',
           className
         )}
@@ -124,23 +131,27 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 export function Select({ label, options, className, ...props }: SelectProps) {
   return (
     <div className="space-y-1">
-      {label && <label className="block text-sm font-medium text-gray-200">{label}</label>}
+      {label && <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">{label}</label>}
+      <div className="relative">
       <select
         className={cn(
-          'w-full px-3 py-2 bg-white/5 border border-white/20 rounded-lg',
-          'text-white',
+          'w-full px-3 py-2 rounded-lg appearance-none',
+          'bg-white dark:bg-white/5',
+          'border border-gray-200 dark:border-white/20',
+          'text-gray-900 dark:text-white',
           'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent',
-          'transition-all',
+          'transition-all duration-200 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/10',
           className
         )}
         {...props}
       >
         {options.map((opt) => (
-          <option key={opt.value} value={opt.value} className="bg-gray-800">
+          <option key={opt.value} value={opt.value} className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
             {opt.label}
           </option>
         ))}
       </select>
+      </div>
     </div>
   )
 }
@@ -153,10 +164,10 @@ interface BadgeProps {
 
 export function Badge({ children, variant = 'default', className }: BadgeProps) {
   const variants = {
-    default: 'bg-gray-600 text-white',
-    success: 'bg-green-600 text-white',
-    warning: 'bg-yellow-600 text-black',
-    danger: 'bg-red-600 text-white',
+    default: 'bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-white',
+    success: 'bg-green-100 dark:bg-green-600 text-green-800 dark:text-white',
+    warning: 'bg-yellow-100 dark:bg-yellow-600 text-yellow-800 dark:text-black',
+    danger: 'bg-red-100 dark:bg-red-600 text-red-800 dark:text-white',
   }
 
   return (
@@ -175,7 +186,7 @@ export function Badge({ children, variant = 'default', className }: BadgeProps) 
 export function Skeleton({ className }: { className?: string }) {
   return (
     <div
-      className={cn('animate-pulse bg-white/10 rounded', className)}
+      className={cn('animate-pulse bg-gray-200 dark:bg-white/10 rounded', className)}
     />
   )
 }
