@@ -54,9 +54,6 @@ Hymo 采用 **CMake + Ninja** 工具链实现高效跨平台编译。
 
 # 完整编译（所有目标架构 + Web UI）
 ./build.sh all
-
-# 快速开发构建（仅 ARM64）
-./quick-build.sh
 ```
 
 ### 可用构建目标
@@ -76,7 +73,11 @@ Hymo 采用 **CMake + Ninja** 工具链实现高效跨平台编译。
 
 HymoFS 提供自动化的 `setup.sh` 安装程序，可无缝集成到内核源码。
 
-> **注意:**HymoFS已经不支持SUSFS并与之互斥，并且当前支持的KernelSU管理器仅有YukiSU。
+> **重要通知:** **HymoFS 现已正式与 YukiSU 合并**。
+> 
+> *   **YukiSU 独占支持**：目前仅支持配合 YukiSU 管理器使用，不再支持其他管理器。
+> *   **SUSFS 互斥**：HymoFS 不再支持 SUSFS，且两者存在冲突，请勿尝试共存。
+> *   **变更日志**：近期对项目进行了底层代码清理与优化，修复了构建问题，并升级了 WebUI 依赖（适配 React 19），提升了整体稳定性。
 
 **自动化安装**：
 ```bash

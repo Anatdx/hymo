@@ -54,9 +54,6 @@ Hymo utilizes a **CMake + Ninja** toolchain for efficient cross-platform compila
 
 # Full compilation (all target architectures + web UI)
 ./build.sh all
-
-# Rapid development build (ARM64 only)
-./quick-build.sh
 ```
 
 ### Available Build Targets
@@ -76,7 +73,11 @@ Hymo utilizes a **CMake + Ninja** toolchain for efficient cross-platform compila
 
 HymoFS ships with an automated `setup.sh` installer for seamless kernel source integration.
 
-> **Note:** HymoFS no longer supports SUSFS and is mutually exclusive with it. Currently, the only compatible KernelSU manager is YukiSU.
+> **Important Notice:** **HymoFS has officially merged with YukiSU.**
+>
+> *   **YukiSU Exclusive Support**: Currently only supported for use with YukiSU Manager; other managers are no longer supported.
+> *   **SUSFS Incompatibility**: HymoFS no longer supports SUSFS and is mutually exclusive with it. Do not attempt to coexist.
+> *   **Changelog**: Recent updates include low-level code cleanup and optimization, build fixes, and WebUI dependency upgrades (React 19 adaptation) to improve overall stability.
 
 **Automated Installation**:
 ```bash

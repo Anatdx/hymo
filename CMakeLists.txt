@@ -45,7 +45,7 @@ include(CheckIPOSupported)
 check_ipo_supported(RESULT LTO_SUPPORTED OUTPUT error)
 
 set(HYMO_COMPILE_OPTIONS
-    -O3
+    -Os
     -Wall
     -Wextra
     -Wno-unused-parameter
