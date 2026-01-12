@@ -56,6 +56,15 @@ jobs:
           ./build.sh init
           ./build.sh package
 
+      - name: Rename Output with Hash
+        run: |
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+          echo "Adding commit hash $COMMIT_HASH to artifacts..."
+          cd build/out
+          for file in *.zip; do
+            mv "$file" "${file%.zip}-$COMMIT_HASH.zip"
+          done
+
       - name: Sign Module (Internal)
         if: github.actor == 'Anatdx'
         env:
