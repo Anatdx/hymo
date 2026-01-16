@@ -5,6 +5,8 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <set>
+#include <sstream>
 #include "conf/config.hpp"
 #include "core/executor.hpp"
 #include "core/inventory.hpp"
