@@ -726,6 +726,14 @@ int main(int argc, char* argv[]) {
                         LOG_WARN("Failed to set stealth mode.");
                     }
 
+                    // Apply HymoFS Enable/Disable
+                    if (HymoFS::set_enabled(config.hymofs_enabled)) {
+                        LOG_INFO("HymoFS enabled set to: " +
+                                 std::string(config.hymofs_enabled ? "true" : "false"));
+                    } else {
+                        LOG_WARN("Failed to set HymoFS enabled state.");
+                    }
+
                     // Fix mount namespace (reorder mnt_id) if stealth is enabled
                     // This ensures that any new mounts created during reload are also
                     // hidden/reordered
@@ -898,6 +906,14 @@ int main(int argc, char* argv[]) {
                          std::string(config.enable_stealth ? "true" : "false"));
             } else {
                 LOG_WARN("Failed to set stealth mode.");
+            }
+
+            // Apply HymoFS Enable/Disable
+            if (HymoFS::set_enabled(config.hymofs_enabled)) {
+                LOG_INFO("HymoFS enabled set to: " +
+                         std::string(config.hymofs_enabled ? "true" : "false"));
+            } else {
+                LOG_WARN("Failed to set HymoFS enabled state.");
             }
 
             // **Mirror Strategy (Tmpfs/Ext4)**

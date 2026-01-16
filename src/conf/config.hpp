@@ -27,6 +27,7 @@ struct Config {
     bool ignore_protocol_mismatch = false;
     bool enable_kernel_debug = false;
     bool enable_stealth = true;
+    bool hymofs_enabled = true;
     std::string mirror_path;
     std::vector<std::string> partitions;
     std::map<std::string, std::string> module_modes;
