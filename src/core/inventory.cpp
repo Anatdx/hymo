@@ -160,6 +160,11 @@ std::vector<std::string> scan_partition_candidates(const fs::path& source_dir) {
     // BUILTIN_PARTITIONS from defs.hpp
     std::set<std::string> builtin_set(BUILTIN_PARTITIONS.begin(), BUILTIN_PARTITIONS.end());
 
+    // System directories that are mountpoints but NOT Android partitions
+    std::set<std::string> system_dirs = {"tmp", "proc", "sys",  "dev",   "run",
+                                         "mnt", "boot", "root", "etc",   "home",
+                                         "var", "opt",  "srv",  "media", "usr"};
+
     try {
         for (const auto& mod_entry : fs::directory_iterator(source_dir)) {
             if (!mod_entry.is_directory())
@@ -177,6 +182,10 @@ std::vector<std::string> scan_partition_candidates(const fs::path& source_dir) {
 
                 // Skip builtin partitions (already handled by default)
                 if (builtin_set.find(name) != builtin_set.end())
+                    continue;
+
+                // Skip system directories (not Android partitions)
+                if (system_dirs.find(name) != system_dirs.end())
                     continue;
 
                 // Only include if:

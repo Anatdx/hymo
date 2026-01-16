@@ -438,14 +438,54 @@ int main(int argc, char* argv[]) {
                 }
                 return 0;
             } else if (cli.command == "version") {
+                std::cout << "{\n";
+                std::cout << "  \"protocol_version\": " << HymoFS::EXPECTED_PROTOCOL_VERSION
+                          << ",\n";
+                std::cout << "  \"hymofs_available\": "
+                          << (HymoFS::is_available() ? "true" : "false") << ",\n";
+
                 if (HymoFS::is_available()) {
                     int ver = HymoFS::get_protocol_version();
-                    std::cout << "HymoFS Protocol Version: " << HymoFS::EXPECTED_PROTOCOL_VERSION
-                              << "\n";
-                    std::cout << "HymoFS Atomiconfig Version: " << ver << "\n";
+                    std::cout << "  \"kernel_version\": " << ver << ",\n";
+                    std::cout << "  \"protocol_mismatch\": "
+                              << (ver != HymoFS::EXPECTED_PROTOCOL_VERSION ? "true" : "false")
+                              << ",\n";
+
+                    // Parse active rules to get module list
+                    std::string rules = HymoFS::get_active_rules();
+                    std::set<std::string> active_modules;
+                    std::istringstream iss(rules);
+                    std::string line;
+                    while (std::getline(iss, line)) {
+                        // Parse lines like: "ADD /data/adb/modules/module_id/..."
+                        size_t pos = line.find("/data/adb/modules/");
+                        if (pos != std::string::npos) {
+                            size_t start = pos + 18;  // length of "/data/adb/modules/"
+                            size_t end = line.find('/', start);
+                            if (end != std::string::npos) {
+                                std::string mod_id = line.substr(start, end - start);
+                                active_modules.insert(mod_id);
+                            }
+                        }
+                    }
+
+                    std::cout << "  \"active_modules\": [";
+                    bool first = true;
+                    for (const auto& mod : active_modules) {
+                        if (!first)
+                            std::cout << ", ";
+                        std::cout << "\"" << mod << "\"";
+                        first = false;
+                    }
+                    std::cout << "],\n";
                 } else {
-                    std::cout << "HymoFS not available.\n";
+                    std::cout << "  \"kernel_version\": 0,\n";
+                    std::cout << "  \"protocol_mismatch\": false,\n";
+                    std::cout << "  \"active_modules\": [],\n";
                 }
+
+                std::cout << "  \"mount_base\": \"/dev/hymo_mirror\"\n";
+                std::cout << "}\n";
                 return 0;
             } else if (cli.command == "list") {
                 if (HymoFS::is_available()) {
