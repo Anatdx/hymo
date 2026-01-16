@@ -207,7 +207,6 @@ jobs:
           fi
 
       - name: "📤 Upload to telegram | 上传至Telegram群组"
-        if: github.repository == 'Anatdx/hymo'
         run: |
           if [ ! -z "${{ secrets.TELEGRAM_BOT_TOKEN }}" ]; then
             echo "📤 正在上传到Telegram..."
