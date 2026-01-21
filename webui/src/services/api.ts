@@ -19,31 +19,8 @@ async function initKernelSU() {
 
 const shouldUseMock = isDev
 
-// Serialize config to TOML
-function serializeConfig(config: Config): string {
-  let output = '# Hymo Config\n'
-  
-  if (config.moduledir) output += `moduledir = "${config.moduledir}"\n`
-  if (config.tempdir) output += `tempdir = "${config.tempdir}"\n`
-  if (config.mountsource) output += `mountsource = "${config.mountsource}"\n`
-  
-  output += `verbose = ${config.verbose}\n`
-  output += `force_ext4 = ${config.force_ext4}\n`
-  output += `disable_umount = ${config.disable_umount}\n`
-  output += `enable_nuke = ${config.enable_nuke}\n`
-  output += `ignore_protocol_mismatch = ${config.ignore_protocol_mismatch}\n`
-  output += `enable_kernel_debug = ${config.enable_kernel_debug}\n`
-  output += `enable_stealth = ${config.enable_stealth}\n`
-  output += `hymofs_enabled = ${config.hymofs_enabled}\n`
-  
-  if (config.partitions?.length) {
-    output += `partitions = "${config.partitions.join(',')}"\n`
-  } else {
-    output += `partitions = ""\n`
-  }
-  
-  return output
-}
+// Serialize config to JSON (handled natively)
+// function serializeConfig(config: Config): string { ... } removed
 
 const mockApi = {
   async loadConfig(): Promise<Config> {
@@ -114,6 +91,30 @@ const mockApi = {
     }
   },
 
+  async getUserHideRules(): Promise<string[]> {
+    return [
+      '/data/adb/magisk',
+      '/data/local/tmp/test_file',
+    ]
+  },
+
+  async getAllHideRules(): Promise<Array<{ path: string; isUserDefined: boolean }>> {
+    return [
+      { path: '/data/adb/magisk', isUserDefined: true },
+      { path: '/data/local/tmp/test_file', isUserDefined: true },
+      { path: '/system/app/EdXposed', isUserDefined: false },
+      { path: '/data/adb/modules/test/.hidden', isUserDefined: false },
+    ]
+  },
+
+  async addUserHideRule(_path: string): Promise<void> {
+    console.log('[Mock] Add hide rule:', _path)
+  },
+
+  async removeUserHideRule(_path: string): Promise<void> {
+    console.log('[Mock] Remove hide rule:', _path)
+  },
+
   async hotMount(_moduleId: string): Promise<void> {
     console.log('[Mock] Hot mount')
   },
@@ -145,7 +146,7 @@ const realApi = {
     await initKernelSU()
     if (!ksuExec) throw new Error('KernelSU not available')
     
-    const data = serializeConfig(config).replace(/'/g, "'\\''")
+    const data = JSON.stringify(config, null, 2).replace(/'/g, "'\\''")
     const cmd = `mkdir -p "$(dirname "${PATHS.CONFIG}")" && printf '%s\\n' '${data}' > "${PATHS.CONFIG}"`
     const { errno } = await ksuExec!(cmd)
     if (errno !== 0) throw new Error('Failed to save config')
@@ -155,6 +156,12 @@ const realApi = {
     await ksuExec!(`${PATHS.BINARY} stealth ${config.enable_stealth ? 'on' : 'off'}`)
     if (config.hymofs_available) {
       await ksuExec!(`${PATHS.BINARY} hymofs ${config.hymofs_enabled ? 'on' : 'off'}`)
+    }
+    // Apply uname spoofing (always apply to ensure we can clear it)
+    {
+      const release = (config.uname_release || '').replace(/'/g, "'\\''")
+      const version = (config.uname_version || '').replace(/'/g, "'\\''")
+      await ksuExec!(`${PATHS.BINARY} set-uname '${release}' '${version}'`)
     }
   },
 
@@ -190,14 +197,14 @@ const realApi = {
     await initKernelSU()
     if (!ksuExec) throw new Error('KernelSU not available')
     
-    let content = '# Module Modes\n'
+    const modes: Record<string, string> = {}
     modules.forEach(m => {
       if (m.mode !== 'auto' && /^[a-zA-Z0-9_.-]+$/.test(m.id)) {
-        content += `${m.id}=${m.mode}\n`
+        modes[m.id] = m.mode
       }
     })
     
-    const data = content.replace(/'/g, "'\\''")
+    const data = JSON.stringify(modes, null, 2).replace(/'/g, "'\\''")
     const cmd = `mkdir -p "$(dirname "${PATHS.MODE_CONFIG}")" && printf '%s\\n' '${data}' > "${PATHS.MODE_CONFIG}"`
     const { errno } = await ksuExec!(cmd)
     if (errno !== 0) throw new Error('Failed to save modes')
@@ -223,16 +230,14 @@ const realApi = {
     await initKernelSU()
     if (!ksuExec) throw new Error('KernelSU not available')
     
-    let content = '# Module Rules\n'
+    const rules: Record<string, Array<{path: string, mode: string}>> = {}
     modules.forEach(m => {
       if (m.rules?.length) {
-        m.rules.forEach(r => {
-          content += `${m.id}:${r.path}=${r.mode}\n`
-        })
+        rules[m.id] = m.rules.map(r => ({path: r.path, mode: r.mode}))
       }
     })
     
-    const data = content.replace(/'/g, "'\\''")
+    const data = JSON.stringify(rules, null, 2).replace(/'/g, "'\\''")
     const cmd = `mkdir -p "$(dirname "${PATHS.RULES_CONFIG}")" && printf '%s\\n' '${data}' > "${PATHS.RULES_CONFIG}"`
     const { errno } = await ksuExec!(cmd)
     if (errno !== 0) throw new Error('Failed to save rules')
@@ -303,6 +308,18 @@ const realApi = {
       
       if (errno === 0 && stdout) {
         const data = JSON.parse(stdout)
+        
+        // Handle "Not mounted" error or valid stats
+        if (data.error) {
+              return {
+              size: '-',
+              used: '-',
+              avail: '-',
+              percent: 0,
+              mode: null,
+            }
+        }
+
         return {
           size: data.size || '-',
           used: data.used || '-',
@@ -330,10 +347,20 @@ const realApi = {
     try {
       // Fetch kernel version
       let kernel = 'Unknown'
+      let unameRelease = ''
+      let unameVersion = ''
       try {
         const { stdout } = await ksuExec!('uname -r')
-        if (stdout) kernel = stdout.trim()
+        if (stdout) {
+          kernel = stdout.trim()
+          unameRelease = stdout.trim()
+        }
       } catch (e) { console.warn('Failed to get kernel info', e) }
+
+      try {
+        const { stdout } = await ksuExec!('uname -v')
+        if (stdout) unameVersion = stdout.trim()
+      } catch (e) { console.warn('Failed to get kernel version', e) }
 
       // Fetch SELinux status
       let selinux = 'Unknown'
@@ -347,16 +374,23 @@ const realApi = {
       try {
         const { stdout: outMount } = await ksuExec!(cmdMount)
         mountData = JSON.parse(outMount || '{}')
-      } catch (e) { console.warn('Failed to get mount info', e) }
+        console.log('[SystemInfo] version command output:', mountData)
+      } catch (e) { 
+        console.warn('Failed to get mount info', e) 
+      }
       
-      return {
+      const result = {
         kernel,
         selinux,
         mountBase: mountData.mount_base || '/dev/hymo_mirror',
+        unameRelease,
+        unameVersion,
         hymofsModules: mountData.active_modules || [],
         hymofsMismatch: mountData.protocol_mismatch || false,
         mismatchMessage: mountData.mismatch_message,
       }
+      console.log('[SystemInfo] Final result:', result)
+      return result
     } catch (e) {
       console.error('System info check failed:', e)
       return {
@@ -383,6 +417,112 @@ const realApi = {
     const cmd = `${PATHS.BINARY} delete "${moduleId}"`
     const { errno } = await ksuExec!(cmd)
     if (errno !== 0) throw new Error('Hot unmount failed')
+  },
+
+  async getUserHideRules(): Promise<string[]> {
+    await initKernelSU()
+    if (!ksuExec) return []
+    
+    try {
+      const cmd = `${PATHS.BINARY} hide list`
+      const { errno, stdout } = await ksuExec!(cmd)
+      
+      if (errno === 0 && stdout) {
+        try {
+          const rules = JSON.parse(stdout)
+          if (Array.isArray(rules)) {
+            return rules
+          }
+        } catch (e) {
+          // Fallback
+          return stdout
+            .split('\n')
+            .map(line => line.trim())
+            .filter(line => line && line.startsWith('/'))
+        }
+      }
+    } catch (e) {
+      console.error('Failed to get user hide rules:', e)
+    }
+    return []
+  },
+
+  async getAllHideRules(): Promise<Array<{ path: string; isUserDefined: boolean }>> {
+    await initKernelSU()
+    if (!ksuExec) return []
+    
+    try {
+      const [userRules, allOutput] = await Promise.all([
+        this.getUserHideRules(),
+        ksuExec!(`${PATHS.BINARY} list`)
+      ])
+      
+      const userSet = new Set(userRules)
+      const rules: Array<{ path: string; isUserDefined: boolean }> = []
+      
+      if (allOutput.errno === 0 && allOutput.stdout) {
+        let parsed = false
+        try {
+          const data = JSON.parse(allOutput.stdout)
+          if (Array.isArray(data)) {
+            parsed = true
+            data.forEach((rule: any) => {
+              if (rule.type === 'HIDE' && rule.path) {
+                rules.push({
+                  path: rule.path,
+                  isUserDefined: userSet.has(rule.path)
+                })
+              }
+            })
+          }
+        } catch (e) {
+          // JSON parse failed, fall through to legacy
+        }
+
+        if (!parsed) {
+          // Parse "hide /path/to/file" lines
+          const lines = allOutput.stdout.split('\n')
+          for (const line of lines) {
+            if (line.startsWith('hide ')) {
+              const path = line.substring(5).trim()
+              if (path) {
+                rules.push({
+                  path,
+                  isUserDefined: userSet.has(path)
+                })
+              }
+            }
+          }
+        }
+      }
+      
+      return rules
+    } catch (e) {
+      console.error('Failed to get all hide rules:', e)
+      return []
+    }
+  },
+
+  async addUserHideRule(path: string): Promise<void> {
+    await initKernelSU()
+    if (!ksuExec) throw new Error('KernelSU not available')
+    
+    const cmd = `${PATHS.BINARY} hide add "${path}"`
+    const { errno, stderr } = await ksuExec!(cmd)
+    if (errno !== 0) {
+      throw new Error(stderr || 'Failed to add hide rule')
+    }
+  },
+
+  async removeUserHideRule(path: string): Promise<void> {
+    await initKernelSU()
+    if (!ksuExec) throw new Error('KernelSU not available')
+    
+    const cmd = `${PATHS.BINARY} hide remove "${path}"`
+    const { errno, stderr } = await ksuExec!(cmd)
+    if (errno !== 0) {
+      throw new Error(stderr || 'Failed to remove hide rule')
+    }
   },
 }
 

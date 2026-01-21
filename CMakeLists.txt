@@ -35,6 +35,7 @@ set(HYMO_SOURCES
     src/core/modules.cpp
     src/core/planner.cpp
     src/core/executor.cpp
+    src/core/user_rules.cpp
     src/mount/overlay.cpp
     src/mount/magic.cpp
     src/mount/hymofs.cpp

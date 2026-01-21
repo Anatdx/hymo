@@ -125,7 +125,7 @@ export function Input({ label, error, className, ...props }: InputProps) {
 
 interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label?: string
-  options: Array<{ value: string; label: string }>
+  options: Array<{ value: string; label: string; disabled?: boolean }>
 }
 
 export function Select({ label, options, className, ...props }: SelectProps) {
@@ -146,11 +146,61 @@ export function Select({ label, options, className, ...props }: SelectProps) {
         {...props}
       >
         {options.map((opt) => (
-          <option key={opt.value} value={opt.value} className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+          <option key={opt.value} value={opt.value} className={cn("bg-white dark:bg-gray-800 text-gray-900 dark:text-white", opt.disabled && "text-gray-400 dark:text-gray-600")} disabled={opt.disabled}>
             {opt.label}
           </option>
         ))}
       </select>
+      </div>
+    </div>
+  )
+}
+
+interface RadioCardsProps {
+  options: Array<{ value: string; label: string; icon?: ReactNode; disabled?: boolean; description?: string }>
+  value: string
+  onChange: (value: string) => void
+  label?: string
+}
+
+export function RadioCards({ options, value, onChange, label }: RadioCardsProps) {
+  return (
+    <div className="space-y-3">
+      {label && <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">{label}</label>}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {options.map((opt) => {
+          const isSelected = value === opt.value
+          return (
+            <div
+              key={opt.value}
+              onClick={() => !opt.disabled && onChange(opt.value)}
+              className={cn(
+                "relative flex items-center p-3 rounded-lg border-2 cursor-pointer transition-all duration-200",
+                isSelected 
+                  ? "border-primary-500 bg-primary-50 dark:bg-primary-900/10" 
+                  : "border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 hover:border-gray-300 dark:hover:border-white/20",
+                 opt.disabled && "opacity-50 cursor-not-allowed grayscale"
+              )}
+            >
+              <div className="flex-1 min-w-0">
+                 <div className={cn("font-medium truncate", isSelected ? "text-primary-700 dark:text-primary-400" : "text-gray-900 dark:text-gray-100")}>
+                   {opt.label}
+                 </div>
+                 {opt.description && (
+                   <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
+                     {opt.description}
+                   </div>
+                 )}
+              </div>
+              <div className={cn(
+                "ml-3 w-5 h-5 rounded-full border flex items-center justify-center transition-colors",
+                isSelected ? "border-primary-600 bg-primary-600" : "border-gray-400 dark:border-gray-500"
+              )}>
+                {isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

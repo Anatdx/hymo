@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Font files (download separately, see public/fonts/README.md)
+public/fonts/*.woff2
+public/fonts/*.woff
+public/fonts/*.ttf
+public/fonts/*.otf
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

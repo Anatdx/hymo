@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
 import { useStore } from '@/store'
-import { Activity, Settings, Package, FileText, Info, Globe, Moon, Sun, SunMoon } from 'lucide-react'
+import { Activity, Settings, Package, EyeOff, FileText, Info, Globe, Moon, Sun, SunMoon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const tabs = [
   { id: 'status' as const, icon: Activity, label: 'nav.status' },
   { id: 'config' as const, icon: Settings, label: 'nav.config' },
   { id: 'modules' as const, icon: Package, label: 'nav.modules' },
+  { id: 'hide' as const, icon: EyeOff, label: 'nav.hide' },
   { id: 'logs' as const, icon: FileText, label: 'nav.logs' },
   { id: 'info' as const, icon: Info, label: 'nav.info' },
 ]

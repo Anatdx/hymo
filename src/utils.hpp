@@ -41,6 +41,7 @@ bool mount_image(const fs::path& image_path, const fs::path& target,
 bool repair_image(const fs::path& image_path);
 bool sync_dir(const fs::path& src, const fs::path& dst);
 bool has_files_recursive(const fs::path& path);
+bool check_tmpfs_xattr();
 
 // KSU utilities
 bool send_unmountable(const fs::path& target);

@@ -9,6 +9,7 @@
 #include "../defs.hpp"
 #include "../mount/hymofs.hpp"
 #include "../utils.hpp"
+#include "user_rules.hpp"
 
 namespace hymo {
 
@@ -481,6 +482,9 @@ void update_hymofs_mappings(const Config& config, const std::vector<Module>& mod
     for (const auto& path : hide_rules) {
         HymoFS::hide_path(path);
     }
+
+    // Apply user-defined hide rules
+    apply_user_hide_rules();
 
     LOG_INFO("HymoFS mappings updated.");
 }

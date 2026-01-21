@@ -36,6 +36,7 @@ public:
     static bool set_debug(bool enable);
     static bool set_stealth(bool enable);
     static bool set_enabled(bool enable);
+    static bool set_uname(const std::string& release, const std::string& version);
     static bool fix_mounts();
     static bool hide_overlay_xattrs(const std::string& path);
 };

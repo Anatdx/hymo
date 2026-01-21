@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { useStore } from '@/store'
 import { api } from '@/services/api'
-import { Card, Button, Input, Switch } from '@/components/ui'
+import { Card, Button, Input, Switch, RadioCards } from '@/components/ui'
 import { Plus, X, Scan } from 'lucide-react'
 
 export function ConfigPage() {
-  const { t, config, showAdvanced, setShowAdvanced, updateConfig, saveConfig, useSystemFont, setUseSystemFont } = useStore((state) => state)
+  const { t, config, showAdvanced, setShowAdvanced, updateConfig, saveConfig, useSystemFont, setUseSystemFont, systemInfo } = useStore((state) => state)
   const [newPartition, setNewPartition] = useState('')
   const [scanning, setScanning] = useState(false)
   
@@ -105,6 +105,50 @@ export function ConfigPage() {
       </Card>
 
       <Card>
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white">{t.config.unameSpoof}</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t.config.unameSpoofDesc}</p>
+          </div>
+          <div className="flex gap-2">
+            <Button 
+              onClick={() => updateConfig({ 
+                uname_release: systemInfo.unameRelease || '', 
+                uname_version: systemInfo.unameVersion || '' 
+              })}
+              size="sm"
+              variant="secondary"
+            >
+              {t.config.useSystemValue || '使用系统值'}
+            </Button>
+            <Button 
+              onClick={() => updateConfig({ uname_release: '', uname_version: '' })}
+              size="sm"
+              variant="secondary"
+            >
+              {t.common.clear || '清空'}
+            </Button>
+          </div>
+        </div>
+        
+        <div className="space-y-4">
+          <Input
+            label={t.config.unameRelease}
+            value={config.uname_release}
+            onChange={(e) => updateConfig({ uname_release: e.target.value })}
+            placeholder={systemInfo.unameRelease || "5.15.0-generic"}
+          />
+
+          <Input
+            label={t.config.unameVersion}
+            value={config.uname_version}
+            onChange={(e) => updateConfig({ uname_version: e.target.value })}
+            placeholder={systemInfo.unameVersion || "#1 SMP PREEMPT ..."}
+          />
+        </div>
+      </Card>
+
+      <Card>
         <Switch
           checked={showAdvanced}
           onChange={setShowAdvanced}
@@ -123,18 +167,18 @@ export function ConfigPage() {
               label={t.config.verbose}
             />
 
-            <Switch
-              checked={config.force_ext4}
-              onChange={(checked) => updateConfig({ force_ext4: checked })}
-              label={t.config.forceExt4}
+            <RadioCards
+              label={t.config.fsType || "Filesystem Type"}
+              options={[
+                  { value: "auto", label: "Auto", description: "Recommended (Try Tmpfs -> EROFS -> Ext4)" },
+                  { value: "ext4", label: "Ext4", description: "Read-Write, Persistent loop image" },
+                  { value: "erofs", label: "EROFS", description: "Read-Only, High performance" },
+                  { value: "tmpfs", label: "Tmpfs", description: "RAM based, requires xattr support", disabled: !config.tmpfs_xattr_supported },
+              ]}
+              value={config.fs_type}
+              onChange={(val) => updateConfig({ fs_type: val })}
             />
-
-            <Switch
-              checked={config.prefer_erofs}
-              onChange={(checked) => updateConfig({ prefer_erofs: checked })}
-              label={t.config.preferErofs || "Prefer EROFS (Read-Only)"}
-            />
-
+            
             <Switch
               checked={config.disable_umount}
               onChange={(checked) => updateConfig({ disable_umount: checked })}

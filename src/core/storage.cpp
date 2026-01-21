@@ -10,6 +10,7 @@
 #include <iostream>
 #include "../defs.hpp"
 #include "../utils.hpp"
+#include "json.hpp"
 #include "state.hpp"
 
 #include <cinttypes>
@@ -184,8 +185,8 @@ static std::string setup_ext4_image(const fs::path& target, const fs::path& imag
     return "ext4";
 }
 
-StorageHandle setup_storage(const fs::path& mnt_dir, const fs::path& image_path, bool force_ext4,
-                            bool prefer_erofs) {
+StorageHandle setup_storage(const fs::path& mnt_dir, const fs::path& image_path,
+                            FilesystemType fs_type) {
     LOG_DEBUG("Setting up storage at " + mnt_dir.string());
 
     if (fs::exists(mnt_dir)) {
@@ -194,36 +195,60 @@ StorageHandle setup_storage(const fs::path& mnt_dir, const fs::path& image_path,
     ensure_dir_exists(mnt_dir);
 
     std::string mode;
+    fs::path erofs_image = image_path.parent_path() / "modules.erofs";
+    fs::path modules_dir = image_path.parent_path() / "modules";
 
-    // Try different storage modes in order
-    if (force_ext4) {
-        // Force ext4 mode
-        mode = setup_ext4_image(mnt_dir, image_path);
-    } else if (prefer_erofs) {
-        // Try: EROFS -> Ext4
-        fs::path erofs_image = image_path.parent_path() / "modules.erofs";
-        fs::path modules_dir = image_path.parent_path() / "modules";
-
-        if (try_setup_erofs(mnt_dir, modules_dir, erofs_image)) {
-            mode = "erofs";
-        } else {
-            LOG_WARN("EROFS setup failed, falling back to ext4");
-            mode = setup_ext4_image(mnt_dir, image_path);
-        }
-    } else {
-        // Try: Tmpfs -> EROFS -> Ext4
+    // Helper functions for readability
+    auto do_tmpfs = [&]() {
         if (try_setup_tmpfs(mnt_dir)) {
             mode = "tmpfs";
-        } else {
-            fs::path erofs_image = image_path.parent_path() / "modules.erofs";
-            fs::path modules_dir = image_path.parent_path() / "modules";
+            return true;
+        }
+        return false;
+    };
 
-            if (try_setup_erofs(mnt_dir, modules_dir, erofs_image)) {
-                mode = "erofs";
-            } else {
-                mode = setup_ext4_image(mnt_dir, image_path);
+    auto do_erofs = [&]() {
+        if (try_setup_erofs(mnt_dir, modules_dir, erofs_image)) {
+            mode = "erofs";
+            return true;
+        }
+        return false;
+    };
+
+    auto do_ext4 = [&]() {
+        mode = setup_ext4_image(mnt_dir, image_path);
+        return true;
+    };
+
+    switch (fs_type) {
+    case FilesystemType::EXT4:
+        do_ext4();
+        break;
+
+    case FilesystemType::EROFS_FS:
+        if (!do_erofs()) {
+            LOG_WARN("EROFS setup failed, falling back to ext4");
+            do_ext4();
+        }
+        break;
+
+    case FilesystemType::TMPFS:
+        if (!do_tmpfs()) {
+            LOG_WARN("Tmpfs setup failed (or no xattr), falling back to auto preference");
+            if (!do_erofs())
+                do_ext4();
+        }
+        break;
+
+    case FilesystemType::AUTO:
+    default:
+        // Try: Tmpfs -> EROFS -> Ext4
+        if (!do_tmpfs()) {
+            if (!do_erofs()) {
+                do_ext4();
             }
         }
+        break;
     }
 
     return StorageHandle{mnt_dir, mode};
@@ -258,7 +283,9 @@ void print_storage_status() {
         state.mount_point.empty() ? fs::path(FALLBACK_CONTENT_DIR) : fs::path(state.mount_point);
 
     if (!fs::exists(path)) {
-        std::cout << "{ \"error\": \"Not mounted\" }\n";
+        json::Value err = json::Value::object();
+        err["error"] = json::Value("Not mounted");
+        std::cout << json::dump(err) << "\n";
         return;
     }
 
@@ -266,7 +293,9 @@ void print_storage_status() {
 
     struct statfs stats;
     if (statfs(path.c_str(), &stats) != 0) {
-        std::cout << "{ \"error\": \"statvfs failed\" }\n";
+        json::Value err = json::Value::object();
+        err["error"] = json::Value("statvfs failed");
+        std::cout << json::dump(err) << "\n";
         return;
     }
 
@@ -276,13 +305,14 @@ void print_storage_status() {
     uint64_t used_bytes = total_bytes > free_bytes ? total_bytes - free_bytes : 0;
     double percent = total_bytes > 0 ? (used_bytes * 100.0 / total_bytes) : 0.0;
 
-    std::cout << "{ "
-              << "\"size\": \"" << format_size(total_bytes) << "\", "
-              << "\"used\": \"" << format_size(used_bytes) << "\", "
-              << "\"avail\": \"" << format_size(free_bytes) << "\", "
-              << "\"percent\": " << percent << ", "
-              << "\"mode\": \"" << fs_type << "\""
-              << " }\n";
+    json::Value root = json::Value::object();
+    root["size"] = json::Value(format_size(total_bytes));
+    root["used"] = json::Value(format_size(used_bytes));
+    root["avail"] = json::Value(format_size(free_bytes));
+    root["percent"] = json::Value(percent);
+    root["mode"] = json::Value(fs_type);
+
+    std::cout << json::dump(root) << "\n";
 }
 
 }  // namespace hymo

@@ -5,6 +5,7 @@ import { ToastContainer } from '@/components/Toast'
 import { StatusPage } from '@/pages/StatusPage'
 import { ConfigPage } from '@/pages/ConfigPage'
 import { ModulesPage } from '@/pages/ModulesPage'
+import { HideRulesPage } from '@/pages/HideRulesPage'
 import { LogsPage } from '@/pages/LogsPage'
 import { InfoPage } from '@/pages/InfoPage'
 import { Card, Button } from '@/components/ui'
@@ -101,7 +102,7 @@ function App() {
     isDraggingHorizontalRef.current = false
   }
 
-  const PAGES = ['status', 'config', 'modules', 'logs', 'info'] as const
+  const PAGES = ['status', 'config', 'modules', 'hide', 'logs', 'info'] as const
 
   useEffect(() => {
     const index = PAGES.indexOf(activeTab as any)
@@ -203,6 +204,13 @@ function App() {
             <div className="min-w-full w-full h-full overflow-y-auto px-4 py-8 no-scrollbar">
                 <main className="max-w-7xl mx-auto animate-fade-in">
                     <ModulesPage />
+                </main>
+            </div>
+
+            {/* Hide Rules Page */}
+            <div className="min-w-full w-full h-full overflow-y-auto px-4 py-8 no-scrollbar">
+                <main className="max-w-7xl mx-auto animate-fade-in">
+                    <HideRulesPage />
                 </main>
             </div>
 

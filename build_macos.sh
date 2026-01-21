@@ -225,9 +225,44 @@ build_arch() {
     fi
 }
 
+# Download WebUI fonts
+download_fonts() {
+    local FONTS_DIR="${PROJECT_ROOT}/webui/public/fonts"
+    
+    # Check if fonts already exist
+    if [ -f "${FONTS_DIR}/Inter-Regular.woff2" ] && \
+       [ -f "${FONTS_DIR}/NotoSansSC-Regular.woff2" ] && \
+       [ -f "${FONTS_DIR}/JetBrainsMono-Regular.woff2" ]; then
+        print_info "Fonts already downloaded, skipping..."
+        return
+    fi
+    
+    print_info "Downloading WebUI fonts..."
+    mkdir -p "${FONTS_DIR}"
+    
+    # Download Inter
+    curl -sL -o "${FONTS_DIR}/Inter-Regular.woff2" 'https://fonts.gstatic.com/s/inter/v12/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa1ZL7.woff2'
+    curl -sL -o "${FONTS_DIR}/Inter-Medium.woff2" 'https://fonts.gstatic.com/s/inter/v12/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa25L7.woff2'
+    curl -sL -o "${FONTS_DIR}/Inter-SemiBold.woff2" 'https://fonts.gstatic.com/s/inter/v12/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa5ZL7.woff2'
+    curl -sL -o "${FONTS_DIR}/Inter-Bold.woff2" 'https://fonts.gstatic.com/s/inter/v12/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa2JL7.woff2'
+    
+    # Download Noto Sans SC
+    curl -sL -o "${FONTS_DIR}/NotoSansSC-Regular.woff2" 'https://fonts.gstatic.com/s/notosanssc/v26/k3kCo84MPvpLmixcA63oeALhL4iJ-Q7m8w.woff2'
+    curl -sL -o "${FONTS_DIR}/NotoSansSC-Medium.woff2" 'https://fonts.gstatic.com/s/notosanssc/v26/k3kCo84MPvpLmixcA63oeALhL4iJ-RLm8w.woff2'
+    curl -sL -o "${FONTS_DIR}/NotoSansSC-Bold.woff2" 'https://fonts.gstatic.com/s/notosanssc/v26/k3kCo84MPvpLmixcA63oeALhL4iJ-Xbm8w.woff2'
+    
+    # Download JetBrains Mono
+    curl -sL -o "${FONTS_DIR}/JetBrainsMono-Regular.woff2" 'https://fonts.gstatic.com/s/jetbrainsmono/v13/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yK1jPVmUsaaDhw.woff2'
+    curl -sL -o "${FONTS_DIR}/JetBrainsMono-Medium.woff2" 'https://fonts.gstatic.com/s/jetbrainsmono/v13/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKxjPVmUsaaDhw.woff2'
+    curl -sL -o "${FONTS_DIR}/JetBrainsMono-Bold.woff2" 'https://fonts.gstatic.com/s/jetbrainsmono/v13/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKwOPVmUsaaDhw.woff2'
+    
+    print_success "Fonts downloaded successfully"
+}
+
 # WebUI Builder
 build_webui() {
     if [[ $NO_WEBUI -eq 0 ]]; then
+        download_fonts
         print_info "Building WebUI..."
         mkdir -p "${BUILD_DIR}/webui_build"
         

@@ -1,8 +1,8 @@
 export const PATHS = {
   BINARY: '/data/adb/modules/hymo/hymod',
-  CONFIG: '/data/adb/hymo/config.toml',
-  MODE_CONFIG: '/data/adb/hymo/module_mode.conf',
-  RULES_CONFIG: '/data/adb/hymo/module_rules.conf',
+  CONFIG: '/data/adb/hymo/config.json',
+  MODE_CONFIG: '/data/adb/hymo/module_mode.json',
+  RULES_CONFIG: '/data/adb/hymo/module_rules.json',
   DEFAULT_LOG: '/data/adb/hymo/daemon.log',
 } as const
 
@@ -12,16 +12,18 @@ export const DEFAULT_CONFIG = {
   mountsource: 'KSU',
   logfile: PATHS.DEFAULT_LOG,
   verbose: false,
-  force_ext4: false,
-  prefer_erofs: false,
+  fs_type: 'auto',
   disable_umount: false,
   enable_nuke: true,
   ignore_protocol_mismatch: false,
   enable_kernel_debug: false,
   enable_stealth: true,
   hymofs_enabled: true,
+  uname_release: '',
+  uname_version: '',
   partitions: [] as string[],
   hymofs_available: false,
+  tmpfs_xattr_supported: false,
 }
 
 export const BUILTIN_PARTITIONS = [
@@ -61,6 +63,8 @@ export type SystemInfo = {
   kernel: string
   selinux: string
   mountBase: string
+  unameRelease?: string
+  unameVersion?: string
   hymofsModules?: string[]
   hymofsMismatch?: boolean
   mismatchMessage?: string

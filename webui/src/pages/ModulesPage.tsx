@@ -40,7 +40,17 @@ export function ModulesPage() {
   const filteredModules = modules.filter((m) => {
     const matchSearch = m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                         m.id.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchFilter = filterMode === 'all' || m.mode === filterMode
+    
+    // 筛选逻辑：hymofs 筛选显示实际挂载在 HymoFS 上的模块（不管是强制还是 auto 分配的）
+    let matchFilter = false
+    if (filterMode === 'all') {
+      matchFilter = true
+    } else if (filterMode === 'hymofs') {
+      matchFilter = systemInfo.hymofsModules?.includes(m.id) || false
+    } else {
+      matchFilter = m.mode === filterMode
+    }
+    
     return matchSearch && matchFilter
   })
 
@@ -210,8 +220,8 @@ export function ModulesPage() {
                     ]}
                     className="flex-1"
                   />
-                  {(module.mode === 'hymofs' || module.mode === 'auto') && (
-                   (module.mode === 'hymofs' || isMounted) && (
+                  {/* 为所有HymoFS模块（包括auto模式自动分配的）显示热挂载/热卸载按钮 */}
+                  {(module.mode === 'hymofs' || (module.mode === 'auto' && isMounted)) && (
                       <div className="space-y-1 ml-auto">
                         <label className="block text-sm font-medium text-transparent select-none">Action</label>
                         <Button 
@@ -236,7 +246,7 @@ export function ModulesPage() {
                         </Button>
                       </div>
                    )
-                  )}
+                  }
                 </div>
 
                 {isExpanded && (

@@ -3,6 +3,7 @@
 
 #include <filesystem>
 #include <string>
+#include "../conf/config.hpp"
 
 namespace fs = std::filesystem;
 
@@ -13,8 +14,8 @@ struct StorageHandle {
     std::string mode;  // tmpfs, ext4, erofs
 };
 
-StorageHandle setup_storage(const fs::path& mnt_dir, const fs::path& image_path, bool force_ext4,
-                            bool prefer_erofs = false);
+StorageHandle setup_storage(const fs::path& mnt_dir, const fs::path& image_path,
+                            FilesystemType fs_type);
 
 void finalize_storage_permissions(const fs::path& storage_root);
 

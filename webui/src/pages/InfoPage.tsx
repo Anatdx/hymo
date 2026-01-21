@@ -84,7 +84,7 @@ export function InfoPage() {
         <div className="space-y-3">
           <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-white/10">
             <span className="text-gray-500 dark:text-gray-400">{t.info.version}</span>
-            <span className="text-gray-900 dark:text-white font-mono">1.0.0</span>
+            <span className="text-gray-900 dark:text-white font-mono">{__MODULE_VERSION__}</span>
           </div>
           <div className="flex justify-between items-center py-2">
             <span className="text-gray-500 dark:text-gray-400">License</span>
@@ -122,11 +122,12 @@ export function InfoPage() {
           {[
               { name: 'KernelSU', url: 'https://kernelsu.org' },
               { name: 'Magisk', url: 'https://github.com/topjohnwu/Magisk' },
+              { name: 'susfs4ksu', url: 'https://gitlab.com/simonpunk/susfs4ksu' },
               { name: 'React', url: 'https://react.dev' },
               { name: 'Vite', url: 'https://vitejs.dev' },
               { name: 'Tailwind CSS', url: 'https://tailwindcss.com' },
               { name: 'Zustand', url: 'https://github.com/pmndrs/zustand' },
-              { name: 'Lucide Icons', url: 'https://lucide.dev' }
+              { name: 'Lucide Icons', url: 'https://lucide.dev' },
           ].map((item) => (
              <Button
                 key={item.name}

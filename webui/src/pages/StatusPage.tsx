@@ -14,7 +14,8 @@ export function StatusPage() {
   }, [loadStatus])
 
   const displayPartitions = [...new Set([...BUILTIN_PARTITIONS, ...config.partitions])]
-  const hymoFsCount = config.hymofs_available ? (systemInfo.hymofsModules?.length ?? 0) : t.status.notSupported
+  // 显示实际以HymoFS挂载的模块数量，而不是配置中选择的数量
+  const hymoFsCount = (systemInfo.hymofsModules?.length ?? 0)
 
   return (
     <div className="space-y-6">
