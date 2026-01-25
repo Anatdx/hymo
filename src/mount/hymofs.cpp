@@ -57,7 +57,7 @@ int HymoFS::get_protocol_version() {
 
     int version = 0;
     if (ioctl(fd, HYMO_IOC_GET_VERSION, &version) == 0) {
-        LOG_INFO("get_protocol_version returned: " + std::to_string(version));
+        LOG_VERBOSE("get_protocol_version returned: " + std::to_string(version));
         return version;
     }
 
@@ -67,6 +67,7 @@ int HymoFS::get_protocol_version() {
 
 HymoFSStatus HymoFS::check_status() {
     if (s_status_checked) {
+        LOG_VERBOSE("HymoFS check_status: Cached (" + std::to_string((int)s_cached_status) + ")");
         return s_cached_status;
     }
 

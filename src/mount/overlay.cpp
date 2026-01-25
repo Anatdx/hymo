@@ -162,6 +162,12 @@ static std::vector<std::string> get_child_mounts(const std::string& target_root)
         return mounts;
     }
 
+    // Ensure we check for proper directory prefix (e.g., /system/ not /system_ext)
+    std::string prefix = target_root;
+    if (prefix.back() != '/') {
+        prefix += '/';
+    }
+
     std::string line;
     while (std::getline(mountinfo, line)) {
         // Parse mountinfo format: mount_id parent_id major:minor root mount_point
@@ -170,8 +176,9 @@ static std::vector<std::string> get_child_mounts(const std::string& target_root)
         std::string mount_id, parent_id, dev, root, mount_point;
         iss >> mount_id >> parent_id >> dev >> root >> mount_point;
 
-        // Check if mount point is under target_root and not equal to target_root
-        if (mount_point.find(target_root) == 0 && mount_point != target_root) {
+        // Check if mount point is a proper child (starts with target_root + "/")
+        // This prevents /system_ext from matching /system
+        if (mount_point.find(prefix) == 0) {
             mounts.push_back(mount_point);
         }
     }
@@ -394,6 +401,10 @@ bool mount_overlay(const std::string& target_root_raw, const std::vector<std::st
     }
 
     // Restore child mounts using the MIRROR as source
+    // If any child mount fails, we revert the entire overlay to prevent inconsistent state
+    bool child_mount_failed = false;
+    std::string failed_mount_point;
+
     for (const auto& mount_point : mount_seq) {
         // Calculate relative path
         std::string relative = mount_point;
@@ -408,45 +419,23 @@ bool mount_overlay(const std::string& target_root_raw, const std::vector<std::st
 
         if (!mount_overlay_child(mount_point, relative, module_roots, source_path, mount_source,
                                  disable_umount, partitions)) {
-            LOG_WARN("failed to restore child mount " + mount_point);
+            LOG_ERROR("Failed to restore child mount " + mount_point + ", reverting overlay");
+            child_mount_failed = true;
+            failed_mount_point = mount_point;
+            break;
         }
     }
 
-    // Fix system partition symlinks (e.g. /system/vendor -> /vendor)
-    // The mirror has the correct structure.
-    for (const auto& part : partitions) {
-        std::string root_part = "/" + part;
-        std::string target_part = target_root + "/" + part;
-
-        // 1. Check if root partition exists and is a directory
-        if (!fs::exists(root_part) || !fs::is_directory(root_part)) {
-            continue;
+    // If child mount failed, revert the overlay
+    if (child_mount_failed) {
+        LOG_WARN("Reverting overlay for " + target_root + " due to child mount failure at " +
+                 failed_mount_point);
+        if (umount2(target_root.c_str(), MNT_DETACH) != 0) {
+            LOG_ERROR("Failed to revert overlay: " + std::string(strerror(errno)));
         }
-
-        // 2. Check if target path exists and is a directory (if symlink, it's not
-        // covered, no need to handle)
-        if (!fs::exists(target_part) || fs::is_symlink(target_part) ||
-            !fs::is_directory(target_part)) {
-            continue;
-        }
-
-        // 3. Check if already restored in mount_seq (avoid duplicate mount)
-        bool already_restored = false;
-        for (const auto& mp : mount_seq) {
-            if (mp == target_part) {
-                already_restored = true;
-                break;
-            }
-        }
-        if (already_restored) {
-            continue;
-        }
-
-        // 4. Execute bind mount
-        LOG_INFO("Restoring partition symlink/mount: " + root_part + " -> " + target_part);
-        if (!bind_mount(root_part, target_part, disable_umount)) {
-            LOG_ERROR("Failed to restore partition " + part);
-        }
+        // Cleanup mirror
+        umount2(mirror_path.c_str(), MNT_DETACH);
+        return false;
     }
 
     return true;

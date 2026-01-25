@@ -17,6 +17,12 @@ struct StorageHandle {
 StorageHandle setup_storage(const fs::path& mnt_dir, const fs::path& image_path,
                             FilesystemType fs_type);
 
+// Build an EROFS image from `source_dir` and mount it read-only at `mnt_dir`.
+// This is intended for mirror flows where content must be synced to a writable
+// staging directory before creating the compressed EROFS image.
+StorageHandle setup_erofs_storage(const fs::path& mnt_dir, const fs::path& source_dir,
+                                  const fs::path& image_path);
+
 // Exposed for CLI tools
 bool create_image(const fs::path& base_dir);
 

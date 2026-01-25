@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useStore } from '@/store'
 import { api } from '@/services/api'
 import { Card, Button, Input, Switch, RadioCards } from '@/components/ui'
-import { Plus, X, Scan } from 'lucide-react'
+import { Plus, X, Radar } from 'lucide-react'
 
 export function ConfigPage() {
   const { t, config, showAdvanced, setShowAdvanced, updateConfig, saveConfig, useSystemFont, setUseSystemFont, systemInfo } = useStore((state) => state)
@@ -81,26 +81,86 @@ export function ConfigPage() {
             onChange={setUseSystemFont}
           />
 
-          <Input
-            label={t.config.moduleDir}
-            value={config.moduledir}
-            onChange={(e) => updateConfig({ moduledir: e.target.value })}
-            placeholder="/data/adb/modules"
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              {t.config.tempDir}
+            </label>
+            <RadioCards
+              options={[
+                { 
+                  value: "/data/adb/hymo/img_mnt", 
+                  label: "/data/adb/hymo/img_mnt", 
+                  description: t.config.tempDirDefault 
+                },
+                { 
+                  value: "/debug_ramdisk", 
+                  label: "/debug_ramdisk", 
+                  description: t.config.tempDirDebug 
+                },
+                { 
+                  value: "/dev/hymo_mirror", 
+                  label: "/dev/hymo_mirror", 
+                  description: t.config.tempDirDevice 
+                },
+                { 
+                  value: "custom", 
+                  label: t.config.tempDirCustom, 
+                  description: t.config.tempDirCustomDesc 
+                },
+              ]}
+              value={["/data/adb/hymo/img_mnt", "/debug_ramdisk", "/dev/hymo_mirror"].includes(config.tempdir) ? config.tempdir : "custom"}
+              onChange={(val) => {
+                if (val !== "custom") {
+                  updateConfig({ tempdir: val })
+                }
+              }}
+            />
+            {(!["/data/adb/hymo/img_mnt", "/debug_ramdisk", "/dev/hymo_mirror"].includes(config.tempdir)) && (
+              <Input
+                value={config.tempdir}
+                onChange={(e) => updateConfig({ tempdir: e.target.value })}
+                placeholder="/data/adb/hymo/custom_path"
+                className="mt-2"
+              />
+            )}
+          </div>
+
+          <RadioCards
+            label={t.config.fsType || "Filesystem Type"}
+            options={[
+                { value: "auto", label: t.config.fsAuto, description: t.config.fsAutoDesc },
+                { value: "tmpfs", label: t.config.fsTmpfs, description: t.config.fsTmpfsDesc, disabled: !config.tmpfs_xattr_supported },
+                { value: "erofs", label: t.config.fsErofs, description: t.config.fsErofsDesc },
+                { value: "ext4", label: t.config.fsExt4, description: t.config.fsExt4Desc },
+            ]}
+            value={config.fs_type}
+            onChange={(val) => updateConfig({ fs_type: val })}
           />
 
-          <Input
-            label={t.config.tempDir}
-            value={config.tempdir}
-            onChange={(e) => updateConfig({ tempdir: e.target.value })}
-            placeholder="/data/adb/hymo/img_mnt"
+          <RadioCards
+            label={t.config.mountStage || "Mount Stage"}
+            options={[
+                { value: "post-fs-data", label: t.config.stagePostFsData || "post-fs-data.sh", description: t.config.stagePostFsDataDesc || "Earliest (before Zygote)" },
+                { value: "metamount", label: t.config.stageMetamount || "metamount.sh", description: t.config.stageMetamountDesc || "Standard (end of post-fs-data, recommended)" },
+                { value: "services", label: t.config.stageServices || "services.sh", description: t.config.stageServicesDesc || "Late (after boot completed)" },
+            ]}
+            value={config.mount_stage || "metamount"}
+            onChange={(val) => updateConfig({ mount_stage: val })}
           />
-
-          <Input
-            label={t.config.mountSource}
-            value={config.mountsource}
-            onChange={(e) => updateConfig({ mountsource: e.target.value })}
-            placeholder="KSU"
-          />
+          {config.mount_stage === "post-fs-data" && (
+            <div className="mt-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
+              <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                ⚠️ {t.config.stagePostFsDataWarning || "Early mount may cause compatibility issues with some modules. Use only if you understand the implications."}
+              </p>
+            </div>
+          )}
+          {config.mount_stage === "services" && (
+            <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
+              <p className="text-sm text-blue-800 dark:text-blue-200">
+                ℹ️ {t.config.stageServicesWarning || "Late mount ensures all system services are ready, but may delay module availability."}
+              </p>
+            </div>
+          )}
         </div>
       </Card>
 
@@ -149,6 +209,46 @@ export function ConfigPage() {
       </Card>
 
       <Card>
+        <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white">{t.config.partitions}</h3>
+            <Button onClick={handleScanPartitions} disabled={scanning} size="sm" variant="secondary">
+                <Radar size={16} className={scanning ? 'animate-spin mr-2' : 'mr-2'} />
+                {scanning ? t.config.scanning : t.config.scanPartitions}
+            </Button>
+        </div>
+        
+        <div className="flex gap-2 mb-4">
+          <Input
+            placeholder={t.config.addPartition}
+            value={newPartition}
+            onChange={(e) => setNewPartition(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="flex-1"
+          />
+          <Button onClick={addPartition} size="md">
+            <Plus size={20} />
+          </Button>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {config.partitions.map((partition, index) => (
+            <div
+              key={index}
+              className="flex items-center gap-2 px-3 py-1 bg-primary-100 dark:bg-primary-600/20 border border-primary-200 dark:border-primary-500/30 rounded-lg"
+            >
+              <span className="text-gray-800 dark:text-white text-sm">{partition}</span>
+              <button
+                onClick={() => removePartition(index)}
+                className="text-gray-500 hover:text-gray-800 dark:text-white/60 dark:hover:text-white transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card>
         <Switch
           checked={showAdvanced}
           onChange={setShowAdvanced}
@@ -159,25 +259,23 @@ export function ConfigPage() {
       {showAdvanced && (
         <Card>
           <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">{t.config.advanced}</h3>
-          
-          <div className="space-y-4">
+            
+          <div className="space-y-4"></div>
             <Switch
-              checked={config.verbose}
-              onChange={(checked) => updateConfig({ verbose: checked })}
-              label={t.config.verbose}
+              checked={config.debug}
+              onChange={(checked) => updateConfig({ debug: checked })}
+              label={t.config.debug}
             />
-
-            <RadioCards
-              label={t.config.fsType || "Filesystem Type"}
-              options={[
-                  { value: "auto", label: t.config.fsAuto, description: t.config.fsAutoDesc },
-                  { value: "tmpfs", label: t.config.fsTmpfs, description: t.config.fsTmpfsDesc, disabled: !config.tmpfs_xattr_supported },
-                  { value: "erofs", label: t.config.fsErofs, description: t.config.fsErofsDesc },
-                  { value: "ext4", label: t.config.fsExt4, description: t.config.fsExt4Desc },
-              ]}
-              value={config.fs_type}
-              onChange={(val) => updateConfig({ fs_type: val })}
-            />
+            
+            {config.debug && (
+              <div className="ml-6">
+                <Switch
+                  checked={config.verbose}
+                  onChange={(checked) => updateConfig({ verbose: checked })}
+                  label={t.config.verbose}
+                />
+              </div>
+            )}
             
             <Switch
               checked={config.disable_umount}
@@ -216,49 +314,22 @@ export function ConfigPage() {
               onChange={(checked) => updateConfig({ ignore_protocol_mismatch: checked })}
               label={t.config.ignoreProtocolMismatch}
             />
-          </div>
+
+            <Input
+              label={t.config.moduleDir}
+              value={config.moduledir}
+              onChange={(e) => updateConfig({ moduledir: e.target.value })}
+              placeholder="/data/adb/modules"
+            />
+          
+            <Input
+              label={t.config.mountSource}
+              value={config.mountsource}
+              onChange={(e) => updateConfig({ mountsource: e.target.value })}
+              placeholder="KSU"
+            />
         </Card>
       )}
-
-      <Card>
-        <div className="flex justify-between items-center mb-4">
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white">{t.config.partitions}</h3>
-            <Button onClick={handleScanPartitions} disabled={scanning} size="sm" variant="secondary">
-                <Scan size={16} className={scanning ? 'animate-spin mr-2' : 'mr-2'} />
-                {scanning ? t.config.scanning : t.config.scanPartitions}
-            </Button>
-        </div>
-        
-        <div className="flex gap-2 mb-4">
-          <Input
-            placeholder={t.config.addPartition}
-            value={newPartition}
-            onChange={(e) => setNewPartition(e.target.value)}
-            onKeyDown={handleKeyDown}
-            className="flex-1"
-          />
-          <Button onClick={addPartition} size="md">
-            <Plus size={20} />
-          </Button>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          {config.partitions.map((partition, index) => (
-            <div
-              key={index}
-              className="flex items-center gap-2 px-3 py-1 bg-primary-100 dark:bg-primary-600/20 border border-primary-200 dark:border-primary-500/30 rounded-lg"
-            >
-              <span className="text-gray-800 dark:text-white text-sm">{partition}</span>
-              <button
-                onClick={() => removePartition(index)}
-                className="text-gray-500 hover:text-gray-800 dark:text-white/60 dark:hover:text-white transition-colors"
-              >
-                <X size={16} />
-              </button>
-            </div>
-          ))}
-        </div>
-      </Card>
     </div>
   )
 }

@@ -13,11 +13,12 @@ namespace hymo {
 class Logger {
 public:
     static Logger& getInstance();
-    void init(bool verbose, const fs::path& log_path);
+    void init(bool debug, bool verbose, const fs::path& log_path);
     void log(const std::string& level, const std::string& message);
 
 private:
     Logger() = default;
+    bool debug_ = false;
     bool verbose_ = false;
     std::unique_ptr<std::ofstream> log_file_;
 };
@@ -26,12 +27,14 @@ private:
 #define LOG_WARN(msg) Logger::getInstance().log("WARN", msg)
 #define LOG_ERROR(msg) Logger::getInstance().log("ERROR", msg)
 #define LOG_DEBUG(msg) Logger::getInstance().log("DEBUG", msg)
+#define LOG_VERBOSE(msg) Logger::getInstance().log("VERBOSE", msg)
 
 // File system utilities
 bool ensure_dir_exists(const fs::path& path);
 bool is_xattr_supported(const fs::path& path);
 bool lsetfilecon(const fs::path& path, const std::string& context);
 std::string lgetfilecon(const fs::path& path);
+std::string get_context_for_path(const fs::path& path);
 bool copy_path_context(const fs::path& src, const fs::path& dst);
 
 bool mount_tmpfs(const fs::path& target);
@@ -42,6 +45,9 @@ bool repair_image(const fs::path& image_path);
 bool sync_dir(const fs::path& src, const fs::path& dst);
 bool has_files_recursive(const fs::path& path);
 bool check_tmpfs_xattr();
+
+// EROFS support
+bool is_erofs_supported();
 
 // KSU utilities
 bool send_unmountable(const fs::path& target);

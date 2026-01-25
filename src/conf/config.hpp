@@ -46,6 +46,7 @@ struct Config {
     fs::path moduledir = "/data/adb/modules";
     fs::path tempdir;
     std::string mountsource = "KSU";
+    bool debug = false;
     bool verbose = false;
     FilesystemType fs_type = FilesystemType::AUTO;
     bool disable_umount = false;
@@ -57,6 +58,7 @@ struct Config {
     std::string mirror_path;
     std::string uname_release;
     std::string uname_version;
+    std::string mount_stage = "metamount";  // "post-fs-data", "metamount", "services"
     std::vector<std::string> partitions;
     std::map<std::string, std::string> module_modes;
     std::map<std::string, std::vector<ModuleRuleConfig>> module_rules;

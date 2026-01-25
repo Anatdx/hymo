@@ -11,7 +11,6 @@ namespace hymo {
 
 Config Config::load_default() {
     Config config;
-    // Try to load from default location if exists
     fs::path default_path = fs::path(BASE_DIR) / "config.json";
     if (fs::exists(default_path)) {
         try {
@@ -46,6 +45,8 @@ Config Config::from_file(const fs::path& path) {
                 config.tempdir = o.at("tempdir").as_string();
             if (o.count("mountsource"))
                 config.mountsource = o.at("mountsource").as_string();
+            if (o.count("debug"))
+                config.debug = o.at("debug").as_bool();
             if (o.count("verbose"))
                 config.verbose = o.at("verbose").as_bool();
             if (o.count("fs_type"))
@@ -68,6 +69,8 @@ Config Config::from_file(const fs::path& path) {
                 config.uname_release = o.at("uname_release").as_string();
             if (o.count("uname_version"))
                 config.uname_version = o.at("uname_version").as_string();
+            if (o.count("mount_stage"))
+                config.mount_stage = o.at("mount_stage").as_string();
 
             if (o.count("partitions") && o.at("partitions").type == json::Type::Array) {
                 for (const auto& p : o.at("partitions").as_array()) {
@@ -90,9 +93,17 @@ bool Config::save_to_file(const fs::path& path) const {
     json::Value root = json::Value::object();
 
     root["moduledir"] = json::Value(moduledir.string());
-    if (!tempdir.empty())
-        root["tempdir"] = json::Value(tempdir.string());
+
+    std::string tempdir_value;
+    if (tempdir.empty()) {
+        tempdir_value = "/data/adb/hymo/img_mnt";
+    } else {
+        tempdir_value = tempdir.string();
+    }
+    root["tempdir"] = json::Value(tempdir_value);
+
     root["mountsource"] = json::Value(mountsource);
+    root["debug"] = json::Value(debug);
     root["verbose"] = json::Value(verbose);
     root["fs_type"] = json::Value(filesystem_type_to_string(fs_type));
     root["disable_umount"] = json::Value(disable_umount);
@@ -107,6 +118,8 @@ bool Config::save_to_file(const fs::path& path) const {
         root["uname_release"] = json::Value(uname_release);
     if (!uname_version.empty())
         root["uname_version"] = json::Value(uname_version);
+    if (!mount_stage.empty())
+        root["mount_stage"] = json::Value(mount_stage);
 
     if (!partitions.empty()) {
         json::Value parts = json::Value::array();

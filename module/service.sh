@@ -1,6 +1,6 @@
 #!/system/bin/sh
-# Hymo metamount.sh
-# Mount stage: standard (end of post-fs-data, KSU's special timing)
+# Hymo services.sh
+# Mount stage: late (after boot completed)
 
 MODDIR="${0%/*}"
 CONFIG_FILE="/data/adb/hymo/config.json"
@@ -18,8 +18,8 @@ get_mount_stage() {
 
 MOUNT_STAGE=$(get_mount_stage)
 
-if [ "$MOUNT_STAGE" = "metamount" ]; then
-    exec "$MODDIR/hymo_mount.sh" "metamount"
+if [ "$MOUNT_STAGE" = "services" ]; then
+    exec "$MODDIR/hymo_mount.sh" "services"
 fi
 
 # Not our turn, exit silently

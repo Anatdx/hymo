@@ -198,6 +198,34 @@ static bool try_setup_erofs(const fs::path& target, const fs::path& modules_dir,
     return true;
 }
 
+StorageHandle setup_erofs_storage(const fs::path& mnt_dir, const fs::path& source_dir,
+                                  const fs::path& image_path) {
+    LOG_DEBUG("Setting up EROFS storage at " + mnt_dir.string() + " from " + source_dir.string());
+
+    if (fs::exists(mnt_dir)) {
+        umount2(mnt_dir.c_str(), MNT_DETACH);
+    }
+    ensure_dir_exists(mnt_dir);
+
+    if (!is_erofs_available()) {
+        throw std::runtime_error("mkfs.erofs not found");
+    }
+
+    if (!create_erofs_image(source_dir, image_path)) {
+        throw std::runtime_error("Failed to create EROFS image");
+    }
+
+    if (!mount_image(image_path, mnt_dir, "erofs", "loop,ro,noatime")) {
+        throw std::runtime_error("Failed to mount EROFS image");
+    }
+
+    // Register unmountable path for proper cleanup
+    send_unmountable(mnt_dir);
+
+    LOG_INFO("EROFS active (read-only, compressed)");
+    return StorageHandle{mnt_dir, "erofs"};
+}
+
 static std::string setup_ext4_image(const fs::path& target, const fs::path& image_path) {
     LOG_DEBUG("Falling back to Ext4...");
 
@@ -318,6 +346,20 @@ static std::string format_size(uint64_t bytes) {
     return std::string(buf);
 }
 
+static uint64_t calculate_dir_size(const fs::path& path) {
+    uint64_t total = 0;
+    try {
+        for (const auto& entry : fs::recursive_directory_iterator(path)) {
+            if (entry.is_regular_file()) {
+                total += entry.file_size();
+            }
+        }
+    } catch (...) {
+        // Ignore errors and return best-effort size
+    }
+    return total;
+}
+
 void print_storage_status() {
     auto state = load_runtime_state();
 
@@ -351,6 +393,33 @@ void print_storage_status() {
     uint64_t free_bytes = stats.f_bfree * block_size;
     uint64_t used_bytes = total_bytes > free_bytes ? total_bytes - free_bytes : 0;
     double percent = total_bytes > 0 ? (used_bytes * 100.0 / total_bytes) : 0.0;
+
+    // Fallback: if used shows 0 but directory has files, compute logical size
+    if (used_bytes == 0 && fs::exists(path)) {
+        uint64_t logical_used = calculate_dir_size(path);
+        if (logical_used > 0) {
+            used_bytes = logical_used;
+            percent = total_bytes > 0 ? (used_bytes * 100.0 / total_bytes) : 0.0;
+        }
+    }
+
+    // Mirror/tmpfs mode: data may live in moduledir rather than mount_point
+    if (used_bytes == 0 && state.storage_mode == "tmpfs") {
+        try {
+            Config cfg = Config::load_default();
+            fs::path module_root =
+                cfg.moduledir.empty() ? fs::path("/data/adb/modules") : fs::path(cfg.moduledir);
+            if (fs::exists(module_root)) {
+                uint64_t logical_used = calculate_dir_size(module_root);
+                if (logical_used > 0) {
+                    used_bytes = logical_used;
+                    percent = total_bytes > 0 ? (used_bytes * 100.0 / total_bytes) : 0.0;
+                }
+            }
+        } catch (...) {
+            // Ignore and keep statfs results
+        }
+    }
 
     // Explicitly check for 0 total bytes which might indicate issue with the mount
     if (total_bytes == 0) {

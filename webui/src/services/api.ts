@@ -92,6 +92,23 @@ const mockApi = {
       mountBase: '/dev/hymofs',
       hymofsModules: ['example_module'],
       hymofsMismatch: false,
+      mountStats: {
+        total_mounts: 45,
+        successful_mounts: 44,
+        failed_mounts: 1,
+        tmpfs_created: 3,
+        files_mounted: 20,
+        dirs_mounted: 15,
+        symlinks_created: 10,
+        overlayfs_mounts: 0,
+        success_rate: 97.8,
+      },
+      detectedPartitions: [
+        { name: 'system', mount_point: '/system', fs_type: 'ext4', is_read_only: true, exists_as_symlink: false },
+        { name: 'vendor', mount_point: '/vendor', fs_type: 'ext4', is_read_only: true, exists_as_symlink: true },
+        { name: 'product', mount_point: '/product', fs_type: 'ext4', is_read_only: true, exists_as_symlink: true },
+        { name: 'odm', mount_point: '/odm', fs_type: 'ext4', is_read_only: true, exists_as_symlink: false },
+      ],
     }
   },
 
@@ -133,7 +150,7 @@ const realApi = {
     await initKernelSU()
     if (!ksuExec) return DEFAULT_CONFIG
     
-    const cmd = `${PATHS.BINARY} show-config`
+    const cmd = `${PATHS.BINARY} config show`
     try {
       const { errno, stdout } = await ksuExec!(cmd)
       if (errno === 0 && stdout) {
@@ -150,22 +167,40 @@ const realApi = {
     await initKernelSU()
     if (!ksuExec) throw new Error('KernelSU not available')
     
-    const data = JSON.stringify(config, null, 2).replace(/'/g, "'\\''")
+    // Only save persistent config fields, exclude runtime status fields
+    const configToSave = {
+      moduledir: config.moduledir,
+      tempdir: config.tempdir,
+      mountsource: config.mountsource,
+      debug: config.debug,
+      verbose: config.verbose,
+      fs_type: config.fs_type,
+      disable_umount: config.disable_umount,
+      enable_nuke: config.enable_nuke,
+      ignore_protocol_mismatch: config.ignore_protocol_mismatch,
+      enable_kernel_debug: config.enable_kernel_debug,
+      enable_stealth: config.enable_stealth,
+      hymofs_enabled: config.hymofs_enabled,
+      uname_release: config.uname_release,
+      uname_version: config.uname_version,
+      partitions: config.partitions,
+    }
+    const data = JSON.stringify(configToSave, null, 2).replace(/'/g, "'\\''")
     const cmd = `mkdir -p "$(dirname "${PATHS.CONFIG}")" && printf '%s\\n' '${data}' > "${PATHS.CONFIG}"`
     const { errno } = await ksuExec!(cmd)
     if (errno !== 0) throw new Error('Failed to save config')
     
     // Apply kernel settings
-    await ksuExec!(`${PATHS.BINARY} debug ${config.enable_kernel_debug ? 'on' : 'off'}`)
-    await ksuExec!(`${PATHS.BINARY} stealth ${config.enable_stealth ? 'on' : 'off'}`)
+    await ksuExec!(`${PATHS.BINARY} debug ${config.enable_kernel_debug ? 'enable' : 'disable'}`)
+    await ksuExec!(`${PATHS.BINARY} debug stealth ${config.enable_stealth ? 'enable' : 'disable'}`)
     if (config.hymofs_available) {
-      await ksuExec!(`${PATHS.BINARY} hymofs ${config.hymofs_enabled ? 'on' : 'off'}`)
+      await ksuExec!(`${PATHS.BINARY} hymofs ${config.hymofs_enabled ? 'enable' : 'disable'}`)
     }
     // Apply uname spoofing (always apply to ensure we can clear it)
     {
       const release = (config.uname_release || '').replace(/'/g, "'\\''")
       const version = (config.uname_version || '').replace(/'/g, "'\\''")
-      await ksuExec!(`${PATHS.BINARY} set-uname '${release}' '${version}'`)
+      await ksuExec!(`${PATHS.BINARY} debug set-uname '${release}' '${version}'`)
     }
   },
 
@@ -173,7 +208,7 @@ const realApi = {
     await initKernelSU()
     if (!ksuExec) return []
     
-    const cmd = `${PATHS.BINARY} modules`
+    const cmd = `${PATHS.BINARY} module list`
     try {
       const { errno, stdout } = await ksuExec!(cmd)
       if (errno === 0 && stdout) {
@@ -218,7 +253,7 @@ const realApi = {
     await initKernelSU()
     if (!ksuExec) return []
     
-    const cmd = `${PATHS.BINARY} check-conflicts`
+    const cmd = `${PATHS.BINARY} module check-conflicts`
     try {
       const { errno, stdout } = await ksuExec!(cmd)
       if (errno === 0 && stdout) {
@@ -251,7 +286,7 @@ const realApi = {
     await initKernelSU()
     if (!ksuExec) throw new Error('KernelSU not available')
     
-    const cmd = `${PATHS.BINARY} sync-partitions`
+    const cmd = `${PATHS.BINARY} config sync-partitions`
     const { errno, stdout } = await ksuExec!(cmd)
     if (errno === 0) return stdout
     throw new Error('Sync failed')
@@ -263,7 +298,7 @@ const realApi = {
       
       // Use hymod to scan for actual partition candidates
       // This checks module directories against system mountpoints
-      const cmd = `${PATHS.BINARY} sync-partitions 2>&1`
+      const cmd = `${PATHS.BINARY} config sync-partitions 2>&1`
       try {
         const { stdout } = await ksuExec!(cmd)
         const partitions = new Set<string>()
@@ -307,7 +342,7 @@ const realApi = {
     if (!ksuExec) return { size: '-', used: '-', avail: '-', percent: 0, mode: null }
     
     try {
-      const cmd = `${PATHS.BINARY} storage`
+      const cmd = `${PATHS.BINARY} api storage`
       const { errno, stdout } = await ksuExec!(cmd)
       
       if (errno === 0 && stdout) {
@@ -349,22 +384,41 @@ const realApi = {
     }
     
     try {
-      // Fetch kernel version
+      // Fetch kernel version from /proc/version to get real system values (not spoofed by HymoFS)
       let kernel = 'Unknown'
       let unameRelease = ''
       let unameVersion = ''
       try {
-        const { stdout } = await ksuExec!('uname -r')
+        const { stdout } = await ksuExec!('cat /proc/version')
         if (stdout) {
-          kernel = stdout.trim()
-          unameRelease = stdout.trim()
+          // Extract just the kernel version number from /proc/version
+          // Format: "Linux version 5.15.0-generic (...)"
+          const releaseMatch = stdout.match(/Linux version ([^\s]+)/)
+          if (releaseMatch) {
+            kernel = releaseMatch[1]  // Just the version number
+            unameRelease = releaseMatch[1]
+          } else {
+            kernel = stdout.trim()
+          }
+          // Extract version string (everything after the release), then drop leading build host/toolchain info
+          const versionMatch = stdout.match(/Linux version [^\s]+ (.+)/)
+          if (versionMatch) {
+            let fullVersion = versionMatch[1].trim()
+            // Remove leading parenthetical groups like "(user@host)" "(gcc version ...)"
+            while (fullVersion.startsWith('(')) {
+              const end = fullVersion.indexOf(')')
+              if (end === -1) break
+              fullVersion = fullVersion.substring(end + 1).trim()
+            }
+            // If toolchain/host info still exists, keep from the first '#'
+            const hashIndex = fullVersion.indexOf('#')
+            if (hashIndex > 0) {
+              fullVersion = fullVersion.substring(hashIndex).trim()
+            }
+            unameVersion = fullVersion
+          }
         }
-      } catch (e) { console.warn('Failed to get kernel info', e) }
-
-      try {
-        const { stdout } = await ksuExec!('uname -v')
-        if (stdout) unameVersion = stdout.trim()
-      } catch (e) { console.warn('Failed to get kernel version', e) }
+      } catch (e) { console.warn('Failed to get kernel info from /proc/version', e) }
 
       // Fetch SELinux status
       let selinux = 'Unknown'
@@ -373,12 +427,24 @@ const realApi = {
          if (stdout) selinux = stdout.trim()
       } catch (e) { console.warn('Failed to get selinux info', e) }
       
-      const cmdMount = `${PATHS.BINARY} version`
+      // Use 'api system' to get complete system info including mount stats
+      const cmdSystem = `${PATHS.BINARY} api system`
+      let systemData: any = {}
+      try {
+        const { stdout: outSystem } = await ksuExec!(cmdSystem)
+        systemData = JSON.parse(outSystem || '{}')
+        console.log('[SystemInfo] api system output:', systemData)
+      } catch (e) { 
+        console.warn('Failed to get system info', e) 
+      }
+      
+      // Also get hymofs version for active modules and mismatch info
+      const cmdMount = `${PATHS.BINARY} hymofs version`
       let mountData: any = {}
       try {
         const { stdout: outMount } = await ksuExec!(cmdMount)
         mountData = JSON.parse(outMount || '{}')
-        console.log('[SystemInfo] version command output:', mountData)
+        console.log('[SystemInfo] hymofs version output:', mountData)
       } catch (e) { 
         console.warn('Failed to get mount info', e) 
       }
@@ -386,12 +452,14 @@ const realApi = {
       const result = {
         kernel,
         selinux,
-        mountBase: mountData.mount_base || '/dev/hymo_mirror',
+        mountBase: systemData.mount_base || mountData.mount_base || '/dev/hymo_mirror',
         unameRelease,
         unameVersion,
         hymofsModules: mountData.active_modules || [],
         hymofsMismatch: mountData.protocol_mismatch || false,
         mismatchMessage: mountData.mismatch_message,
+        mountStats: systemData.mountStats,
+        detectedPartitions: systemData.detectedPartitions,
       }
       console.log('[SystemInfo] Final result:', result)
       return result
@@ -409,7 +477,7 @@ const realApi = {
     await initKernelSU()
     if (!ksuExec) throw new Error('KernelSU not available')
     
-    const cmd = `${PATHS.BINARY} hot-mount "${moduleId}"`
+    const cmd = `${PATHS.BINARY} module hot-mount "${moduleId}"`
     const { errno } = await ksuExec!(cmd)
     if (errno !== 0) throw new Error('Hot mount failed')
   },
@@ -418,7 +486,7 @@ const realApi = {
     await initKernelSU()
     if (!ksuExec) throw new Error('KernelSU not available')
     
-    const cmd = `${PATHS.BINARY} hot-unmount "${moduleId}"`
+    const cmd = `${PATHS.BINARY} module hot-unmount "${moduleId}"`
     const { errno } = await ksuExec!(cmd)
     if (errno !== 0) throw new Error('Hot unmount failed')
   },
@@ -458,7 +526,7 @@ const realApi = {
     try {
       const [userRules, allOutput] = await Promise.all([
         this.getUserHideRules(),
-        ksuExec!(`${PATHS.BINARY} list`)
+        ksuExec!(`${PATHS.BINARY} hymofs list`)
       ])
       
       const userSet = new Set(userRules)

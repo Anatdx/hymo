@@ -12,6 +12,7 @@ constexpr const char* FALLBACK_CONTENT_DIR = "/data/adb/hymo/img_mnt/";
 constexpr const char* BASE_DIR = "/data/adb/hymo/";
 constexpr const char* RUN_DIR = "/data/adb/hymo/run/";
 constexpr const char* STATE_FILE = "/data/adb/hymo/run/daemon_state.json";
+constexpr const char* MOUNT_STATS_FILE = "/data/adb/hymo/run/mount_stats.json";
 constexpr const char* DAEMON_LOG_FILE = "/data/adb/hymo/daemon.log";
 constexpr const char* SYSTEM_RW_DIR = "/data/adb/hymo/rw";
 constexpr const char* MODULE_PROP_FILE = "/data/adb/modules/hymo/module.prop";
@@ -31,6 +32,7 @@ constexpr const char* KSU_OVERLAY_SOURCE = OVERLAY_SOURCE;
 constexpr const char* REPLACE_DIR_XATTR = "trusted.overlay.opaque";
 constexpr const char* SELINUX_XATTR = "security.selinux";
 constexpr const char* DEFAULT_SELINUX_CONTEXT = "u:object_r:system_file:s0";
+constexpr const char* VENDOR_SELINUX_CONTEXT = "u:object_r:vendor_file:s0";
 
 // Standard Android partitions
 const std::vector<std::string> BUILTIN_PARTITIONS = {"system",     "vendor", "product",

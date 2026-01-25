@@ -69,6 +69,8 @@ export function LogsPage() {
         className = "text-blue-600 dark:text-blue-400"
     } else if (line.includes('[DEBUG]')) {
         className = "text-green-600 dark:text-green-400"
+    } else if (line.includes('[VERBOSE]')) {
+        className = "text-purple-400 dark:text-purple-300"
     }
 
     return <div key={index} className={`${className} font-mono whitespace-pre-wrap break-words`}>{line}</div>
@@ -91,6 +93,8 @@ export function LogsPage() {
         matchLevel = line.includes('[INFO]')
       } else if (logLevel === 'debug') {
         matchLevel = line.includes('[DEBUG]')
+      } else if (logLevel === 'verbose') {
+        matchLevel = line.includes('[VERBOSE]')
       }
       
       return matchSearch && matchLevel
@@ -128,6 +132,7 @@ export function LogsPage() {
                 <Select
                   options={[
                     { value: 'all', label: t.logs.all },
+                    { value: 'verbose', label: t.logs.verbose },
                     { value: 'debug', label: t.logs.debug },
                     { value: 'info', label: t.logs.info },
                     { value: 'warning', label: t.logs.warning },

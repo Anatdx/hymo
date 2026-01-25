@@ -25,7 +25,8 @@ Logger& Logger::getInstance() {
     return instance;
 }
 
-void Logger::init(bool verbose, const fs::path& log_path) {
+void Logger::init(bool debug, bool verbose, const fs::path& log_path) {
+    debug_ = debug || verbose;
     verbose_ = verbose;
 
     if (!log_path.empty()) {
@@ -37,8 +38,10 @@ void Logger::init(bool verbose, const fs::path& log_path) {
 }
 
 void Logger::log(const std::string& level, const std::string& message) {
-    // Skip DEBUG messages if not in verbose mode
-    if (level == "DEBUG" && !verbose_) {
+    if (level == "VERBOSE" && !verbose_) {
+        return;
+    }
+    if (level == "DEBUG" && !debug_) {
         return;
     }
 
@@ -90,12 +93,26 @@ std::string lgetfilecon(const fs::path& path) {
     return DEFAULT_SELINUX_CONTEXT;
 }
 
+// Get appropriate SELinux context based on path
+// /vendor and /odm paths should use vendor_file context
+std::string get_context_for_path(const fs::path& path) {
+    std::string path_str = path.string();
+    if (path_str.find("/vendor") == 0 || path_str.find("/odm") == 0) {
+        return VENDOR_SELINUX_CONTEXT;
+    }
+    return DEFAULT_SELINUX_CONTEXT;
+}
+
 bool copy_path_context(const fs::path& src, const fs::path& dst) {
     std::string context;
     if (fs::exists(src)) {
         context = lgetfilecon(src);
+        // Fix rootfs context
+        if (context.find("u:object_r:rootfs:s0") != std::string::npos) {
+            context = get_context_for_path(dst);
+        }
     } else {
-        context = DEFAULT_SELINUX_CONTEXT;
+        context = get_context_for_path(dst);
     }
     return lsetfilecon(dst, context);
 }
@@ -143,6 +160,24 @@ bool has_files_recursive(const fs::path& path) {
         return true;
     }
 
+    return false;
+}
+
+// Forward declaration for loop device helper
+static int setup_loop_device(const std::string& image_path, std::string& loop_path, bool read_only);
+
+// EROFS support - check if kernel supports EROFS filesystem
+bool is_erofs_supported() {
+    std::ifstream fs("/proc/filesystems");
+    if (!fs.is_open()) {
+        return false;
+    }
+    std::string line;
+    while (std::getline(fs, line)) {
+        if (line.find("erofs") != std::string::npos) {
+            return true;
+        }
+    }
     return false;
 }
 
@@ -296,8 +331,6 @@ bool mount_image(const fs::path& image_path, const fs::path& target, const std::
         return false;
     }
 
-    // Success - if we used loop, we can close the fd now.
-    // MOUNT holds the reference, so AUTOCLEAR won't trigger until umount.
     if (loop_fd >= 0)
         close(loop_fd);
 
@@ -327,45 +360,63 @@ bool repair_image(const fs::path& image_path) {
 
 static bool native_cp_r(const fs::path& src, const fs::path& dst) {
     try {
+        LOG_DEBUG("native_cp_r: " + src.string() + " -> " + dst.string());
+
         if (!fs::exists(dst)) {
             fs::create_directories(dst);
             fs::permissions(dst, fs::status(src).permissions());
-            lsetfilecon(dst, DEFAULT_SELINUX_CONTEXT);
+            lsetfilecon(dst, get_context_for_path(dst));
         }
 
+        int count = 0;
         for (const auto& entry : fs::directory_iterator(src)) {
             auto dst_path = dst / entry.path().filename();
+            count++;
 
             if (fs::is_directory(entry)) {
-                native_cp_r(entry.path(), dst_path);
+                if (!native_cp_r(entry.path(), dst_path)) {
+                    LOG_ERROR("Failed to copy dir: " + entry.path().string());
+                    return false;
+                }
             } else if (fs::is_symlink(entry)) {
                 auto link_target = fs::read_symlink(entry.path());
                 if (fs::exists(dst_path)) {
                     fs::remove(dst_path);
                 }
                 fs::create_symlink(link_target, dst_path);
-                lsetfilecon(dst_path, DEFAULT_SELINUX_CONTEXT);
+                lsetfilecon(dst_path, get_context_for_path(dst_path));
             } else {
                 fs::copy_file(entry.path(), dst_path, fs::copy_options::overwrite_existing);
                 fs::permissions(dst_path, fs::status(entry.path()).permissions());
-                lsetfilecon(dst_path, DEFAULT_SELINUX_CONTEXT);
+                lsetfilecon(dst_path, get_context_for_path(dst_path));
             }
         }
+
+        LOG_DEBUG("Copied " + std::to_string(count) + " items from " + src.string());
         return true;
     } catch (const std::exception& e) {
-        LOG_ERROR("native_cp_r failed: " + std::string(e.what()));
+        LOG_ERROR("native_cp_r failed (" + src.string() + " -> " + dst.string() +
+                  "): " + std::string(e.what()));
         return false;
     }
 }
 
 bool sync_dir(const fs::path& src, const fs::path& dst) {
+    LOG_DEBUG("sync_dir: " + src.string() + " -> " + dst.string());
+
     if (!fs::exists(src)) {
-        return true;
+        LOG_WARN("sync_dir: source does not exist: " + src.string());
+        return true;  // Not an error if source doesn't exist
     }
+
     if (!ensure_dir_exists(dst)) {
+        LOG_ERROR("sync_dir: failed to create dst: " + dst.string());
         return false;
     }
-    return native_cp_r(src, dst);
+
+    bool result = native_cp_r(src, dst);
+    LOG_DEBUG("sync_dir result: " + std::to_string(result));
+    return result;
 }
 
 // Check if tmpfs supports xattr on this device
@@ -389,7 +440,6 @@ bool camouflage_process(const std::string& name) {
     return false;
 }
 
-// Temp directory
 fs::path select_temp_dir() {
     fs::path run_dir(RUN_DIR);
     ensure_dir_exists(run_dir);

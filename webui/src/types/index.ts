@@ -11,6 +11,7 @@ export const DEFAULT_CONFIG = {
   tempdir: '',
   mountsource: 'KSU',
   logfile: PATHS.DEFAULT_LOG,
+  debug: false,
   verbose: false,
   fs_type: 'auto',
   disable_umount: false,
@@ -21,6 +22,7 @@ export const DEFAULT_CONFIG = {
   hymofs_enabled: true,
   uname_release: '',
   uname_version: '',
+  mount_stage: 'metamount',
   partitions: [] as string[],
   hymofs_available: false,
   tmpfs_xattr_supported: false,
@@ -68,4 +70,26 @@ export type SystemInfo = {
   hymofsModules?: string[]
   hymofsMismatch?: boolean
   mismatchMessage?: string
+  mountStats?: MountStatistics
+  detectedPartitions?: PartitionInfo[]
+}
+
+export type MountStatistics = {
+  total_mounts: number
+  successful_mounts: number
+  failed_mounts: number
+  tmpfs_created: number
+  files_mounted: number
+  dirs_mounted: number
+  symlinks_created: number
+  overlayfs_mounts: number
+  success_rate?: number
+}
+
+export type PartitionInfo = {
+  name: string
+  mount_point: string
+  fs_type: string
+  is_read_only: boolean
+  exists_as_symlink: boolean
 }

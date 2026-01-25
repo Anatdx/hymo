@@ -71,18 +71,67 @@ export function StatusPage() {
         <div className="flex flex-wrap gap-2">
           {displayPartitions.map((partition) => {
             const isActive = activePartitions.includes(partition)
+            const partitionInfo = systemInfo.detectedPartitions?.find(p => p.name === partition)
+            const tooltipText = partitionInfo ? `${partitionInfo.mount_point} (${partitionInfo.fs_type}${partitionInfo.is_read_only ? ', ro' : ''})` : undefined
             return (
-              <Badge
-                key={partition}
-                variant={isActive ? 'success' : 'default'}
-                className="px-3 py-1"
-              >
-                {partition}
-              </Badge>
+              <div key={partition} title={tooltipText}>
+                <Badge
+                  variant={isActive ? 'success' : 'default'}
+                  className="px-3 py-1"
+                >
+                  {partition}
+                </Badge>
+              </div>
             )
           })}
         </div>
       </Card>
+
+      {systemInfo.mountStats && (
+        <Card>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">{t.status.mountStats || 'Mount Statistics'}</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t.status.totalMounts || 'Total Mounts'}</div>
+              <div className="text-xl font-bold text-gray-900 dark:text-white">{systemInfo.mountStats.total_mounts}</div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t.status.successfulMounts || 'Successful'}</div>
+              <div className="text-xl font-bold text-green-600 dark:text-green-400">{systemInfo.mountStats.successful_mounts}</div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t.status.failedMounts || 'Failed'}</div>
+              <div className="text-xl font-bold text-red-600 dark:text-red-400">{systemInfo.mountStats.failed_mounts}</div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t.status.successRate || 'Success Rate'}</div>
+              <div className="text-xl font-bold text-blue-600 dark:text-blue-400">
+                {systemInfo.mountStats.success_rate ? `${systemInfo.mountStats.success_rate.toFixed(1)}%` : 'N/A'}
+              </div>
+            </div>
+          </div>
+          <div className="mt-4 pt-4 border-t border-gray-100 dark:border-white/10">
+            <div className="grid grid-cols-4 gap-4 text-center">
+              <div>
+                <div className="text-sm text-gray-600 dark:text-gray-300">{t.status.filesMounted || 'Files'}</div>
+                <div className="text-lg font-semibold text-gray-900 dark:text-white">{systemInfo.mountStats.files_mounted}</div>
+              </div>
+              <div>
+                <div className="text-sm text-gray-600 dark:text-gray-300">{t.status.dirsMounted || 'Directories'}</div>
+                <div className="text-lg font-semibold text-gray-900 dark:text-white">{systemInfo.mountStats.dirs_mounted}</div>
+              </div>
+              <div>
+                <div className="text-sm text-gray-600 dark:text-gray-300">{t.status.symlinksCreated || 'Symlinks'}</div>
+                <div className="text-lg font-semibold text-gray-900 dark:text-white">{systemInfo.mountStats.symlinks_created}</div>
+              </div>
+              <div>
+                <div className="text-sm text-gray-600 dark:text-gray-300">{t.status.overlayMounts || 'Overlay'}</div>
+                <div className="text-lg font-semibold text-gray-900 dark:text-white">{systemInfo.mountStats.overlayfs_mounts}</div>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
 
       <Card>
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t.status.systemInfo}</h3>

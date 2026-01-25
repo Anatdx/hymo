@@ -36,9 +36,12 @@ set(HYMO_SOURCES
     src/core/planner.cpp
     src/core/executor.cpp
     src/core/user_rules.cpp
+    src/core/webui.cpp
     src/mount/overlay.cpp
     src/mount/magic.cpp
     src/mount/hymofs.cpp
+    src/mount/mount_utils.cpp
+    src/mount/partition_utils.cpp
 )
 
 # Common compile options
