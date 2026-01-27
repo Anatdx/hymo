@@ -161,13 +161,13 @@ void apply_user_hide_rules() {
         return;
     }
 
+    int success = 0;
+    int failed = 0;
+
     if (!HymoFS::is_available()) {
         LOG_WARN("HymoFS not available, cannot apply user hide rules");
         return;
     }
-
-    int success = 0;
-    int failed = 0;
 
     for (const auto& rule : rules) {
         if (HymoFS::hide_path(rule.path)) {

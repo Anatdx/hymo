@@ -1364,7 +1364,7 @@ int main(int argc, char* argv[]) {
                         plan = generate_plan(config, module_list, MIRROR_DIR);
                         segregate_custom_rules(plan, MIRROR_DIR);
                         update_hymofs_mappings(config, module_list, MIRROR_DIR, plan);
-                        exec_result = execute_plan(plan, config);
+                        exec_result = execute_plan(plan, config, hymofs_active);
 
                         if (config.enable_stealth) {
                             if (HymoFS::fix_mounts()) {
@@ -1404,7 +1404,7 @@ int main(int argc, char* argv[]) {
                         // Prepare plan and update mappings
                         segregate_custom_rules(plan, MIRROR_DIR);
                         update_hymofs_mappings(config, module_list, MIRROR_DIR, plan);
-                        exec_result = execute_plan(plan, config);
+                        exec_result = execute_plan(plan, config, hymofs_active);
 
                         if (config.enable_stealth) {
                             if (HymoFS::fix_mounts()) {
@@ -1458,7 +1458,7 @@ int main(int argc, char* argv[]) {
                 }
 
                 // Execute plan
-                exec_result = execute_plan(plan, config);
+                exec_result = execute_plan(plan, config, hymofs_active);
             }
 
         } else {
@@ -1515,7 +1515,7 @@ int main(int argc, char* argv[]) {
             plan = generate_plan(config, module_list, storage.mount_point);
 
             // **Step 5: Execute Plan**
-            exec_result = execute_plan(plan, config);
+            exec_result = execute_plan(plan, config, hymofs_active);
         }
 
         LOG_INFO("Plan: " + std::to_string(exec_result.overlay_module_ids.size()) +

@@ -6,8 +6,6 @@
 #include <unistd.h>
 #include <cerrno>
 #include <cstring>
-#include <fstream>
-#include <iostream>
 #include "../utils.hpp"
 #include "hymo_magic.h"
 

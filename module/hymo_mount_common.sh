@@ -89,9 +89,6 @@ run_hymod_mount() {
     if [ "$EXIT_CODE" = "0" ]; then
         touch "$MOUNT_DONE_FLAG"
         /data/adb/ksud kernel notify-module-mounted 2>/dev/null || true
-        # Reset boot count on successful mount
-        echo "0" > "$BOOT_COUNT_FILE"
-        log "Mount successful, reset boot count"
     fi
 
     return "$EXIT_CODE"

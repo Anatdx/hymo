@@ -1,11 +1,8 @@
 // core/user_rules.hpp - User-defined HymoFS rules management
 #pragma once
 
-#include <filesystem>
 #include <string>
 #include <vector>
-
-namespace fs = std::filesystem;
 
 namespace hymo {
 

@@ -301,9 +301,15 @@ static bool mount_mirror(const fs::path& src_path, const fs::path& dst_path,
             clone_attr(src, dst);
 
             // Recursively mirror all children
+            bool ok = true;
             for (const auto& entry : fs::directory_iterator(src)) {
                 std::string child_name = entry.path().filename().string();
-                mount_mirror(src, dst, child_name);
+                if (!mount_mirror(src, dst, child_name)) {
+                    ok = false;
+                }
+            }
+            if (!ok) {
+                return false;
             }
         } else if (S_ISLNK(st.st_mode)) {
             // Symlink: read target and create symlink
@@ -421,6 +427,7 @@ static bool do_magic_mount(const fs::path& path, const fs::path& work_dir_path, 
 
 static bool mount_directory_children(const fs::path& path, const fs::path& work_dir_path,
                                      const Node& node, bool has_tmpfs, bool disable_umount) {
+    bool ok = true;
     if (fs::exists(path) && !node.replace) {
         try {
             for (const auto& entry : fs::directory_iterator(path)) {
@@ -428,14 +435,20 @@ static bool mount_directory_children(const fs::path& path, const fs::path& work_
                 auto it = node.children.find(name);
                 if (it != node.children.end()) {
                     if (!it->second.skip) {
-                        do_magic_mount(path, work_dir_path, it->second, has_tmpfs, disable_umount);
+                        if (!do_magic_mount(path, work_dir_path, it->second, has_tmpfs,
+                                            disable_umount)) {
+                            ok = false;
+                        }
                     }
                 } else if (has_tmpfs) {
-                    mount_mirror(path, work_dir_path, name);
+                    if (!mount_mirror(path, work_dir_path, name)) {
+                        ok = false;
+                    }
                 }
             }
         } catch (...) {
             LOG_WARN("Failed to iterate directory: " + path.string());
+            ok = false;
         }
     }
 
@@ -446,11 +459,13 @@ static bool mount_directory_children(const fs::path& path, const fs::path& work_
 
         fs::path real_path = path / name;
         if (!fs::exists(real_path) && !node.replace) {
-            do_magic_mount(path, work_dir_path, child_node, has_tmpfs, disable_umount);
+            if (!do_magic_mount(path, work_dir_path, child_node, has_tmpfs, disable_umount)) {
+                ok = false;
+            }
         }
     }
 
-    return true;
+    return ok;
 }
 
 static bool should_create_tmpfs(const Node& node, const fs::path& path, bool has_tmpfs) {
@@ -553,7 +568,10 @@ static bool do_magic_mount(const fs::path& path, const fs::path& work_dir_path, 
 
         if (effective_tmpfs) {
             if (create_tmpfs) {
-                prepare_tmpfs_dir(target_path, target_work_path, current);
+                if (!prepare_tmpfs_dir(target_path, target_work_path, current)) {
+                    g_mount_stats.failed_mounts++;
+                    return false;
+                }
             } else if (has_tmpfs && !fs::exists(target_work_path)) {
                 fs::create_directory(target_work_path);
                 fs::path src_path = fs::exists(target_path) ? target_path : current.module_path;
@@ -561,11 +579,17 @@ static bool do_magic_mount(const fs::path& path, const fs::path& work_dir_path, 
             }
         }
 
-        mount_directory_children(target_path, target_work_path, current, effective_tmpfs,
-                                 disable_umount);
+        if (!mount_directory_children(target_path, target_work_path, current, effective_tmpfs,
+                                      disable_umount)) {
+            g_mount_stats.failed_mounts++;
+            return false;
+        }
 
         if (create_tmpfs) {
-            finalize_tmpfs_overlay(target_path, target_work_path, disable_umount);
+            if (!finalize_tmpfs_overlay(target_path, target_work_path, disable_umount)) {
+                g_mount_stats.failed_mounts++;
+                return false;
+            }
         }
         break;
     }
@@ -603,11 +627,28 @@ bool mount_partitions(const fs::path& tmp_path, const std::vector<fs::path>& mod
 
     mount(nullptr, work_dir.c_str(), nullptr, MS_PRIVATE, nullptr);
 
-    bool result = do_magic_mount("/", work_dir, *root, false, disable_umount);
+    bool result = false;
+    try {
+        result = do_magic_mount("/", work_dir, *root, false, disable_umount);
+    } catch (const std::exception& e) {
+        LOG_ERROR("Magic mount failed with exception: " + std::string(e.what()));
+        result = false;
+    } catch (...) {
+        LOG_ERROR("Magic mount failed with unknown exception");
+        result = false;
+    }
 
     g_mount_stats.tmpfs_created++;
-    umount2(work_dir.c_str(), MNT_DETACH);
-    fs::remove(work_dir);
+    if (umount2(work_dir.c_str(), MNT_DETACH) != 0) {
+        LOG_WARN("Failed to umount workdir: " + work_dir.string() + ": " + strerror(errno));
+    }
+    try {
+        if (fs::exists(work_dir)) {
+            fs::remove(work_dir);
+        }
+    } catch (const std::exception& e) {
+        LOG_WARN("Failed to remove workdir: " + work_dir.string() + ": " + e.what());
+    }
 
     delete root;
 

@@ -51,7 +51,7 @@ mkdir -p "$BASE_DIR"
 if [ ! -f "$BASE_DIR/config.json" ]; then
   ui_print "- Installing default config"
   # Generate default config using hymod
-  $MODPATH/hymod gen-config -o "$BASE_DIR/config.json"
+  $MODPATH/hymod config gen -o "$BASE_DIR/config.json"
 fi
 
 # Handle Image Creation (Borrowed from meta-overlayfs)
@@ -78,7 +78,7 @@ if [ ! -f "$IMG_FILE" ]; then
         fi
         
         # Use hymod to create image
-        $MODPATH/hymod create-image "$BASE_DIR"
+        $MODPATH/hymod config create-image "$BASE_DIR"
         
         if [ $? -ne 0 ]; then
             ui_print "! Failed to format ext4 image"

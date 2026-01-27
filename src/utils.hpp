@@ -59,7 +59,8 @@ bool camouflage_process(const std::string& name);
 
 // Temp directory
 fs::path select_temp_dir();
-bool ensure_temp_dir(const fs::path& temp_dir);
-void cleanup_temp_dir(const fs::path& temp_dir);
+bool is_safe_temp_dir(const fs::path& temp_dir, bool allow_dev_mirror = false);
+bool ensure_temp_dir(const fs::path& temp_dir, bool allow_dev_mirror = false);
+void cleanup_temp_dir(const fs::path& temp_dir, bool allow_dev_mirror = false);
 
 }  // namespace hymo

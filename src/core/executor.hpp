@@ -13,6 +13,6 @@ struct ExecutionResult {
   std::vector<std::string> magic_module_ids;
 };
 
-ExecutionResult execute_plan(const MountPlan &plan, const Config &config);
+ExecutionResult execute_plan(const MountPlan& plan, const Config& config, bool hymofs_active);
 
 } // namespace hymo

@@ -22,7 +22,7 @@ static fs::path extract_module_root(const fs::path& partition_path) {
     return fs::path();
 }
 
-ExecutionResult execute_plan(const MountPlan& plan, const Config& config) {
+ExecutionResult execute_plan(const MountPlan& plan, const Config& config, bool hymofs_active) {
     if (!plan.hymofs_module_ids.empty()) {
         LOG_INFO("HymoFS modules handled by Fast Path controller.");
     }
@@ -84,7 +84,24 @@ ExecutionResult execute_plan(const MountPlan& plan, const Config& config) {
     std::vector<std::string> final_magic_ids;
 
     if (!magic_queue.empty()) {
-        fs::path tempdir = config.tempdir.empty() ? select_temp_dir() : config.tempdir;
+        fs::path tempdir = select_temp_dir();
+        if (!config.tempdir.empty()) {
+            fs::path candidate = config.tempdir;
+            bool candidate_ok = true;
+
+            if (!is_safe_temp_dir(candidate, hymofs_active)) {
+                candidate_ok = false;
+            } else if (fs::exists(candidate) && !fs::is_directory(candidate)) {
+                candidate_ok = false;
+            }
+
+            if (!candidate_ok) {
+                LOG_WARN("Configured tempdir is not usable for magic mount: " + candidate.string() +
+                         ". Falling back to " + tempdir.string());
+            } else {
+                tempdir = candidate / "hymo_tmp";
+            }
+        }
 
         // Calculate magic IDs from final queue
         for (const auto& path : magic_queue) {
@@ -95,15 +112,18 @@ ExecutionResult execute_plan(const MountPlan& plan, const Config& config) {
 
         LOG_INFO("Executing Magic Mount for " + std::to_string(magic_queue.size()) + " modules...");
 
-        ensure_temp_dir(tempdir);
-
-        if (!mount_partitions(tempdir, magic_queue, config.mountsource, config.partitions,
-                              config.disable_umount)) {
-            LOG_ERROR("Magic Mount critical failure");
+        if (!ensure_temp_dir(tempdir, hymofs_active)) {
+            LOG_ERROR("Magic Mount aborted: temp dir prepare failed");
             final_magic_ids.clear();
-        }
+        } else {
+            if (!mount_partitions(tempdir, magic_queue, config.mountsource, config.partitions,
+                                  config.disable_umount)) {
+                LOG_ERROR("Magic Mount critical failure");
+                final_magic_ids.clear();
+            }
 
-        cleanup_temp_dir(tempdir);
+            cleanup_temp_dir(tempdir, hymofs_active);
+        }
     }
 
     // Final cleanup of ID lists

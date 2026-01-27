@@ -2,7 +2,6 @@
 
 #include <filesystem>
 #include <string>
-#include <vector>
 #include "defs.hpp"
 #include "hymo_magic.h"
 

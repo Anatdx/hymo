@@ -436,19 +436,64 @@ fs::path select_temp_dir() {
     return run_dir / "workdir";
 }
 
-bool ensure_temp_dir(const fs::path& temp_dir) {
+static std::string normalize_path_string(const fs::path& path) {
+    std::string normalized = path.lexically_normal().string();
+    if (normalized.size() > 1 && normalized.back() == '/') {
+        normalized.pop_back();
+    }
+    return normalized;
+}
+
+static bool is_dangerous_temp_path(const fs::path& path, bool allow_dev_mirror) {
+    std::string p = normalize_path_string(path);
+    if (p.empty() || p == "." || p == "..") {
+        return true;
+    }
+
+    if (p == "/" || p == "/data" || p == "/data/adb" || p == "/data/adb/hymo") {
+        return true;
+    }
+
+    if (allow_dev_mirror &&
+        (p == "/dev/hymo_mirror" || p.rfind("/dev/hymo_mirror/", 0) == 0)) {
+        return false;
+    }
+
+    if (p.rfind("/dev", 0) == 0 || p.rfind("/proc", 0) == 0 || p.rfind("/sys", 0) == 0) {
+        return true;
+    }
+
+    return false;
+}
+
+bool is_safe_temp_dir(const fs::path& temp_dir, bool allow_dev_mirror) {
+    return !is_dangerous_temp_path(temp_dir, allow_dev_mirror);
+}
+
+bool ensure_temp_dir(const fs::path& temp_dir, bool allow_dev_mirror) {
+    if (!is_safe_temp_dir(temp_dir, allow_dev_mirror)) {
+        LOG_ERROR("Refusing to clean unsafe temp dir: " + temp_dir.string());
+        return false;
+    }
+
     try {
         if (fs::exists(temp_dir)) {
             fs::remove_all(temp_dir);
         }
         fs::create_directories(temp_dir);
         return true;
-    } catch (...) {
+    } catch (const std::exception& e) {
+        LOG_ERROR("Failed to prepare temp dir " + temp_dir.string() + ": " + e.what());
         return false;
     }
 }
 
-void cleanup_temp_dir(const fs::path& temp_dir) {
+void cleanup_temp_dir(const fs::path& temp_dir, bool allow_dev_mirror) {
+    if (!is_safe_temp_dir(temp_dir, allow_dev_mirror)) {
+        LOG_WARN("Skipping cleanup for unsafe temp dir: " + temp_dir.string());
+        return;
+    }
+
     try {
         if (fs::exists(temp_dir)) {
             fs::remove_all(temp_dir);
