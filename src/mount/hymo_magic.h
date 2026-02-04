@@ -34,8 +34,55 @@
 #define BIT_HYMO_SPOOF_KSTAT BIT(42)
 #endif // #ifdef __KERNEL__
 
-// Only one syscall command: Get anonymous FD
+/*
+ * Syscall commands (via reboot syscall):
+ * - GET_FD: legacy, only returns anonymous fd
+ * - GET_FD_WITH_MASK: bootstrap fast path, sets hook mask immediately (arg register)
+ */
 #define HYMO_CMD_GET_FD 0x48021
+#define HYMO_CMD_GET_FD_WITH_MASK 0x48022
+
+/*
+ * Internal command definitions (used with HYMO_IOC_CALL).
+ * Must match kernel-side hymofs_kpm/hymofs.h.
+ */
+#define HYMO_CMD_CLEAR_ALL 100
+#define HYMO_CMD_GET_VERSION 101
+#define HYMO_CMD_SET_DEBUG 102
+#define HYMO_CMD_REORDER_MNT_ID 103
+#define HYMO_CMD_SET_STEALTH 104
+#define HYMO_CMD_SET_ENABLED 105
+#define HYMO_CMD_LIST_RULES 106
+#define HYMO_CMD_SET_MIRROR_PATH 107
+#define HYMO_CMD_ADD_MERGE_RULE 108
+#define HYMO_CMD_ADD_RULE 109
+#define HYMO_CMD_HIDE_RULE 110
+#define HYMO_CMD_HIDE_OVERLAY_XATTRS 111
+#define HYMO_CMD_DEL_RULE 112
+#define HYMO_CMD_ADD_SPOOF_KSTAT 113
+#define HYMO_CMD_UPDATE_SPOOF_KSTAT 114
+#define HYMO_CMD_SET_UNAME 115
+#define HYMO_CMD_SET_CMDLINE 116
+#define HYMO_CMD_SET_HOOK_MASK 117
+
+/*
+ * KPM runtime hook mask bits (must match hymofs_kpm/hymofs.c).
+ * Default: enable all hooks at bootstrap (post-fs-data).
+ */
+#define HYMO_HOOK_DIRENTS (1ULL << 0)
+#define HYMO_HOOK_FILENAME_LOOKUP (1ULL << 1)
+#define HYMO_HOOK_SHOW_MOUNTINFO (1ULL << 2)
+#define HYMO_HOOK_SETXATTR (1ULL << 3)
+#define HYMO_HOOK_GETXATTR (1ULL << 4)
+#define HYMO_HOOK_LISTXATTR (1ULL << 5)
+#define HYMO_HOOK_RENAME (1ULL << 6)
+#define HYMO_HOOK_UNLINK (1ULL << 7)
+#define HYMO_HOOK_READLINK (1ULL << 8)
+#define HYMO_HOOK_CMDLINE (1ULL << 9)
+#define HYMO_HOOK_ALL                                                                            \
+    (HYMO_HOOK_DIRENTS | HYMO_HOOK_FILENAME_LOOKUP | HYMO_HOOK_SHOW_MOUNTINFO | HYMO_HOOK_SETXATTR | \
+     HYMO_HOOK_GETXATTR | HYMO_HOOK_LISTXATTR | HYMO_HOOK_RENAME | HYMO_HOOK_UNLINK |             \
+     HYMO_HOOK_READLINK | HYMO_HOOK_CMDLINE)
 
 struct hymo_syscall_arg {
     const char* src;
@@ -123,5 +170,16 @@ struct hymo_spoof_cmdline {
 #define HYMO_IOC_SET_CMDLINE _IOW(HYMO_IOC_MAGIC, 18, struct hymo_spoof_cmdline)
 #define HYMO_IOC_GET_FEATURES _IOR(HYMO_IOC_MAGIC, 19, int)
 #define HYMO_IOC_SET_ENABLED _IOW(HYMO_IOC_MAGIC, 20, int)
+
+/*
+ * Unified ioctl (recommended): pass cmd + arg pointer, kernel does the dispatch.
+ * This replaces the large HYMO_IOC_* surface for most use cases.
+ */
+struct hymo_ioctl_call {
+    uint32_t cmd;       /* HYMO_CMD_* */
+    uint32_t reserved;  /* must be 0 */
+    uint64_t arg;       /* (void*) for cmd-specific argument */
+};
+#define HYMO_IOC_CALL _IOW(HYMO_IOC_MAGIC, 22, struct hymo_ioctl_call)
 
 #endif /* _LINUX_HYMO_MAGIC_H */

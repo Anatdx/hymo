@@ -18,8 +18,8 @@ NC='\033[0m'
 # Detect OS
 OS_TYPE="unknown"
 case "$(uname -s)" in
-    Linux*)     OS_TYPE="linux";;
-    Darwin*)    OS_TYPE="macos";;
+    Linux*)     OS_TYPE="Linux";;
+    Darwin*)    OS_TYPE="macOS";;
     *)          OS_TYPE="unknown";;
 esac
 

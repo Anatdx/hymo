@@ -55,6 +55,8 @@ struct Config {
     bool enable_kernel_debug = false;
     bool enable_stealth = true;
     bool hymofs_enabled = true;
+    // KPM hook mask used for bootstrap (defaults to all hooks: bits 0..9).
+    uint64_t hymofs_hook_mask = 0x3ff;
     std::string mirror_path;
     std::string uname_release;
     std::string uname_version;

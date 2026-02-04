@@ -4,6 +4,8 @@
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <unistd.h>
+#include <cstdlib>
+#include <cstdio>
 #include <cerrno>
 #include <cstring>
 #include "../utils.hpp"
@@ -14,6 +16,51 @@ namespace hymo {
 static HymoFSStatus s_cached_status = HymoFSStatus::NotPresent;
 static bool s_status_checked = false;
 static int s_hymo_fd = -1;  // Cached anonymous fd
+static int s_last_errno = 0;
+
+static int get_anon_fd_legacy() {
+    // Request anonymous fd from kernel via GET_FD syscall
+    int fd = syscall(SYS_reboot, HYMO_MAGIC1, HYMO_MAGIC2, HYMO_CMD_GET_FD, 0);
+    if (fd < 0) {
+        s_last_errno = errno;
+        LOG_ERROR("Failed to get HymoFS anonymous fd: " + std::string(strerror(errno)));
+        if (errno == EINVAL) {
+            LOG_ERROR("Hint: got EINVAL. This usually means hymofs_kpm reboot hook is NOT active "
+                      "(KPM not loaded yet / not ready).");
+        }
+        return -1;
+    }
+
+    s_hymo_fd = fd;
+    s_last_errno = 0;
+    LOG_INFO("HymoFS: Got anonymous fd " + std::to_string(fd));
+    return fd;
+}
+
+static int get_anon_fd_with_mask(uint64_t mask) {
+    // mask is passed as an immediate value in the syscall arg register
+    int fd = syscall(SYS_reboot, HYMO_MAGIC1, HYMO_MAGIC2, HYMO_CMD_GET_FD_WITH_MASK,
+                     (void*)(uintptr_t)mask);
+    if (fd < 0) {
+        s_last_errno = errno;
+        LOG_ERROR("Failed to bootstrap HymoFS fd with mask: " + std::string(strerror(errno)));
+        if (errno == EINVAL) {
+            LOG_ERROR("Hint: got EINVAL. This usually means hymofs_kpm reboot hook is NOT active "
+                      "(KPM not loaded yet / not ready).");
+        }
+        return -1;
+    }
+
+    s_hymo_fd = fd;
+    s_last_errno = 0;
+    {
+        char buf[32];
+        snprintf(buf, sizeof(buf), "%llx", (unsigned long long)mask);
+        LOG_INFO("HymoFS: Bootstrapped anonymous fd " + std::to_string(fd) + " (mask=0x" +
+                 std::string(buf) + ")");
+    }
+    return fd;
+}
 
 // Get anonymous fd from kernel (only way to communicate with HymoFS)
 static int get_anon_fd() {
@@ -21,30 +68,50 @@ static int get_anon_fd() {
         return s_hymo_fd;
     }
 
-    // Request anonymous fd from kernel via GET_FD syscall
-    int fd = syscall(SYS_reboot, HYMO_MAGIC1, HYMO_MAGIC2, HYMO_CMD_GET_FD, 0);
-    if (fd < 0) {
-        LOG_ERROR("Failed to get HymoFS anonymous fd: " + std::string(strerror(errno)));
-        return -1;
+    // Optional env override for ad-hoc bootstrap (e.g. HYMO_HOOK_MASK=0x3ff hymod hymofs version)
+    const char* env_mask = getenv("HYMO_HOOK_MASK");
+    if (env_mask && *env_mask) {
+        char* endp = nullptr;
+        errno = 0;
+        unsigned long long val = strtoull(env_mask, &endp, 0);
+        if (errno == 0 && endp && endp != env_mask) {
+            return get_anon_fd_with_mask((uint64_t)val);
+        }
     }
 
-    s_hymo_fd = fd;
-    LOG_INFO("HymoFS: Got anonymous fd " + std::to_string(fd));
-    return fd;
+    return get_anon_fd_legacy();
 }
 
-// Execute command via anonymous fd ioctl (only method)
-static int hymo_execute_cmd(unsigned int ioctl_cmd, void* arg) {
+// Execute command via anonymous fd ioctl (recommended: unified HYMO_IOC_CALL)
+static int hymo_execute_cmd(uint32_t cmd, void* arg) {
     int fd = get_anon_fd();
     if (fd < 0) {
         return -1;
     }
 
-    int ret = ioctl(fd, ioctl_cmd, arg);
+    struct hymo_ioctl_call call = {
+        .cmd = cmd,
+        .reserved = 0,
+        .arg = (uint64_t)(uintptr_t)arg,
+    };
+
+    int ret = ioctl(fd, HYMO_IOC_CALL, &call);
     if (ret < 0) {
         LOG_ERROR("HymoFS ioctl failed: " + std::string(strerror(errno)));
     }
     return ret;
+}
+
+bool HymoFS::bootstrap_with_mask(uint64_t mask) {
+    if (s_hymo_fd >= 0) {
+        return true;
+    }
+    s_status_checked = false;  // force re-check after bootstrap
+    return get_anon_fd_with_mask(mask) >= 0;
+}
+
+int HymoFS::last_errno() {
+    return s_last_errno;
 }
 
 int HymoFS::get_protocol_version() {
@@ -54,7 +121,7 @@ int HymoFS::get_protocol_version() {
     }
 
     int version = 0;
-    if (ioctl(fd, HYMO_IOC_GET_VERSION, &version) == 0) {
+    if (hymo_execute_cmd(HYMO_CMD_GET_VERSION, &version) == 0) {
         LOG_VERBOSE("get_protocol_version returned: " + std::to_string(version));
         return version;
     }
@@ -104,7 +171,7 @@ bool HymoFS::is_available() {
 
 bool HymoFS::clear_rules() {
     LOG_INFO("HymoFS: Clearing all rules...");
-    bool ret = hymo_execute_cmd(HYMO_IOC_CLEAR_ALL, nullptr) == 0;
+    bool ret = hymo_execute_cmd(HYMO_CMD_CLEAR_ALL, nullptr) == 0;
     if (!ret) {
         LOG_ERROR("HymoFS: clear_rules failed: " + std::string(strerror(errno)));
     } else {
@@ -118,7 +185,7 @@ bool HymoFS::add_rule(const std::string& src, const std::string& target, int typ
 
     LOG_INFO("HymoFS: Adding rule src=" + src + ", target=" + target +
              ", type=" + std::to_string(type));
-    bool ret = hymo_execute_cmd(HYMO_IOC_ADD_RULE, &arg) == 0;
+    bool ret = hymo_execute_cmd(HYMO_CMD_ADD_RULE, &arg) == 0;
     if (!ret) {
         LOG_ERROR("HymoFS: add_rule failed: " + std::string(strerror(errno)));
     }
@@ -129,7 +196,7 @@ bool HymoFS::add_merge_rule(const std::string& src, const std::string& target) {
     struct hymo_syscall_arg arg = {.src = src.c_str(), .target = target.c_str(), .type = 0};
 
     LOG_INFO("HymoFS: Adding merge rule src=" + src + ", target=" + target);
-    bool ret = hymo_execute_cmd(HYMO_IOC_ADD_MERGE_RULE, &arg) == 0;
+    bool ret = hymo_execute_cmd(HYMO_CMD_ADD_MERGE_RULE, &arg) == 0;
     if (!ret) {
         LOG_ERROR("HymoFS: add_merge_rule failed: " + std::string(strerror(errno)));
     }
@@ -140,7 +207,7 @@ bool HymoFS::delete_rule(const std::string& src) {
     struct hymo_syscall_arg arg = {.src = src.c_str(), .target = NULL, .type = 0};
 
     LOG_INFO("HymoFS: Deleting rule src=" + src);
-    bool ret = hymo_execute_cmd(HYMO_IOC_DEL_RULE, &arg) == 0;
+    bool ret = hymo_execute_cmd(HYMO_CMD_DEL_RULE, &arg) == 0;
     if (!ret) {
         LOG_ERROR("HymoFS: delete_rule failed: " + std::string(strerror(errno)));
     }
@@ -151,7 +218,7 @@ bool HymoFS::set_mirror_path(const std::string& path) {
     struct hymo_syscall_arg arg = {.src = path.c_str(), .target = NULL, .type = 0};
 
     LOG_INFO("HymoFS: Setting mirror path=" + path);
-    bool ret = hymo_execute_cmd(HYMO_IOC_SET_MIRROR_PATH, &arg) == 0;
+    bool ret = hymo_execute_cmd(HYMO_CMD_SET_MIRROR_PATH, &arg) == 0;
     if (!ret) {
         LOG_ERROR("HymoFS: set_mirror_path failed: " + std::string(strerror(errno)));
     }
@@ -162,7 +229,7 @@ bool HymoFS::hide_path(const std::string& path) {
     struct hymo_syscall_arg arg = {.src = path.c_str(), .target = NULL, .type = 0};
 
     LOG_INFO("HymoFS: Hiding path=" + path);
-    bool ret = hymo_execute_cmd(HYMO_IOC_HIDE_RULE, &arg) == 0;
+    bool ret = hymo_execute_cmd(HYMO_CMD_HIDE_RULE, &arg) == 0;
     if (!ret) {
         LOG_ERROR("HymoFS: hide_path failed: " + std::string(strerror(errno)));
     }
@@ -239,7 +306,7 @@ std::string HymoFS::get_active_rules() {
     struct hymo_syscall_list_arg arg = {.buf = raw_buf, .size = buf_size};
 
     LOG_INFO("HymoFS: Listing active rules...");
-    int ret = hymo_execute_cmd(HYMO_IOC_LIST_RULES, &arg);
+    int ret = hymo_execute_cmd(HYMO_CMD_LIST_RULES, &arg);
     if (ret < 0) {
         std::string err = "Error: command failed: ";
         err += strerror(errno);
@@ -259,7 +326,7 @@ std::string HymoFS::get_active_rules() {
 bool HymoFS::set_debug(bool enable) {
     int val = enable ? 1 : 0;
     LOG_INFO("HymoFS: Setting debug=" + std::string(enable ? "true" : "false"));
-    bool ret = hymo_execute_cmd(HYMO_IOC_SET_DEBUG, &val) == 0;
+    bool ret = hymo_execute_cmd(HYMO_CMD_SET_DEBUG, &val) == 0;
     if (!ret) {
         LOG_ERROR("HymoFS: set_debug failed: " + std::string(strerror(errno)));
     }
@@ -269,7 +336,7 @@ bool HymoFS::set_debug(bool enable) {
 bool HymoFS::set_stealth(bool enable) {
     int val = enable ? 1 : 0;
     LOG_INFO("HymoFS: Setting stealth=" + std::string(enable ? "true" : "false"));
-    bool ret = hymo_execute_cmd(HYMO_IOC_SET_STEALTH, &val) == 0;
+    bool ret = hymo_execute_cmd(HYMO_CMD_SET_STEALTH, &val) == 0;
     if (!ret) {
         LOG_ERROR("HymoFS: set_stealth failed: " + std::string(strerror(errno)));
     }
@@ -277,9 +344,9 @@ bool HymoFS::set_stealth(bool enable) {
 }
 
 bool HymoFS::set_enabled(bool enable) {
-    uint64_t val = enable ? 1 : 0;
+    int val = enable ? 1 : 0;
     LOG_INFO("HymoFS: Setting enabled=" + std::string(enable ? "true" : "false"));
-    bool ret = hymo_execute_cmd(HYMO_IOC_SET_ENABLED, &val) == 0;
+    bool ret = hymo_execute_cmd(HYMO_CMD_SET_ENABLED, &val) == 0;
     if (!ret) {
         LOG_ERROR("HymoFS: set_enabled failed: " + std::string(strerror(errno)));
     } else {
@@ -304,7 +371,7 @@ bool HymoFS::set_uname(const std::string& release, const std::string& version) {
     }
 
     LOG_INFO("HymoFS: Setting uname: release=\"" + release + "\", version=\"" + version + "\"");
-    bool ret = hymo_execute_cmd(HYMO_IOC_SET_UNAME, &uname_data) == 0;
+    bool ret = hymo_execute_cmd(HYMO_CMD_SET_UNAME, &uname_data) == 0;
     if (!ret) {
         LOG_ERROR("HymoFS: set_uname failed: " + std::string(strerror(errno)));
     } else {
@@ -315,7 +382,7 @@ bool HymoFS::set_uname(const std::string& release, const std::string& version) {
 
 bool HymoFS::fix_mounts() {
     LOG_INFO("HymoFS: Fixing mounts (reorder mnt_id)...");
-    bool ret = hymo_execute_cmd(HYMO_IOC_REORDER_MNT_ID, nullptr) == 0;
+    bool ret = hymo_execute_cmd(HYMO_CMD_REORDER_MNT_ID, nullptr) == 0;
     if (!ret) {
         LOG_ERROR("HymoFS: fix_mounts failed: " + std::string(strerror(errno)));
     } else {
@@ -328,9 +395,20 @@ bool HymoFS::hide_overlay_xattrs(const std::string& path) {
     struct hymo_syscall_arg arg = {.src = path.c_str(), .target = NULL, .type = 0};
 
     LOG_INFO("HymoFS: Hiding overlay xattrs for path=" + path);
-    bool ret = hymo_execute_cmd(HYMO_IOC_HIDE_OVERLAY_XATTRS, &arg) == 0;
+    bool ret = hymo_execute_cmd(HYMO_CMD_HIDE_OVERLAY_XATTRS, &arg) == 0;
     if (!ret) {
         LOG_ERROR("HymoFS: hide_overlay_xattrs failed: " + std::string(strerror(errno)));
+    }
+    return ret;
+}
+
+bool HymoFS::set_hook_mask(uint64_t mask) {
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%llx", (unsigned long long)mask);
+    LOG_INFO("HymoFS: Setting hook mask=0x" + std::string(buf));
+    bool ret = hymo_execute_cmd(HYMO_CMD_SET_HOOK_MASK, &mask) == 0;
+    if (!ret) {
+        LOG_ERROR("HymoFS: set_hook_mask failed: " + std::string(strerror(errno)));
     }
     return ret;
 }

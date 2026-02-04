@@ -742,12 +742,32 @@ int main(int argc, char* argv[]) {
 
         case Command::HYMOFS: {
             if (cli.args.empty()) {
-                std::cerr << "Usage: hymod hymofs <enable|disable|list|version|set-mirror|raw>\n";
+                std::cerr << "Usage: hymod hymofs <bootstrap|enable|disable|list|version|set-mirror|raw>\n";
                 return 1;
             }
             std::string subcmd = cli.args[0];
 
-            if (subcmd == "enable" || subcmd == "disable") {
+            if (subcmd == "bootstrap") {
+                Config config = load_config(cli);
+                if (!config.hymofs_enabled) {
+                    std::cout << "HymoFS is disabled by config.\n";
+                    return 0;
+                }
+
+                uint64_t mask = config.hymofs_hook_mask ? config.hymofs_hook_mask : (uint64_t)HYMO_HOOK_ALL;
+                if (!HymoFS::bootstrap_with_mask(mask)) {
+                    int e = HymoFS::last_errno();
+                    std::cerr << "Failed to bootstrap HymoFS/KPM with mask (errno=" << e
+                              << " " << strerror(e) << ").\n";
+                    if (e == EINVAL) {
+                        std::cerr << "Hint: EINVAL usually means hymofs_kpm reboot hook is not "
+                                     "active yet (KPM not loaded / not ready).\n";
+                    }
+                    return 1;
+                }
+                std::cout << "HymoFS/KPM bootstrapped (mask applied).\n";
+                return 0;
+            } else if (subcmd == "enable" || subcmd == "disable") {
                 bool enable = (subcmd == "enable");
                 if (HymoFS::is_available()) {
                     if (HymoFS::set_enabled(enable)) {
@@ -947,7 +967,7 @@ int main(int argc, char* argv[]) {
                 return 0;
             } else {
                 std::cerr << "Unknown hymofs subcommand: " << subcmd << "\n";
-                std::cerr << "Available: enable, disable, list, version, set-mirror, raw\n";
+                std::cerr << "Available: bootstrap, enable, disable, list, version, set-mirror, raw\n";
                 return 1;
             }
         }

@@ -15,6 +15,10 @@ class HymoFS {
 public:
     static constexpr int EXPECTED_PROTOCOL_VERSION = HYMO_PROTOCOL_VERSION;
 
+    // Bootstrap: get anonymous fd and apply hook mask immediately (post-fs-data requirement)
+    static bool bootstrap_with_mask(uint64_t mask);
+    static int last_errno();
+
     static HymoFSStatus check_status();
     static bool is_available();
     static int get_protocol_version();
@@ -38,6 +42,7 @@ public:
     static bool set_uname(const std::string& release, const std::string& version);
     static bool fix_mounts();
     static bool hide_overlay_xattrs(const std::string& path);
+    static bool set_hook_mask(uint64_t mask);
 };
 
 }  // namespace hymo

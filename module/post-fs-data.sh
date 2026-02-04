@@ -26,6 +26,24 @@ get_mount_stage() {
 
 MOUNT_STAGE=$(get_mount_stage)
 
+# Bootstrap KPM early: apply hook mask before later mount stage runs.
+if [ -f "$MODDIR/hymod" ]; then
+    chmod 755 "$MODDIR/hymod" 2>/dev/null || true
+    log "post-fs-data: bootstrap HymoFS/KPM (mask)"
+    # Some devices load KPMs slightly later; retry briefly to avoid -EINVAL timing flake.
+    i=0
+    while [ "$i" -lt 15 ]; do
+        "$MODDIR/hymod" hymofs bootstrap >> "$LOG_FILE" 2>&1 && break
+        i=$((i + 1))
+        sleep 0.2
+    done
+    if [ "$i" -ge 15 ]; then
+        log "post-fs-data: bootstrap failed (give up after retries)"
+    fi
+else
+    log "post-fs-data: hymod not found, skip bootstrap"
+fi
+
 if [ "$MOUNT_STAGE" = "post-fs-data" ]; then
     log "post-fs-data: executing mount (stage=$MOUNT_STAGE)"
     if [ -f "$MODDIR/hymo_mount_common.sh" ]; then

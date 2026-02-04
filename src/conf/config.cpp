@@ -1,5 +1,6 @@
 // conf/config.cpp - Configuration implementation
 #include "config.hpp"
+#include <cstdio>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -63,6 +64,27 @@ Config Config::from_file(const fs::path& path) {
                 config.enable_stealth = o.at("enable_stealth").as_bool();
             if (o.count("hymofs_enabled"))
                 config.hymofs_enabled = o.at("hymofs_enabled").as_bool();
+            if (o.count("hymofs_hook_mask")) {
+                const auto& v = o.at("hymofs_hook_mask");
+                if (v.type == json::Type::String) {
+                    const std::string& s = v.as_string();
+                    try {
+                        size_t idx = 0;
+                        unsigned long long m = std::stoull(s, &idx, 0);
+                        if (idx > 0) {
+                            config.hymofs_hook_mask = (uint64_t)m;
+                        }
+                    } catch (...) {
+                        LOG_WARN("Invalid hymofs_hook_mask, keep default");
+                    }
+                } else if (v.type == json::Type::Number) {
+                    // NOTE: JSON numbers are double; keep this for convenience but precision may be lost.
+                    double d = v.as_number();
+                    if (d >= 0) {
+                        config.hymofs_hook_mask = (uint64_t)d;
+                    }
+                }
+            }
             if (o.count("mirror_path"))
                 config.mirror_path = o.at("mirror_path").as_string();
             if (o.count("uname_release"))
@@ -112,6 +134,11 @@ bool Config::save_to_file(const fs::path& path) const {
     root["enable_kernel_debug"] = json::Value(enable_kernel_debug);
     root["enable_stealth"] = json::Value(enable_stealth);
     root["hymofs_enabled"] = json::Value(hymofs_enabled);
+    {
+        char buf[32];
+        snprintf(buf, sizeof(buf), "0x%llx", (unsigned long long)hymofs_hook_mask);
+        root["hymofs_hook_mask"] = json::Value(std::string(buf));
+    }
     if (!mirror_path.empty())
         root["mirror_path"] = json::Value(mirror_path);
     if (!uname_release.empty())
