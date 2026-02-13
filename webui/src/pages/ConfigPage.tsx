@@ -137,30 +137,6 @@ export function ConfigPage() {
             onChange={(val) => updateConfig({ fs_type: val })}
           />
 
-          <RadioCards
-            label={t.config.mountStage || "Mount Stage"}
-            options={[
-                { value: "post-fs-data", label: t.config.stagePostFsData || "post-fs-data.sh", description: t.config.stagePostFsDataDesc || "Earliest (before Zygote)" },
-                { value: "metamount", label: t.config.stageMetamount || "metamount.sh", description: t.config.stageMetamountDesc || "Standard (end of post-fs-data, recommended)" },
-                { value: "services", label: t.config.stageServices || "services.sh", description: t.config.stageServicesDesc || "Late (after boot completed)" },
-            ]}
-            value={config.mount_stage || "metamount"}
-            onChange={(val) => updateConfig({ mount_stage: val })}
-          />
-          {config.mount_stage === "post-fs-data" && (
-            <div className="mt-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
-              <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                ⚠️ {t.config.stagePostFsDataWarning || "Early mount may cause compatibility issues with some modules. Use only if you understand the implications."}
-              </p>
-            </div>
-          )}
-          {config.mount_stage === "services" && (
-            <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
-              <p className="text-sm text-blue-800 dark:text-blue-200">
-                ℹ️ {t.config.stageServicesWarning || "Late mount ensures all system services are ready, but may delay module availability."}
-              </p>
-            </div>
-          )}
         </div>
       </Card>
 
@@ -215,7 +191,7 @@ export function ConfigPage() {
       {showAdvanced && (
         <Card>
           <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">{t.config.advanced}</h3>
-            
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">{t.config.mountRunsInMetamount}</p>
           <div className="space-y-4">
             <Switch
               checked={config.debug}

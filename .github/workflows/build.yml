@@ -47,6 +47,29 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cmake ninja-build
 
+      - name: Build HymoFS LKM and pack into module
+        env:
+          # HymoFS LKM source (branch lkm); kernel branch for GKI-compatible build
+          HYMOFS_REPO: Anatdx/HymoFS
+          KERNEL_BRANCH: android15-6.6
+        run: |
+          set -euo pipefail
+          echo "Cloning HymoFS (lkm branch)..."
+          git clone --depth 1 -b lkm "https://github.com/${HYMOFS_REPO}.git" hymofs_src
+          echo "Cloning kernel tree (${KERNEL_BRANCH})..."
+          git clone --depth 1 -b "${KERNEL_BRANCH}" https://android.googlesource.com/kernel/common kernel_src
+          sudo apt-get install -y libelf-dev libssl-dev flex bison bc rsync cpio pahole
+          echo "Configuring kernel..."
+          make -C kernel_src ARCH=arm64 LLVM=1 LLVM_IAS=1 gki_defconfig 2>/dev/null || \
+            make -C kernel_src ARCH=arm64 LLVM=1 LLVM_IAS=1 defconfig
+          make -C kernel_src ARCH=arm64 LLVM=1 LLVM_IAS=1 modules_prepare
+          echo "Building hymofs_lkm.ko..."
+          make -C kernel_src ARCH=arm64 LLVM=1 LLVM_IAS=1 M="$GITHUB_WORKSPACE/hymofs_src/src" KBUILD_MODPOST_WARN=1 modules
+          cp "$GITHUB_WORKSPACE/hymofs_src/src/hymofs_lkm.ko" module/
+          llvm-strip -d module/hymofs_lkm.ko 2>/dev/null || true
+          ls -la module/hymofs_lkm.ko
+          echo "HymoFS LKM ready for package."
+
       - name: Extract Version
         run: |
           VERSION=$(grep "^version=" module/module.prop | cut -d= -f2)
