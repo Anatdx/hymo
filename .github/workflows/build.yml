@@ -59,7 +59,11 @@ jobs:
           git clone --depth 1 -b lkm "https://github.com/${HYMOFS_REPO}.git" hymofs_src
           echo "Cloning kernel tree (${KERNEL_BRANCH})..."
           git clone --depth 1 -b "${KERNEL_BRANCH}" https://android.googlesource.com/kernel/common kernel_src
-          sudo apt-get install -y libelf-dev libssl-dev flex bison bc rsync cpio pahole
+          sudo apt-get update
+          sudo apt-get install -y \
+            git make clang lld llvm \
+            flex bison bc rsync cpio \
+            libelf-dev libssl-dev pahole zip
           echo "Configuring kernel..."
           make -C kernel_src ARCH=arm64 LLVM=1 LLVM_IAS=1 gki_defconfig 2>/dev/null || \
             make -C kernel_src ARCH=arm64 LLVM=1 LLVM_IAS=1 defconfig
