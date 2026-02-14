@@ -147,29 +147,26 @@ jobs:
             echo "✅ Internal signing complete."
           fi
 
+      # 手动导入 GPG，避免 crazy-max/ghaction-import-gpg 的 keygrip preset 在 runner 上报 Not implemented
       - name: Import GPG key
         if: github.actor == 'Anatdx'
-        uses: crazy-max/ghaction-import-gpg@v6
-        with:
-          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-          passphrase: ${{ secrets.GPG_PASSPHRASE }}
-          fingerprint: "942F2C75D1DC540F"
-          trust_level: 5
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+        run: |
+          gpg --batch --import <<< "$GPG_PRIVATE_KEY"
+          gpg --list-secret-keys --keyid-format long
       
       - name: Sign Module with GPG
         if: github.actor == 'Anatdx'
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
-          
           cd build/out
           ZIP_FILE=$(ls *.zip | head -n 1)
           echo "Signing $ZIP_FILE..."
-          
-          # Sign
           gpg --detach-sign --local-user an@anatdx.com --batch --yes --pinentry-mode loopback \
-            --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
+            --passphrase "$GPG_PASSPHRASE" \
             --output "$ZIP_FILE.asc" "$ZIP_FILE"
-            
-          # Verify output
           if [ -f "$ZIP_FILE.asc" ]; then
             echo "Signature created successfully:"
             ls -lh "$ZIP_FILE.asc"
