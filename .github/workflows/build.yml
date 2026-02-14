@@ -112,8 +112,10 @@ jobs:
       - name: Rename to hymo-vx.x.x-xxxxxxxx.zip
         run: |
           cd build/out
+          TARGET="hymo-${VERSION_TAG}-${SHORT_HASH}.zip"
           for file in *.zip; do
-            mv "$file" "hymo-${VERSION_TAG}-${SHORT_HASH}.zip"
+            [ -f "$file" ] && [ "$file" != "$TARGET" ] && mv "$file" "$TARGET"
+            break
           done
           ls -la
 

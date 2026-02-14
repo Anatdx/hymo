@@ -306,7 +306,7 @@ case $COMMAND in
         print_info "Packaging..."
         cmake --build "${BUILD_DIR}/arm64-v8a" --target package
         if [ -d "${PROJECT_ROOT}/.git" ] && [ -n "${VERSION_TAG}" ] && [ -n "${SHORT_HASH}" ]; then
-            ( cd "${OUT_DIR}" && for f in hymo-*.zip; do [ -f "$f" ] && mv "$f" "hymo-${VERSION_TAG}-${SHORT_HASH}.zip" && break; done )
+            ( cd "${OUT_DIR}" && T="hymo-${VERSION_TAG}-${SHORT_HASH}.zip"; for f in hymo-*.zip; do [ -f "$f" ] && [ "$f" != "$T" ] && mv "$f" "$T"; break; done )
         fi
         ;;
     testzip)
