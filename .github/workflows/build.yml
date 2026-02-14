@@ -80,11 +80,13 @@ jobs:
           ls -la module/hymofs_lkm.ko
           echo "HymoFS LKM ready for package."
 
-      - name: Extract Version
+      - name: Set version from git commit count
         run: |
-          VERSION=$(grep "^version=" module/module.prop | cut -d= -f2)
+          VERSION=$(git rev-list --count HEAD)
           echo "MODULE_VERSION=$VERSION" >> $GITHUB_ENV
-          echo "Building version: $VERSION"
+          sed -i "s/^version=.*/version=${VERSION}/" module/module.prop
+          sed -i "s/^versionCode=.*/versionCode=${VERSION}/" module/module.prop
+          echo "Building version: $VERSION (commit count)"
 
       - name: Build Project
         env:
