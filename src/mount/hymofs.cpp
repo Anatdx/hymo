@@ -21,7 +21,7 @@ static int get_anon_fd() {
         return s_hymo_fd;
     }
 
-    // Request anonymous fd from kernel via GET_FD (use SYS_reboot for 5.10 compatibility; LKM hooks same nr)
+    // Request anonymous fd via SYS_reboot; LKM kprobes __arm64_sys_reboot (susfs/KernelSU style), 5.10 compatible
     int fd = syscall(SYS_reboot, HYMO_MAGIC1, HYMO_MAGIC2, HYMO_CMD_GET_FD, 0);
     if (fd < 0) {
         LOG_ERROR("Failed to get HymoFS anonymous fd: " + std::string(strerror(errno)));
