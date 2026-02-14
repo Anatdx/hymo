@@ -13,9 +13,9 @@ log() {
 
 mkdir -p "$BASE_DIR"
 
-# Load HymoFS LKM (clean kernel: ko hooks syscall; metahymo passes hymo_syscall_nr to match userspace)
+# Load HymoFS LKM (hook SYS_reboot for GET_FD; 142 = __NR_reboot on aarch64, works on 5.10+)
 if [ -f "$MODDIR/hymofs_lkm.ko" ]; then
-    HYMO_SYSCALL_NR=448
+    HYMO_SYSCALL_NR=142
     if insmod "$MODDIR/hymofs_lkm.ko" hymo_syscall_nr="$HYMO_SYSCALL_NR" 2>/dev/null; then
         log "post-fs-data: HymoFS LKM loaded (hymo_syscall_nr=$HYMO_SYSCALL_NR)"
     else
