@@ -13,11 +13,14 @@ on:
     branches:
       - main
   workflow_dispatch:
+  # 由 HymoFS 仓库 call 触发：构建完整模块（与 push 时相同）
+  repository_dispatch:
+    types: [build-lkm]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[skip ci]')
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch' || github.event_name == 'pull_request' || (github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip ci]'))
 
     steps:
       - name: Checkout Code
@@ -50,13 +53,15 @@ jobs:
 
       - name: Build HymoFS LKM and pack into module
         env:
-          # HymoFS LKM source (branch lkm); kernel branch for GKI-compatible build
           HYMOFS_REPO: Anatdx/HymoFS
           KERNEL_BRANCH: android15-6.6
+          # repository_dispatch 时用 client_payload.ref，否则用 lkm
+          HYMOFS_REF: ${{ github.event.client_payload.ref || 'lkm' }}
         run: |
           set -euo pipefail
-          echo "Cloning HymoFS (lkm branch)..."
-          git clone --depth 1 -b lkm "https://github.com/${HYMOFS_REPO}.git" hymofs_src
+          echo "Cloning HymoFS (ref: ${HYMOFS_REF})..."
+          git clone --depth 1 "https://github.com/${HYMOFS_REPO}.git" hymofs_src
+          (cd hymofs_src && git fetch --depth 1 origin "${HYMOFS_REF}" && git checkout "${HYMOFS_REF}")
           echo "Cloning kernel tree (${KERNEL_BRANCH})..."
           git clone --depth 1 -b "${KERNEL_BRANCH}" https://android.googlesource.com/kernel/common kernel_src
           sudo apt-get update
@@ -186,6 +191,6 @@ jobs:
         env:
           CHATID: ${{secrets.TELEGRAM_CHAT_ID}}
           MESSAGE_THREAD_ID: ${{secrets.MESSAGE_THREAD_ID}}
-          BOT_TOKEN: ${{secrets.TELEGRAM_BOT_TOKEN}}
+          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           MODULE_VER: ${{ github.ref_name }}
           UPDATE: ${{ github.event.head_commit.message }} 
