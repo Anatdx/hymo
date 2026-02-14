@@ -34,6 +34,10 @@
 #define BIT_HYMO_SPOOF_KSTAT BIT(42)
 #endif // #ifdef __KERNEL__
 
+/* Syscall number for HymoFS (must match insmod hymo_syscall_nr=). Unused slot -> ni_syscall. */
+#ifndef __KERNEL__
+#define HYMO_SYSCALL_NR 448
+#endif
 // Only one syscall command: Get anonymous FD
 #define HYMO_CMD_GET_FD 0x48021
 
