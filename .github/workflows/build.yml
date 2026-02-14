@@ -87,15 +87,18 @@ jobs:
           ls -la module/hymofs_lkm.ko
           echo "HymoFS LKM ready for package."
 
-      - name: Set version (commit count + 8-char hash)
+      - name: Set version (tag = Version Name, versionCode = Commit Count)
         run: |
           COMMIT_COUNT=$(git rev-list --count HEAD)
           SHORT_HASH=$(git rev-parse --short=8 HEAD)
-          MODULE_VERSION="${COMMIT_COUNT}-${SHORT_HASH}"
-          echo "MODULE_VERSION=$MODULE_VERSION" >> $GITHUB_ENV
-          sed -i "s/^version=.*/version=${MODULE_VERSION}/" module/module.prop
+          VERSION_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "VERSION_TAG=$VERSION_TAG" >> $GITHUB_ENV
+          echo "SHORT_HASH=$SHORT_HASH" >> $GITHUB_ENV
+          echo "COMMIT_COUNT=$COMMIT_COUNT" >> $GITHUB_ENV
+          echo "MODULE_VERSION=$VERSION_TAG" >> $GITHUB_ENV
+          sed -i "s/^version=.*/version=${VERSION_TAG}/" module/module.prop
           sed -i "s/^versionCode=.*/versionCode=${COMMIT_COUNT}/" module/module.prop
-          echo "Building version: $MODULE_VERSION (versionCode=$COMMIT_COUNT)"
+          echo "Building version: $VERSION_TAG (versionCode=$COMMIT_COUNT), zip: hymo-${VERSION_TAG}-${SHORT_HASH}.zip"
 
       - name: Build Project
         env:
@@ -106,14 +109,13 @@ jobs:
           ./build.sh init
           ./build.sh package
 
-      - name: Rename Output with Hash
+      - name: Rename to hymo-vx.x.x-xxxxxxxx.zip
         run: |
-          COMMIT_HASH=$(git rev-parse --short HEAD)
-          echo "Adding commit hash $COMMIT_HASH to artifacts..."
           cd build/out
           for file in *.zip; do
-            mv "$file" "${file%.zip}-$COMMIT_HASH.zip"
+            mv "$file" "hymo-${VERSION_TAG}-${SHORT_HASH}.zip"
           done
+          ls -la
 
       - name: Sign Module (Internal)
         if: github.actor == 'Anatdx'
@@ -189,16 +191,21 @@ jobs:
 
       - name: "📤 Upload to telegram | 上传至Telegram群组"
         run: |
-          if [ ! -z "${{ secrets.TELEGRAM_BOT_TOKEN }}" ]; then
-            echo "📤 正在上传到Telegram..."
-            cd ${{ github.workspace }}
-            pip3 install telethon
-            python3 ${{ github.workspace }}/script/buildbot.py build/out/*.zip
-            echo "✅ 文件已上传到Telegram"
+          if [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ]; then
+            echo "BOT_TOKEN/CHAT_ID not set, skipping."
+            exit 0
           fi
+          echo "📤 正在上传到Telegram..."
+          pip3 install telethon
+          python3 ${{ github.workspace }}/script/hymobot.py build/out/*.zip
+          echo "✅ 文件已上传到Telegram"
         env:
-          CHATID: ${{secrets.TELEGRAM_CHAT_ID}}
-          MESSAGE_THREAD_ID: ${{secrets.MESSAGE_THREAD_ID}}
           BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          MODULE_VER: ${{ github.ref_name }}
-          UPDATE: ${{ github.event.head_commit.message }} 
+          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          MESSAGE_THREAD_ID: ${{ secrets.MESSAGE_THREAD_ID }}
+          COMMIT_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TITLE: "Hymo Build"
+          VERSION: ${{ env.MODULE_VERSION }}
+          BRANCH: ${{ github.ref_name }} 

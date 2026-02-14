@@ -208,17 +208,25 @@ jobs:
 
       - name: "📤 Upload to telegram | 上传至Telegram群组"
         run: |
-          if [ ! -z "${{ secrets.TELEGRAM_BOT_TOKEN }}" ]; then
-            echo "📤 正在上传到Telegram..."
-            cd ${{ github.workspace }}
-            pip3 install telethon
-            python3 ${{ github.workspace }}/script/buildbot.py ./build/out/*.zip
-            echo "✅ 文件已上传到Telegram"
+          if [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ]; then
+            echo "BOT_TOKEN/CHAT_ID not set, skipping."
+            exit 0
           fi
+          if [ -f changelog.md ]; then
+            export COMMIT_MESSAGE=$(head -c 2000 changelog.md)
+          else
+            export COMMIT_MESSAGE="Release ${{ github.ref_name }}"
+          fi
+          echo "📤 正在上传到Telegram..."
+          pip3 install telethon
+          python3 ${{ github.workspace }}/script/hymobot.py ./build/out/*.zip
+          echo "✅ 文件已上传到Telegram"
         env:
-          CHATID: ${{secrets.TELEGRAM_CHAT_ID}}
-          MESSAGE_THREAD_ID: ${{secrets.MESSAGE_THREAD_ID}}
-          BOT_TOKEN: ${{secrets.TELEGRAM_BOT_TOKEN}}
-          MODULE_VER: ${{ github.ref_name }}
-          UPDATE: |
-            $(cat /tmp/changelog.md | sed '1d' | sed '/^$/d') 
+          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          MESSAGE_THREAD_ID: ${{ secrets.MESSAGE_THREAD_ID }}
+          COMMIT_URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ github.ref_name }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TITLE: "Hymo Release"
+          VERSION: ${{ github.ref_name }}
+          BRANCH: release 

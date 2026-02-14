@@ -292,19 +292,22 @@ case $COMMAND in
         if [ -d "${PROJECT_ROOT}/.git" ]; then
             COMMIT_COUNT=$(git -C "${PROJECT_ROOT}" rev-list --count HEAD 2>/dev/null || echo "0")
             SHORT_HASH=$(git -C "${PROJECT_ROOT}" rev-parse --short=8 HEAD 2>/dev/null || echo "unknown")
-            MODULE_VERSION="${COMMIT_COUNT}-${SHORT_HASH}"
+            VERSION_TAG=$(git -C "${PROJECT_ROOT}" describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
             PROP="${PROJECT_ROOT}/module/module.prop"
             if [ "$OS_TYPE" = "macos" ]; then
-                sed -i '' "s/^version=.*/version=${MODULE_VERSION}/" "$PROP"
+                sed -i '' "s/^version=.*/version=${VERSION_TAG}/" "$PROP"
                 sed -i '' "s/^versionCode=.*/versionCode=${COMMIT_COUNT}/" "$PROP"
             else
-                sed -i "s/^version=.*/version=${MODULE_VERSION}/" "$PROP"
+                sed -i "s/^version=.*/version=${VERSION_TAG}/" "$PROP"
                 sed -i "s/^versionCode=.*/versionCode=${COMMIT_COUNT}/" "$PROP"
             fi
-            print_info "Module version: ${MODULE_VERSION}"
+            print_info "Module version: ${VERSION_TAG} (versionCode=${COMMIT_COUNT})"
         fi
         print_info "Packaging..."
         cmake --build "${BUILD_DIR}/arm64-v8a" --target package
+        if [ -d "${PROJECT_ROOT}/.git" ] && [ -n "${VERSION_TAG}" ] && [ -n "${SHORT_HASH}" ]; then
+            ( cd "${OUT_DIR}" && for f in hymo-*.zip; do [ -f "$f" ] && mv "$f" "hymo-${VERSION_TAG}-${SHORT_HASH}.zip" && break; done )
+        fi
         ;;
     testzip)
         build_webui
