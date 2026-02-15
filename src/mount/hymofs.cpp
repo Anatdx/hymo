@@ -4,8 +4,10 @@
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <unistd.h>
+#include <chrono>
 #include <cerrno>
 #include <cstring>
+#include <thread>
 #include "../utils.hpp"
 #include "hymo_magic.h"
 
@@ -21,9 +23,14 @@ static int get_anon_fd() {
         return s_hymo_fd;
     }
 
-    // Request anonymous fd via SYS_reboot; LKM writes fd via put_user to 4th arg (KernelSU style)
+    // Request anonymous fd via SYS_reboot; LKM writes fd via put_user. Retry once if first attempt fails (seccomp/context).
     int fd = -1;
-    syscall(SYS_reboot, HYMO_MAGIC1, HYMO_MAGIC2, HYMO_CMD_GET_FD, &fd);
+    for (int attempt = 0; attempt < 2 && fd < 0; ++attempt) {
+        if (attempt > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(80));
+        }
+        syscall(SYS_reboot, HYMO_MAGIC1, HYMO_MAGIC2, HYMO_CMD_GET_FD, &fd);
+    }
     if (fd < 0) {
         LOG_ERROR("Failed to get HymoFS anonymous fd (fd=" + std::to_string(fd) + ")");
         return -1;
