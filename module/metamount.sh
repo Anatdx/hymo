@@ -60,7 +60,13 @@ if [ ! -f "$MODDIR/hymod" ]; then
 fi
 chmod 755 "$MODDIR/hymod"
 
-# LKM is loaded in post-fs-data.sh; hymod will retry get_anon_fd if it runs before LKM is ready.
+# Ensure LKM is loaded before hymod (metamount may run before post-fs-data on some setups)
+if [ -f "$MODDIR/hymofs_lkm.ko" ]; then
+    HYMO_SYSCALL_NR=142
+    if insmod "$MODDIR/hymofs_lkm.ko" hymo_syscall_nr="$HYMO_SYSCALL_NR" 2>/dev/null; then
+        log "metamount: HymoFS LKM loaded (hymo_syscall_nr=$HYMO_SYSCALL_NR)"
+    fi
+fi
 
 log "metamount: running hymod mount"
 "$MODDIR/hymod" mount >> "$LOG_FILE" 2>&1
