@@ -18,7 +18,7 @@ if [ -f "$MODDIR/hymofs_lkm.ko" ]; then
     HYMO_SYSCALL_NR=142
     if insmod "$MODDIR/hymofs_lkm.ko" hymo_syscall_nr="$HYMO_SYSCALL_NR" 2>/dev/null; then
         log "post-fs-data: HymoFS LKM loaded (hymo_syscall_nr=$HYMO_SYSCALL_NR)"
-        sleep 1.5
+        sleep 3
     else
         log "post-fs-data: HymoFS LKM insmod failed (may already be loaded or kernel mismatch)"
     fi
