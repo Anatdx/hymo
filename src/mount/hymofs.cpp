@@ -61,7 +61,11 @@ static int hymo_execute_cmd(unsigned int ioctl_cmd, void* arg) {
 
     int ret = ioctl(fd, ioctl_cmd, arg);
     if (ret < 0) {
-        LOG_ERROR("HymoFS ioctl failed: " + std::string(strerror(errno)));
+        if (errno == EOPNOTSUPP) {
+            LOG_VERBOSE("HymoFS ioctl not supported: " + std::string(strerror(errno)));
+        } else {
+            LOG_ERROR("HymoFS ioctl failed: " + std::string(strerror(errno)));
+        }
     }
     return ret;
 }
@@ -325,7 +329,11 @@ bool HymoFS::set_uname(const std::string& release, const std::string& version) {
     LOG_INFO("HymoFS: Setting uname: release=\"" + release + "\", version=\"" + version + "\"");
     bool ret = hymo_execute_cmd(HYMO_IOC_SET_UNAME, &uname_data) == 0;
     if (!ret) {
-        LOG_ERROR("HymoFS: set_uname failed: " + std::string(strerror(errno)));
+        if (errno == EOPNOTSUPP) {
+            LOG_VERBOSE("HymoFS: uname spoofing not supported by kernel (LKM build)");
+        } else {
+            LOG_ERROR("HymoFS: set_uname failed: " + std::string(strerror(errno)));
+        }
     } else {
         LOG_INFO("HymoFS: set_uname success");
     }
@@ -336,7 +344,11 @@ bool HymoFS::fix_mounts() {
     LOG_INFO("HymoFS: Fixing mounts (reorder mnt_id)...");
     bool ret = hymo_execute_cmd(HYMO_IOC_REORDER_MNT_ID, nullptr) == 0;
     if (!ret) {
-        LOG_ERROR("HymoFS: fix_mounts failed: " + std::string(strerror(errno)));
+        if (errno == EOPNOTSUPP) {
+            LOG_VERBOSE("HymoFS: fix_mounts not supported by kernel (LKM build)");
+        } else {
+            LOG_ERROR("HymoFS: fix_mounts failed: " + std::string(strerror(errno)));
+        }
     } else {
         LOG_INFO("HymoFS: fix_mounts success");
     }
