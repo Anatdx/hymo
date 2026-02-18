@@ -1,28 +1,24 @@
 #!/system/bin/sh
 
-# LKM subfolder: module/lkm/ contains androidXX-X.XX_hymofs_lkm.ko for each KMI.
-# On install: detect device KMI, keep only matching LKM, clear others to save space.
+# LKM selection at install (like hymod binary selection): pick matching KMI, remove others
 LKM_DIR="$MODPATH/lkm"
 if [ -d "$LKM_DIR" ]; then
-  ui_print "- Detecting kernel version (KMI)..."
-  UNAME=$(uname -r 2>/dev/null || echo "")
-  KMI=""
-  if echo "$UNAME" | grep -qE 'android[0-9]+'; then
-    ANDROID=$(echo "$UNAME" | grep -oE 'android[0-9]+')
-    KVER=$(echo "$UNAME" | grep -oE '^[0-9]+\.[0-9]+')
-    KMI="${ANDROID}-${KVER}"
-  fi
-  if [ -n "$KMI" ] && [ -f "$LKM_DIR/${KMI}_hymofs_lkm.ko" ]; then
-    ui_print "- Keeping LKM for $KMI, removing other versions..."
-    cp "$LKM_DIR/${KMI}_hymofs_lkm.ko" "$MODPATH/hymofs_lkm.ko"
-  else
-    ui_print "- Trying first available LKM (KMI $KMI not found)..."
-    FIRST_KO=$(ls "$LKM_DIR"/*.ko 2>/dev/null | head -n1)
-    if [ -n "$FIRST_KO" ] && [ -f "$FIRST_KO" ]; then
-      cp "$FIRST_KO" "$MODPATH/hymofs_lkm.ko"
+    ui_print "- Detecting kernel KMI..."
+    UNAME=$(uname -r 2>/dev/null || echo "")
+    KMI=""
+    if echo "$UNAME" | grep -qE 'android[0-9]+'; then
+        ANDROID=$(echo "$UNAME" | grep -oE 'android[0-9]+')
+        KVER=$(echo "$UNAME" | grep -oE '^[0-9]+\.[0-9]+')
+        KMI="${ANDROID}-${KVER}"
     fi
-  fi
-  rm -rf "$LKM_DIR"
+    if [ -n "$KMI" ] && [ -f "$LKM_DIR/${KMI}_hymofs_lkm.ko" ]; then
+        cp "$LKM_DIR/${KMI}_hymofs_lkm.ko" "$MODPATH/hymofs_lkm.ko"
+        ui_print "- Selected LKM: ${KMI}_hymofs_lkm.ko"
+        ui_print "- Cleaning unused LKMs..."
+        rm -rf "$LKM_DIR"
+    else
+        ui_print "- No matching LKM for KMI '$KMI' (uname: $UNAME); keeping lkm/ for runtime fallback"
+    fi
 fi
 
 ui_print "- Detecting device architecture..."

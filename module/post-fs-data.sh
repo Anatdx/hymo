@@ -13,7 +13,7 @@ log() {
 
 mkdir -p "$BASE_DIR"
 
-# Load HymoFS LKM (GET_FD via SYS_reboot; LKM also hooks __arm64_sys_reboot for 5.10 compat. hymo_syscall_nr only used for ni_syscall path.)
+# LKM selected at install in customize.sh; just load hymofs_lkm.ko
 if [ -f "$MODDIR/hymofs_lkm.ko" ]; then
     HYMO_SYSCALL_NR=142
     if insmod "$MODDIR/hymofs_lkm.ko" hymo_syscall_nr="$HYMO_SYSCALL_NR" 2>/dev/null; then
