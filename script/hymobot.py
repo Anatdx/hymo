@@ -107,12 +107,7 @@ def save_session(client):
             SESSION_FILE.chmod(0o600)
             print("[+] Session saved to", SESSION_FILE)
         except Exception:
-            pass  # CI has no persistent fs, print below is enough
-        print("")
-        print(">>> Copy TELEGRAM_SESSION_STRING below and add to GitHub repo secrets <<<")
-        print(session_str)
-        print(">>> After adding, delete this secret from logs if needed <<<")
-        print("")
+            pass  # CI has no persistent fs
     except Exception as e:
         print("[!] Could not save session:", e)
 
