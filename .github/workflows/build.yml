@@ -66,11 +66,22 @@ jobs:
           echo "Cloning kernel tree (${KMI})..."
           git clone --depth 1 -b "${KMI}" https://android.googlesource.com/kernel/common kernel_src
           sudo apt-get update
-          sudo apt-get install -y git make clang lld llvm flex bison bc rsync cpio libelf-dev libssl-dev pahole zip
-          make -C kernel_src ARCH=arm64 LLVM=1 LLVM_IAS=1 gki_defconfig 2>/dev/null || \
-            make -C kernel_src ARCH=arm64 LLVM=1 LLVM_IAS=1 defconfig
-          make -C kernel_src ARCH=arm64 LLVM=1 LLVM_IAS=1 modules_prepare
-          make -C kernel_src ARCH=arm64 LLVM=1 LLVM_IAS=1 M="$GITHUB_WORKSPACE/hymofs_src/src" KBUILD_MODPOST_WARN=1 modules
+          sudo apt-get install -y git make clang lld llvm gcc flex bison bc rsync cpio libelf-dev libssl-dev libdw-dev pahole zip
+          # 5.10: ubuntu clang has arm64 "sp" register issues; use GCC
+          if [[ "$KMI" == android12-5.10 ]] || [[ "$KMI" == android13-5.10 ]]; then
+            LLVM_ARGS=""
+          else
+            LLVM_ARGS="LLVM=1 LLVM_IAS=1"
+          fi
+          make -C kernel_src ARCH=arm64 $LLVM_ARGS gki_defconfig 2>/dev/null || \
+            make -C kernel_src ARCH=arm64 $LLVM_ARGS defconfig
+          # 6.12: disable gendwarfksyms to avoid dwarf.h dependency
+          if [[ "$KMI" == *"6.12"* ]] && [ -f kernel_src/scripts/config ]; then
+            kernel_src/scripts/config --file kernel_src/.config -d GENDWARFKSYMS 2>/dev/null || true
+            make -C kernel_src ARCH=arm64 $LLVM_ARGS olddefconfig 2>/dev/null || true
+          fi
+          make -C kernel_src ARCH=arm64 $LLVM_ARGS modules_prepare
+          make -C kernel_src ARCH=arm64 $LLVM_ARGS M="$GITHUB_WORKSPACE/hymofs_src/src" KBUILD_MODPOST_WARN=1 modules
           mkdir -p out
           cp hymofs_src/src/hymofs_lkm.ko "out/${KMI}_hymofs_lkm.ko"
           llvm-strip -d "out/${KMI}_hymofs_lkm.ko" 2>/dev/null || true
