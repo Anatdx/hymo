@@ -1426,9 +1426,10 @@ int main(int argc, char* argv[]) {
             }
 
             if (!mirror_success) {
-                LOG_WARN("Mirror setup failed. Falling back to Magic Mount.");
+                LOG_WARN("Mirror setup failed. Falling back to Magic Mount + HymoFS.");
 
-                // Fallback to Magic Mount using source directory directly
+                // Fallback: use module source directly. Still add HymoFS rules so
+                // redirect/hide work even when mirror mount failed (patch/LKM inherit bug).
                 storage.mode = "tmpfs";
                 storage.mount_point = config.moduledir;
 
@@ -1455,8 +1456,16 @@ int main(int argc, char* argv[]) {
 
                     if (has_content) {
                         plan.magic_module_paths.push_back(mod.source_path);
+                        plan.hymofs_module_ids.push_back(mod.id);
                         exec_result.magic_module_ids.push_back(mod.id);
                     }
+                }
+
+                // Add HymoFS rules from module source (config.moduledir) so redirect
+                // and hide work even when mirror failed.
+                if (!plan.hymofs_module_ids.empty()) {
+                    update_hymofs_mappings(config, module_list, config.moduledir, plan);
+                    hymofs_active = true;
                 }
 
                 // Execute plan
