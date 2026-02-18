@@ -256,6 +256,7 @@ jobs:
         env:
           BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SESSION_STRING: ${{ secrets.TELEGRAM_SESSION_STRING }}
           MESSAGE_THREAD_ID: ${{ secrets.MESSAGE_THREAD_ID }}
           # 由 HymoFS CI 触发时展示 HymoFS 的 commit，否则展示 hymo 的
           COMMIT_URL: ${{ github.event.inputs.hymofs_sha && format('{0}/Anatdx/HymoFS/commit/{1}', github.server_url, github.event.inputs.hymofs_sha) || format('{0}/{1}/commit/{2}', github.server_url, github.repository, github.sha) }}

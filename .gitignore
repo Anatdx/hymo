@@ -27,3 +27,6 @@ compile_commands.json
 /module/webroot/*
 !module/webroot/.gitkeep
 .DS_Store
+
+# Telegram bot session (contains auth, do not commit)
+script/.hymobot_session
