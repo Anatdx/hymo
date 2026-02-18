@@ -13,20 +13,7 @@ on:
     branches:
       - main
   workflow_dispatch:
-    inputs:
-      hymofs_ref:
-        description: 'HymoFS ref to clone (branch/tag/SHA)'
-        required: false
-        default: 'lkm'
-      hymofs_sha:
-        description: 'HymoFS commit SHA (for TG caption when triggered by HymoFS CI)'
-        required: false
-      hymofs_commit_message:
-        description: 'HymoFS commit message (for TG caption)'
-        required: false
-      hymofs_run_id:
-        description: 'HymoFS workflow run ID (to download LKM artifacts)'
-        required: false
+    # 无需 inputs：hymo CI 会自行 clone HymoFS 并读取最新提交信息
   # 由 HymoFS 仓库 call 触发：构建完整模块（与 push 时相同）
   # 注意：repository_dispatch 只有默认分支上的 workflow 会被触发
   repository_dispatch:
@@ -109,6 +96,23 @@ jobs:
 
       - name: Download LKM artifacts
         uses: actions/download-artifact@v4
+
+      - name: Read latest HymoFS commit info
+        env:
+          HYMOFS_REPO: Anatdx/HymoFS
+          HYMOFS_REF: ${{ github.event.inputs.hymofs_ref || github.event.client_payload.ref || 'lkm' }}
+        run: |
+          echo "Fetching HymoFS (ref: ${HYMOFS_REF}) for commit info..."
+          git clone --depth 1 "https://github.com/${HYMOFS_REPO}.git" _hymofs_info
+          (cd _hymofs_info && git fetch --depth 1 origin "${HYMOFS_REF}" && git checkout FETCH_HEAD)
+          HYMOFS_SHA=$(cd _hymofs_info && git rev-parse HEAD)
+          HYMOFS_MSG=$(cd _hymofs_info && git log -1 --format=%B)
+          echo "HYMOFS_SHA=$HYMOFS_SHA" >> $GITHUB_ENV
+          echo "HYMOFS_COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+          echo "$HYMOFS_MSG" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+          rm -rf _hymofs_info
+          echo "HymoFS commit: $HYMOFS_SHA"
 
       - name: Prepare module/lkm folder
         run: |
@@ -258,9 +262,9 @@ jobs:
           CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           SESSION_STRING: ${{ secrets.TELEGRAM_SESSION_STRING }}
           MESSAGE_THREAD_ID: ${{ secrets.MESSAGE_THREAD_ID }}
-          # 由 HymoFS CI 触发时展示 HymoFS 的 commit，否则展示 hymo 的
-          COMMIT_URL: ${{ github.event.inputs.hymofs_sha && format('{0}/Anatdx/HymoFS/commit/{1}', github.server_url, github.event.inputs.hymofs_sha) || format('{0}/{1}/commit/{2}', github.server_url, github.repository, github.sha) }}
-          COMMIT_MESSAGE: ${{ github.event.inputs.hymofs_commit_message || github.event.head_commit.message }}
+          # 展示 HymoFS 最新提交（build 里已读取）；无则展示 hymo 的
+          COMMIT_URL: ${{ env.HYMOFS_SHA && format('{0}/Anatdx/HymoFS/commit/{1}', github.server_url, env.HYMOFS_SHA) || format('{0}/{1}/commit/{2}', github.server_url, github.repository, github.sha) }}
+          COMMIT_MESSAGE: ${{ env.HYMOFS_COMMIT_MESSAGE || github.event.head_commit.message }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           TITLE: "Hymo Build"
           VERSION: ${{ env.MODULE_VERSION }}
