@@ -62,9 +62,16 @@ chmod 755 "$MODDIR/hymod"
 
 # LKM is loaded in post-fs-data.sh; per KernelSU docs metamount runs after all post-fs-data.
 
-log "metamount: running hymod mount"
-"$MODDIR/hymod" mount >> "$LOG_FILE" 2>&1
+# Run hymod mount with timeout to avoid blocking boot if LKM/hymod hang (e.g. reent deadlock)
+# 30s should be enough for normal mount; boot continues even if mount fails
+log "metamount: running hymod mount (timeout 30s)"
+timeout 30 "$MODDIR/hymod" mount >> "$LOG_FILE" 2>&1
 EXIT_CODE=$?
+# timeout returns 124 when timed out
+if [ "$EXIT_CODE" = "124" ]; then
+    log "metamount: hymod mount TIMED OUT (30s), boot continues"
+    EXIT_CODE=1
+fi
 log "metamount: hymod exit $EXIT_CODE"
 
 if [ "$EXIT_CODE" = "0" ]; then
