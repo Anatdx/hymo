@@ -24,13 +24,66 @@ on:
       hymofs_commit_message:
         description: 'HymoFS commit message (for TG caption)'
         required: false
+      hymofs_run_id:
+        description: 'HymoFS workflow run ID (to download LKM artifacts)'
+        required: false
   # 由 HymoFS 仓库 call 触发：构建完整模块（与 push 时相同）
   # 注意：repository_dispatch 只有默认分支上的 workflow 会被触发
   repository_dispatch:
     types: [build-lkm]
 
 jobs:
+  build-lkm:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch' || github.event_name == 'pull_request' || (github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip ci]'))
+    strategy:
+      fail-fast: false
+      matrix:
+        kmi:
+          - android12-5.10
+          - android13-5.10
+          - android13-5.15
+          - android14-5.15
+          - android14-6.1
+          - android15-6.6
+          - android16-6.12
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build HymoFS LKM for ${{ matrix.kmi }}
+        env:
+          HYMOFS_REPO: Anatdx/HymoFS
+          HYMOFS_REF: ${{ github.event.inputs.hymofs_ref || github.event.client_payload.ref || 'lkm' }}
+        run: |
+          set -euo pipefail
+          KMI="${{ matrix.kmi }}"
+          echo "Cloning HymoFS (ref: ${HYMOFS_REF})..."
+          git clone --depth 1 "https://github.com/${HYMOFS_REPO}.git" hymofs_src
+          (cd hymofs_src && git fetch --depth 1 origin "${HYMOFS_REF}" && git checkout FETCH_HEAD)
+          echo "Cloning kernel tree (${KMI})..."
+          git clone --depth 1 -b "${KMI}" https://android.googlesource.com/kernel/common kernel_src
+          sudo apt-get update
+          sudo apt-get install -y git make clang lld llvm flex bison bc rsync cpio libelf-dev libssl-dev pahole zip
+          make -C kernel_src ARCH=arm64 LLVM=1 LLVM_IAS=1 gki_defconfig 2>/dev/null || \
+            make -C kernel_src ARCH=arm64 LLVM=1 LLVM_IAS=1 defconfig
+          make -C kernel_src ARCH=arm64 LLVM=1 LLVM_IAS=1 modules_prepare
+          make -C kernel_src ARCH=arm64 LLVM=1 LLVM_IAS=1 M="$GITHUB_WORKSPACE/hymofs_src/src" KBUILD_MODPOST_WARN=1 modules
+          mkdir -p out
+          cp hymofs_src/src/hymofs_lkm.ko "out/${KMI}_hymofs_lkm.ko"
+          llvm-strip -d "out/${KMI}_hymofs_lkm.ko" 2>/dev/null || true
+          ls -la out/
+
+      - name: Upload LKM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.kmi }}_hymofs_lkm.ko
+          path: out/${{ matrix.kmi }}_hymofs_lkm.ko
+
   build:
+    needs: build-lkm
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch' || github.event_name == 'pull_request' || (github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip ci]'))
 
@@ -40,6 +93,18 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
+
+      - name: Download and merge LKM artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: *_hymofs_lkm.ko
+          merge-multiple: true
+
+      - name: Prepare module/lkm folder
+        run: |
+          mkdir -p module/lkm
+          find . -name "*.ko" -path "*hymofs_lkm*" -exec cp {} module/lkm/ \;
+          ls -la module/lkm/
 
       - name: Setup Android NDK
         uses: nttld/setup-ndk@v1
@@ -63,35 +128,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake ninja-build
-
-      - name: Build HymoFS LKM and pack into module
-        env:
-          HYMOFS_REPO: Anatdx/HymoFS
-          KERNEL_BRANCH: android15-6.6
-          # workflow_dispatch 用 inputs.hymofs_ref，repository_dispatch 用 client_payload.ref，否则 lkm
-          HYMOFS_REF: ${{ github.event.inputs.hymofs_ref || github.event.client_payload.ref || 'lkm' }}
-        run: |
-          set -euo pipefail
-          echo "Cloning HymoFS (ref: ${HYMOFS_REF})..."
-          git clone --depth 1 "https://github.com/${HYMOFS_REPO}.git" hymofs_src
-          (cd hymofs_src && git fetch --depth 1 origin "${HYMOFS_REF}" && git checkout FETCH_HEAD)
-          echo "Cloning kernel tree (${KERNEL_BRANCH})..."
-          git clone --depth 1 -b "${KERNEL_BRANCH}" https://android.googlesource.com/kernel/common kernel_src
-          sudo apt-get update
-          sudo apt-get install -y \
-            git make clang lld llvm \
-            flex bison bc rsync cpio \
-            libelf-dev libssl-dev pahole zip
-          echo "Configuring kernel..."
-          make -C kernel_src ARCH=arm64 LLVM=1 LLVM_IAS=1 gki_defconfig 2>/dev/null || \
-            make -C kernel_src ARCH=arm64 LLVM=1 LLVM_IAS=1 defconfig
-          make -C kernel_src ARCH=arm64 LLVM=1 LLVM_IAS=1 modules_prepare
-          echo "Building hymofs_lkm.ko..."
-          make -C kernel_src ARCH=arm64 LLVM=1 LLVM_IAS=1 M="$GITHUB_WORKSPACE/hymofs_src/src" KBUILD_MODPOST_WARN=1 modules
-          cp "$GITHUB_WORKSPACE/hymofs_src/src/hymofs_lkm.ko" module/
-          llvm-strip -d module/hymofs_lkm.ko 2>/dev/null || true
-          ls -la module/hymofs_lkm.ko
-          echo "HymoFS LKM ready for package."
 
       - name: Set version (tag = Version Name, versionCode = Commit Count)
         run: |
