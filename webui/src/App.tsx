@@ -241,15 +241,15 @@ function App() {
 
                 <div className="space-y-4 mb-6">
                 <div className="p-4 bg-red-900/20 rounded-lg border border-red-500/30">
-                    <p className="text-white font-semibold mb-2">警告：</p>
-                    <p className="text-gray-200">
+                    <p className="text-gray-700 dark:text-gray-200 font-semibold mb-2">警告：</p>
+                    <p className="text-gray-700 dark:text-gray-200">
                     HymoFS 是一个实验性项目。它可能会导致手机性能下降，并且可能存在潜在的稳定性问题。
                     </p>
                 </div>
 
                 <div className="p-4 bg-red-900/20 rounded-lg border border-red-500/30">
-                    <p className="text-white font-semibold mb-2">Warning:</p>
-                    <p className="text-gray-200">
+                    <p className="text-gray-700 dark:text-gray-200 font-semibold mb-2">Warning:</p>
+                    <p className="text-gray-700 dark:text-gray-200">
                     HymoFS is an experimental project. It may cause performance degradation and potential stability issues.
                     </p>
                 </div>
