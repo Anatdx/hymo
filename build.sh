@@ -290,24 +290,36 @@ case $COMMAND in
         build_arch "x86_64"
         ;;
     package)
-        build_webui
-        if [ -z "${HYMOD_FROM_ARTIFACTS:-}" ]; then
+        if [ -n "${HYMOD_FROM_ARTIFACTS:-}" ]; then
+            # ========== CI path: artifacts from matrix build, pure shell packaging ==========
+            build_webui
+            print_info "Using hymod binaries from CI artifacts (matrix parallel build)"
+
+            mkdir -p "${OUT_DIR}"
+            for arch in arm64-v8a armeabi-v7a x86_64; do
+                bin="hymod-${arch}"
+                if [ -f "${OUT_DIR}/${bin}" ]; then
+                    :
+                elif [ -f "hymod-${arch}/build/out/${bin}" ]; then
+                    cp -f "hymod-${arch}/build/out/${bin}" "${OUT_DIR}/"
+                elif [ -f "build/out/${bin}" ]; then
+                    cp -f "build/out/${bin}" "${OUT_DIR}/"
+                fi
+            done
+            count=$(ls "${OUT_DIR}"/hymod-* 2>/dev/null | wc -l)
+            if [ "${count:-0}" -lt 3 ]; then
+                print_error "Expected 3 hymod binaries in build/out, found ${count:-0}"
+                ls -la "${OUT_DIR}"/ 2>/dev/null || true
+                exit 1
+            fi
+            print_success "Found all hymod binaries"
+            ls -la "${OUT_DIR}"/hymod-*
+        else
+            # ========== Local path: build all arch ==========
+            build_webui
             build_arch "arm64-v8a"
             build_arch "armeabi-v7a"
             build_arch "x86_64"
-        else
-            print_info "Using hymod binaries from CI artifacts (matrix parallel build)"
-            mkdir -p "${OUT_DIR}"
-            ls -la "${OUT_DIR}"/hymod-* 2>/dev/null || true
-            # Config arm64-v8a so package target can run (it needs a build dir)
-            print_info "Configuring build/arm64-v8a for package target..."
-            cmake -B "${BUILD_DIR}/arm64-v8a" \
-                -G Ninja \
-                -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK}/build/cmake/android.toolchain.cmake" \
-                -DANDROID_ABI=arm64-v8a \
-                -DANDROID_PLATFORM=android-30 \
-                -DBUILD_WEBUI=OFF \
-                "${PROJECT_ROOT}"
         fi
         if [ -d "${PROJECT_ROOT}/.git" ]; then
             COMMIT_COUNT=$(git -C "${PROJECT_ROOT}" rev-list --count HEAD 2>/dev/null || echo "0")
@@ -323,9 +335,24 @@ case $COMMAND in
             fi
             print_info "Module version: ${VERSION_TAG} (versionCode=${COMMIT_COUNT})"
         fi
-        print_info "Packaging..."
-        cmake --build "${BUILD_DIR}/arm64-v8a" --target package
-        if [ -d "${PROJECT_ROOT}/.git" ] && [ -n "${VERSION_TAG}" ] && [ -n "${SHORT_HASH}" ]; then
+
+        if [ -n "${HYMOD_FROM_ARTIFACTS:-}" ]; then
+            print_info "Packaging (shell)..."
+            PKG_TEMP="${BUILD_DIR}/pkg_temp"
+            rm -rf "${PKG_TEMP}"
+            cp -r "${PROJECT_ROOT}/module" "${PKG_TEMP}"
+            cp "${OUT_DIR}"/hymod-* "${PKG_TEMP}/"
+            chmod 755 "${PKG_TEMP}"/hymod-*
+            MODULE_ID=$(grep '^id=' "${PROJECT_ROOT}/module/module.prop" | cut -d= -f2)
+            MODULE_VERSION=$(grep '^version=' "${PROJECT_ROOT}/module/module.prop" | cut -d= -f2)
+            ( cd "${PKG_TEMP}" && zip -q -r "${OUT_DIR}/${MODULE_ID}-${MODULE_VERSION}.zip" . )
+            print_success "Package: ${OUT_DIR}/${MODULE_ID}-${MODULE_VERSION}.zip"
+        else
+            print_info "Packaging (cmake)..."
+            cmake --build "${BUILD_DIR}/arm64-v8a" --target package
+        fi
+
+        if [ -d "${PROJECT_ROOT}/.git" ] && [ -n "${VERSION_TAG:-}" ] && [ -n "${SHORT_HASH:-}" ]; then
             ( cd "${OUT_DIR}" && T="hymo-${VERSION_TAG}-${SHORT_HASH}.zip"; for f in hymo-*.zip; do [ -f "$f" ] && [ "$f" != "$T" ] && mv "$f" "$T"; break; done )
         fi
         ;;
