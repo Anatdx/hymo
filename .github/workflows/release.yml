@@ -212,11 +212,19 @@ jobs:
       - name: Update Module Version (Release)
         run: |
           TAG_NAME="${{ github.ref_name }}"
-          RUN_NUMBER="${{ github.run_number }}"
+          COMMIT_COUNT=$(git rev-list --count HEAD)
           sed -i "s/^version=.*/version=$TAG_NAME/" module/module.prop
-          sed -i "s/^versionCode=.*/versionCode=$RUN_NUMBER/" module/module.prop
+          sed -i "s/^versionCode=.*/versionCode=$COMMIT_COUNT/" module/module.prop
+          python3 -c "
+          import json
+          with open('update.json', 'r') as f: d = json.load(f)
+          d['versionCode'] = int('${COMMIT_COUNT}')
+          d['version'] = '${TAG_NAME}'
+          with open('update.json', 'w') as f: json.dump(d, f, indent=2)
+          "
           echo "VERSION_TAG=$TAG_NAME" >> $GITHUB_ENV
           echo "SHORT_HASH=$(git rev-parse --short=8 HEAD)" >> $GITHUB_ENV
+          echo "COMMIT_COUNT=$COMMIT_COUNT" >> $GITHUB_ENV
           echo "MODULE_VERSION=$TAG_NAME" >> $GITHUB_ENV
           cat module/module.prop
 
@@ -238,25 +246,6 @@ jobs:
             break
           done
           ls -la
-
-      - name: Sign Module (Internal)
-        env:
-          MODULE_PRIVATE_KEY: ${{ secrets.MODULE_PRIVATE_KEY }}
-        run: |
-          if [ -z "$MODULE_PRIVATE_KEY" ]; then
-            echo "⚠️ No MODULE_PRIVATE_KEY secret found. Skipping internal signing."
-          else
-            echo "🔐 Found private key, performing internal signing..."
-            pip3 install cryptography
-            echo "$MODULE_PRIVATE_KEY" > private.pem
-            openssl req -new -x509 -key private.pem -out certificate.pem -days 10000 \
-              -subj "/C=CN/ST=Hymo/L=Hymo/O=Hymo/OU=Hymo/CN=Hymo Module"
-            ZIP_FILE=$(ls build/out/*.zip | head -n 1)
-            python3 script/sign_zip.py "$ZIP_FILE" "build/out/signed.zip" private.pem certificate.pem
-            mv "build/out/signed.zip" "$ZIP_FILE"
-            rm private.pem certificate.pem
-            echo "✅ Internal signing complete."
-          fi
 
       - name: Import GPG key
         uses: crazy-max/ghaction-import-gpg@v6

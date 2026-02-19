@@ -219,6 +219,14 @@ jobs:
           echo "MODULE_VERSION=$VERSION_TAG" >> $GITHUB_ENV
           sed -i "s/^version=.*/version=${VERSION_TAG}/" module/module.prop
           sed -i "s/^versionCode=.*/versionCode=${COMMIT_COUNT}/" module/module.prop
+          python3 -c "
+import json
+with open('update.json', 'r') as f: d = json.load(f)
+d['versionCode'] = int('${COMMIT_COUNT}')
+d['version'] = '${VERSION_TAG}'
+with open('update.json', 'w') as f: json.dump(d, f, indent=2)
+print('update.json updated')
+"
           echo "Building version: $VERSION_TAG (versionCode=$COMMIT_COUNT), zip: hymo-${VERSION_TAG}-${SHORT_HASH}.zip"
 
       - name: Build Project
@@ -240,41 +248,6 @@ jobs:
             break
           done
           ls -la
-
-      - name: Sign Module (Internal)
-        if: github.actor == 'Anatdx'
-        env:
-          MODULE_PRIVATE_KEY: ${{ secrets.MODULE_PRIVATE_KEY }}
-        run: |
-          if [ -z "$MODULE_PRIVATE_KEY" ]; then
-            echo "⚠️ No MODULE_PRIVATE_KEY secret found. Skipping internal signing."
-          else
-            echo "🔐 Found private key, performing internal signing..."
-            
-            # Install dependencies
-            pip3 install cryptography
-            
-            # Write private key
-            echo "$MODULE_PRIVATE_KEY" > private.pem
-            
-            # Generate Certificate (Self-signed) from Private Key
-            openssl req -new -x509 -key private.pem -out certificate.pem -days 10000 \
-              -subj "/C=CN/ST=Hymo/L=Hymo/O=Hymo/OU=Hymo/CN=Hymo Module"
-              
-            # Locate Zip
-            ZIP_FILE=$(ls build/out/*.zip | head -n 1)
-            echo "Signing $ZIP_FILE..."
-            
-            # Run signing script
-            python3 script/sign_zip.py "$ZIP_FILE" "build/out/signed.zip" private.pem certificate.pem
-            
-            # Replace original with signed
-            mv "build/out/signed.zip" "$ZIP_FILE"
-            
-            # Cleanup
-            rm private.pem certificate.pem
-            echo "✅ Internal signing complete."
-          fi
 
       # 手动导入 GPG，避免 crazy-max/ghaction-import-gpg 的 keygrip preset 在 runner 上报 Not implemented
       - name: Import GPG key
