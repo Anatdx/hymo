@@ -132,7 +132,11 @@ build_arch() {
     local ARCH=$1
     local EXTRA_ARGS=$2
     local BUILD_SUBDIR="${BUILD_DIR}/${ARCH}"
-    
+    local UPX_ARG=""
+    if command -v upx &>/dev/null && [ -z "${NO_UPX:-}" ]; then
+        UPX_ARG="-DHYMOD_UPX=ON"
+    fi
+
     print_info "Building for ${ARCH}..."
     
     mkdir -p "${BUILD_SUBDIR}"
@@ -145,6 +149,7 @@ build_arch() {
         -DANDROID_ABI="${ARCH}" \
         -DANDROID_PLATFORM=android-30 \
         -DBUILD_WEBUI=OFF \
+        ${UPX_ARG} \
         ${EXTRA_ARGS} \
         "${PROJECT_ROOT}"
     
@@ -294,6 +299,15 @@ case $COMMAND in
             print_info "Using hymod binaries from CI artifacts (matrix parallel build)"
             mkdir -p "${OUT_DIR}"
             ls -la "${OUT_DIR}"/hymod-* 2>/dev/null || true
+            # Config arm64-v8a so package target can run (it needs a build dir)
+            print_info "Configuring build/arm64-v8a for package target..."
+            cmake -B "${BUILD_DIR}/arm64-v8a" \
+                -G Ninja \
+                -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK}/build/cmake/android.toolchain.cmake" \
+                -DANDROID_ABI=arm64-v8a \
+                -DANDROID_PLATFORM=android-30 \
+                -DBUILD_WEBUI=OFF \
+                "${PROJECT_ROOT}"
         fi
         if [ -d "${PROJECT_ROOT}/.git" ]; then
             COMMIT_COUNT=$(git -C "${PROJECT_ROOT}" rev-list --count HEAD 2>/dev/null || echo "0")

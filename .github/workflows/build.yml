@@ -104,10 +104,10 @@ jobs:
           ndk-version: r25c
         id: setup-ndk
 
-      - name: Setup CMake and Ninja
+      - name: Setup CMake, Ninja and UPX
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build
+          sudo apt-get install -y cmake ninja-build upx-ucl
 
       - name: Build hymod for ${{ matrix.arch }}
         env:
@@ -121,6 +121,7 @@ jobs:
             -DANDROID_ABI="${{ matrix.arch }}" \
             -DANDROID_PLATFORM=android-30 \
             -DBUILD_WEBUI=OFF \
+            -DHYMOD_UPX=ON \
             .
           cmake --build "build/${{ matrix.arch }}"
           cp "build/${{ matrix.arch }}/hymod-${{ matrix.arch }}" "build/out/"
