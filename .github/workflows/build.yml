@@ -293,7 +293,7 @@ jobs:
           cd build/out
           ZIP_FILE=$(ls *.zip | head -n 1)
           echo "Signing $ZIP_FILE..."
-          gpg --detach-sign --local-user an@anatdx.com --batch --yes --pinentry-mode loopback \
+          gpg --detach-sign --local-user 0x942F2C75D1DC540F --batch --yes --pinentry-mode loopback \
             --passphrase "$GPG_PASSPHRASE" \
             --output "$ZIP_FILE.asc" "$ZIP_FILE"
           if [ -f "$ZIP_FILE.asc" ]; then
@@ -304,13 +304,42 @@ jobs:
             exit 1
           fi
 
+      - name: Sign all LKM .ko files with GPG
+        if: github.actor == 'Anatdx'
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          for ko in module/lkm/*.ko; do
+            [ -f "$ko" ] || continue
+            name=$(basename "$ko")
+            echo "Signing $name..."
+            gpg --detach-sign --local-user 0x942F2C75D1DC540F --batch --yes --pinentry-mode loopback \
+              --passphrase "$GPG_PASSPHRASE" \
+              --output "build/out/${name}.asc" "$ko"
+          done
+          ls -la build/out/*.ko.asc 2>/dev/null || echo "No .ko.asc files"
+
+      - name: Sign all hymod binaries with GPG
+        if: github.actor == 'Anatdx'
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          for bin in build/out/hymod-arm64-v8a build/out/hymod-armeabi-v7a build/out/hymod-x86_64; do
+            [ -f "$bin" ] || continue
+            echo "Signing $(basename $bin)..."
+            gpg --detach-sign --local-user 0x942F2C75D1DC540F --batch --yes --pinentry-mode loopback \
+              --passphrase "$GPG_PASSPHRASE" \
+              --output "${bin}.asc" "$bin"
+          done
+          ls -la build/out/hymod-*.asc 2>/dev/null || echo "No hymod.asc files"
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Hymo-${{ env.MODULE_VERSION }}
           path: |
             build/out/*.zip
-            build/out/*.zip.asc
+            build/out/*.asc
           if-no-files-found: error
 
       - name: "📤 Upload to telegram | 上传至Telegram群组"
@@ -321,7 +350,10 @@ jobs:
           fi
           echo "📤 正在上传到Telegram..."
           pip3 install telethon
-          python3 ${{ github.workspace }}/script/hymobot.py build/out/*.zip
+          ZIP=$(ls build/out/*.zip 2>/dev/null | head -1)
+          FILES="$ZIP"
+          [ -f "${ZIP}.asc" ] && FILES="$FILES ${ZIP}.asc"
+          python3 ${{ github.workspace }}/script/hymobot.py $FILES
           echo "✅ 文件已上传到Telegram"
         env:
           BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}

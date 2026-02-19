@@ -270,11 +270,32 @@ jobs:
         run: |
           cd build/out
           ZIP_FILE=$(ls *.zip | head -n 1)
-          gpg --detach-sign --local-user an@anatdx.com --batch --yes --pinentry-mode loopback \
+          gpg --detach-sign --local-user 0x942F2C75D1DC540F --batch --yes --pinentry-mode loopback \
             --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
             --output "$ZIP_FILE.asc" "$ZIP_FILE"
           [ -f "$ZIP_FILE.asc" ] || exit 1
           ls -lh "$ZIP_FILE.asc"
+
+      - name: Sign all LKM .ko files with GPG
+        run: |
+          for ko in module/lkm/*.ko; do
+            [ -f "$ko" ] || continue
+            name=$(basename "$ko")
+            echo "Signing $name..."
+            gpg --detach-sign --local-user 0x942F2C75D1DC540F --batch --yes --pinentry-mode loopback \
+              --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
+              --output "build/out/${name}.asc" "$ko"
+          done
+
+      - name: Sign all hymod binaries with GPG
+        run: |
+          for bin in build/out/hymod-arm64-v8a build/out/hymod-armeabi-v7a build/out/hymod-x86_64; do
+            [ -f "$bin" ] || continue
+            echo "Signing $(basename $bin)..."
+            gpg --detach-sign --local-user 0x942F2C75D1DC540F --batch --yes --pinentry-mode loopback \
+              --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
+              --output "${bin}.asc" "$bin"
+          done
 
       - name: Generate Update Files
         id: meta
@@ -314,7 +335,7 @@ jobs:
           prerelease: false
           files: |
             build/out/*.zip
-            build/out/*.zip.asc
+            build/out/*.asc
           body_path: /tmp/changelog.md
 
       - name: Push Update Info to Main
@@ -343,7 +364,7 @@ jobs:
           fi
           [ -f changelog.md ] && export COMMIT_MESSAGE=$(head -c 2000 changelog.md) || export COMMIT_MESSAGE="Release ${{ github.ref_name }}"
           pip3 install telethon
-          python3 ${{ github.workspace }}/script/hymobot.py ./build/out/*.zip
+          python3 ${{ github.workspace }}/script/hymobot.py ./build/out/*.zip ./build/out/*.zip.asc
           echo "✅ 文件已上传到Telegram"
         env:
           BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
