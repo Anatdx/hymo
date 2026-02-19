@@ -6,17 +6,185 @@ on:
       - "v*.*.*"
 
 jobs:
-  release:
+  # 与 build.yml 同步：全部 KMI + 三架构 ko (arm64/arm/x86_64)
+  build-lkm:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            kmi: android12-5.10
+          - arch: arm64
+            kmi: android13-5.10
+          - arch: arm64
+            kmi: android13-5.15
+          - arch: arm64
+            kmi: android14-5.15
+          - arch: arm64
+            kmi: android14-6.1
+          - arch: arm64
+            kmi: android15-6.6
+          - arch: arm64
+            kmi: android16-6.12
+          - arch: arm
+            kmi: android14-5.15
+          - arch: arm
+            kmi: android13-5.15
+          - arch: x86_64
+            kmi: android14-5.15
+          - arch: x86_64
+            kmi: android13-5.15
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
+      - name: Build HymoFS LKM for ${{ matrix.arch }}/${{ matrix.kmi }}
+        env:
+          HYMOFS_REPO: Anatdx/HymoFS
+          HYMOFS_REF: lkm
+        run: |
+          set -euo pipefail
+          ARCH="${{ matrix.arch }}"
+          KMI="${{ matrix.kmi }}"
+          echo "Cloning HymoFS (ref: ${HYMOFS_REF})..."
+          git clone --depth 1 "https://github.com/${HYMOFS_REPO}.git" hymofs_src
+          (cd hymofs_src && git fetch --depth 1 origin "${HYMOFS_REF}" && git checkout FETCH_HEAD)
+          echo "Cloning kernel tree (${KMI})..."
+          git clone --depth 1 -b "${KMI}" https://android.googlesource.com/kernel/common kernel_src
+          sudo apt-get update
+          sudo apt-get install -y git make clang lld llvm gcc gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi flex bison bc rsync cpio libelf-dev libssl-dev libdw-dev pahole zip
+
+          if [[ "$ARCH" == "arm64" ]]; then
+            if [[ "$KMI" == android12-5.10 ]] || [[ "$KMI" == android13-5.10 ]]; then
+              LLVM_ARGS=""
+              CROSS_ARGS="CROSS_COMPILE=aarch64-linux-gnu-"
+            else
+              LLVM_ARGS="LLVM=1 LLVM_IAS=1"
+              CROSS_ARGS=""
+            fi
+            make -C kernel_src ARCH=arm64 $CROSS_ARGS $LLVM_ARGS gki_defconfig 2>/dev/null || \
+              make -C kernel_src ARCH=arm64 $CROSS_ARGS $LLVM_ARGS defconfig
+            if [[ "$KMI" == *"6.12"* ]] && [ -f kernel_src/scripts/config ]; then
+              kernel_src/scripts/config --file kernel_src/.config -d GENDWARFKSYMS 2>/dev/null || true
+              make -C kernel_src ARCH=arm64 $CROSS_ARGS $LLVM_ARGS olddefconfig 2>/dev/null || true
+            fi
+            make -C kernel_src ARCH=arm64 $CROSS_ARGS $LLVM_ARGS modules_prepare
+            make -C kernel_src ARCH=arm64 $CROSS_ARGS $LLVM_ARGS M="$GITHUB_WORKSPACE/hymofs_src/src" KBUILD_MODPOST_WARN=1 modules
+            cp hymofs_src/src/hymofs_lkm.ko "hymofs_lkm.ko"
+          elif [[ "$ARCH" == "arm" ]]; then
+            make -C kernel_src ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- multi_v7_defconfig 2>/dev/null || \
+              make -C kernel_src ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- defconfig
+            make -C kernel_src ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- modules_prepare
+            make -C kernel_src ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- M="$GITHUB_WORKSPACE/hymofs_src/src" KBUILD_MODPOST_WARN=1 modules
+            cp hymofs_src/src/hymofs_lkm.ko "hymofs_lkm.ko"
+          else
+            make -C kernel_src ARCH=x86_64 defconfig 2>/dev/null || true
+            make -C kernel_src ARCH=x86_64 modules_prepare
+            make -C kernel_src ARCH=x86_64 M="$GITHUB_WORKSPACE/hymofs_src/src" KBUILD_MODPOST_WARN=1 modules
+            cp hymofs_src/src/hymofs_lkm.ko "hymofs_lkm.ko"
+          fi
+
+          mkdir -p out
+          cp hymofs_lkm.ko "out/${ARCH}_${KMI}_hymofs_lkm.ko"
+          llvm-strip -d "out/${ARCH}_${KMI}_hymofs_lkm.ko" 2>/dev/null || true
+          ls -la out/
+
+      - name: Upload LKM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.arch }}_${{ matrix.kmi }}_hymofs_lkm.ko
+          path: out/${{ matrix.arch }}_${{ matrix.kmi }}_hymofs_lkm.ko
+
+  build-hymod:
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - arm64-v8a
+          - armeabi-v7a
+          - x86_64
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r25c
+        id: setup-ndk
+
+      - name: Setup CMake, Ninja and UPX
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build upx-ucl
+
+      - name: Build hymod for ${{ matrix.arch }}
+        env:
+          ANDROID_NDK: ${{ steps.setup-ndk.outputs.ndk-path }}
+          NDK_PATH: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: |
+          mkdir -p build/out
+          cmake -B "build/${{ matrix.arch }}" \
+            -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK}/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI="${{ matrix.arch }}" \
+            -DANDROID_PLATFORM=android-30 \
+            -DBUILD_WEBUI=OFF \
+            -DHYMOD_UPX=ON \
+            .
+          cmake --build "build/${{ matrix.arch }}"
+          cp "build/${{ matrix.arch }}/hymod-${{ matrix.arch }}" "build/out/"
+          ls -la build/out/
+
+      - name: Upload hymod artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hymod-${{ matrix.arch }}
+          path: build/out/hymod-${{ matrix.arch }}
+
+  build:
+    needs: [build-lkm, build-hymod]
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
+
+      - name: Download LKM and hymod artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Read latest HymoFS commit info
+        env:
+          HYMOFS_REPO: Anatdx/HymoFS
+          HYMOFS_REF: lkm
+        run: |
+          git clone --depth 1 "https://github.com/${HYMOFS_REPO}.git" _hymofs_info
+          (cd _hymofs_info && git fetch --depth 1 origin "${HYMOFS_REF}" && git checkout FETCH_HEAD)
+          HYMOFS_SHA=$(cd _hymofs_info && git rev-parse HEAD)
+          echo "HYMOFS_SHA=$HYMOFS_SHA" >> $GITHUB_ENV
+          rm -rf _hymofs_info
+
+      - name: Prepare module/lkm folder
+        run: |
+          mkdir -p module/lkm
+          find . -name "*.ko" -path "*hymofs_lkm*" -exec cp {} module/lkm/ \;
+          ls -la module/lkm/
+
+      - name: Merge hymod artifacts into build/out
+        run: |
+          mkdir -p build/out
+          for d in hymod-arm64-v8a hymod-armeabi-v7a hymod-x86_64; do
+            [ -f "$d/build/out/$d" ] && cp -f "$d/build/out/$d" build/out/
+          done
+          ls -la build/out/
 
       - name: Setup Android NDK
         uses: nttld/setup-ndk@v1
@@ -36,33 +204,40 @@ jobs:
           cd webui
           npm install
 
-      - name: Update Module Version
-        run: |
-          PROP_FILE="module/module.prop"
-          TAG_NAME="${{ github.ref_name }}"
-          RUN_NUMBER="${{ github.run_number }}"
-          
-          echo "Updating module.prop info..."
-          echo "  Version -> $TAG_NAME"
-          echo "  VersionCode -> $RUN_NUMBER"
-          
-          sed -i "s/^version=.*/version=$TAG_NAME/" "$PROP_FILE"
-          sed -i "s/^versionCode=.*/versionCode=$RUN_NUMBER/" "$PROP_FILE"
-          
-          cat "$PROP_FILE"
-
       - name: Setup CMake and Ninja
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake ninja-build
 
+      - name: Update Module Version (Release)
+        run: |
+          TAG_NAME="${{ github.ref_name }}"
+          RUN_NUMBER="${{ github.run_number }}"
+          sed -i "s/^version=.*/version=$TAG_NAME/" module/module.prop
+          sed -i "s/^versionCode=.*/versionCode=$RUN_NUMBER/" module/module.prop
+          echo "VERSION_TAG=$TAG_NAME" >> $GITHUB_ENV
+          echo "SHORT_HASH=$(git rev-parse --short=8 HEAD)" >> $GITHUB_ENV
+          echo "MODULE_VERSION=$TAG_NAME" >> $GITHUB_ENV
+          cat module/module.prop
+
       - name: Build Project
         env:
           ANDROID_NDK: ${{ steps.setup-ndk.outputs.ndk-path }}
+          NDK_PATH: ${{ steps.setup-ndk.outputs.ndk-path }}
+          HYMOD_FROM_ARTIFACTS: "1"
         run: |
-          echo "Building with CMake + Ninja..."
           ./build.sh init
           ./build.sh package
+
+      - name: Rename to hymo-vx.x.x-xxxxxxxx.zip
+        run: |
+          cd build/out
+          TARGET="hymo-${VERSION_TAG}-${SHORT_HASH}.zip"
+          for file in *.zip; do
+            [ -f "$file" ] && [ "$file" != "$TARGET" ] && mv "$file" "$TARGET"
+            break
+          done
+          ls -la
 
       - name: Sign Module (Internal)
         env:
@@ -72,28 +247,13 @@ jobs:
             echo "⚠️ No MODULE_PRIVATE_KEY secret found. Skipping internal signing."
           else
             echo "🔐 Found private key, performing internal signing..."
-            
-            # Install dependencies
             pip3 install cryptography
-            
-            # Write private key
             echo "$MODULE_PRIVATE_KEY" > private.pem
-            
-            # Generate Certificate (Self-signed) from Private Key
             openssl req -new -x509 -key private.pem -out certificate.pem -days 10000 \
               -subj "/C=CN/ST=Hymo/L=Hymo/O=Hymo/OU=Hymo/CN=Hymo Module"
-              
-            # Locate Zip
             ZIP_FILE=$(ls build/out/*.zip | head -n 1)
-            echo "Signing $ZIP_FILE..."
-            
-            # Run signing script
             python3 script/sign_zip.py "$ZIP_FILE" "build/out/signed.zip" private.pem certificate.pem
-            
-            # Replace original with signed
             mv "build/out/signed.zip" "$ZIP_FILE"
-            
-            # Cleanup
             rm private.pem certificate.pem
             echo "✅ Internal signing complete."
           fi
@@ -105,50 +265,29 @@ jobs:
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
           fingerprint: "942F2C75D1DC540F"
           trust_level: 5
-      
+
       - name: Sign Module with GPG
         run: |
-          
           cd build/out
           ZIP_FILE=$(ls *.zip | head -n 1)
-          echo "Signing $ZIP_FILE..."
-          
-          # Sign
           gpg --detach-sign --local-user an@anatdx.com --batch --yes --pinentry-mode loopback \
             --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
             --output "$ZIP_FILE.asc" "$ZIP_FILE"
-            
-          # Verify output
-          if [ -f "$ZIP_FILE.asc" ]; then
-            echo "Signature created successfully:"
-            ls -lh "$ZIP_FILE.asc"
-          else
-            echo "Error: Signature file not created!"
-            exit 1
-          fi
+          [ -f "$ZIP_FILE.asc" ] || exit 1
+          ls -lh "$ZIP_FILE.asc"
 
       - name: Generate Update Files
         id: meta
         run: |
           PROP_FILE="module/module.prop"
-          
-          # Backup updated module.prop
           cp "$PROP_FILE" /tmp/module.prop
-          
           VERSION=$(grep "^version=" "$PROP_FILE" | cut -d= -f2)
           VERSION_CODE=$(grep "^versionCode=" "$PROP_FILE" | cut -d= -f2)
-          
           ZIP_FILE=$(cd build/out && ls *.zip | head -n 1)
-          
           REPO="${{ github.repository }}"
           TAG="${{ github.ref_name }}"
           DOWNLOAD_URL="https://github.com/$REPO/releases/download/$TAG/$ZIP_FILE"
           CHANGELOG_URL="https://raw.githubusercontent.com/$REPO/main/changelog.md"
-          
-          echo "Final Version: $VERSION"
-          echo "Final Code: $VERSION_CODE"
-          echo "Zip: $ZIP_FILE"
-          
           cat <<EOF > /tmp/update.json
           {
             "version": "$VERSION",
@@ -157,12 +296,9 @@ jobs:
             "changelog": "$CHANGELOG_URL"
           }
           EOF
-          
           PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-          
           echo "## $VERSION" > /tmp/changelog.md
           echo "" >> /tmp/changelog.md
-          
           if [ -z "$PREV_TAG" ]; then
             echo "Initial release." >> /tmp/changelog.md
             git log --pretty=format:"* %s" >> /tmp/changelog.md
@@ -170,12 +306,9 @@ jobs:
             echo "Changes since $PREV_TAG:" >> /tmp/changelog.md
             git log --pretty=format:"* %s" "$PREV_TAG..HEAD" >> /tmp/changelog.md
           fi
-          
-          cat /tmp/update.json
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
         with:
           draft: false
           prerelease: false
@@ -189,35 +322,26 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git reset --hard
-          
           git fetch origin main
           git checkout main
-          
           mv /tmp/update.json update.json
           mv /tmp/changelog.md changelog.md
           mv /tmp/module.prop module/module.prop
-          
           git add update.json changelog.md module/module.prop
-          
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "[skip ci] Update KernelSU json, changelog$MSG_SUFFIX for ${{ github.ref_name }}"
+            git commit -m "[skip ci] Update for ${{ github.ref_name }}"
             git push origin main
           fi
 
-      - name: "📤 Upload to telegram | 上传至Telegram群组"
+      - name: "📤 Upload to telegram"
         run: |
           if [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ]; then
             echo "BOT_TOKEN/CHAT_ID not set, skipping."
             exit 0
           fi
-          if [ -f changelog.md ]; then
-            export COMMIT_MESSAGE=$(head -c 2000 changelog.md)
-          else
-            export COMMIT_MESSAGE="Release ${{ github.ref_name }}"
-          fi
-          echo "📤 正在上传到Telegram..."
+          [ -f changelog.md ] && export COMMIT_MESSAGE=$(head -c 2000 changelog.md) || export COMMIT_MESSAGE="Release ${{ github.ref_name }}"
           pip3 install telethon
           python3 ${{ github.workspace }}/script/hymobot.py ./build/out/*.zip
           echo "✅ 文件已上传到Telegram"
@@ -230,4 +354,4 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           TITLE: "Hymo Release"
           VERSION: ${{ github.ref_name }}
-          BRANCH: release 
+          BRANCH: release

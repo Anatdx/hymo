@@ -304,6 +304,9 @@ case $COMMAND in
                     cp -f "hymod-${arch}/build/out/${bin}" "${OUT_DIR}/"
                 elif [ -f "build/out/${bin}" ]; then
                     cp -f "build/out/${bin}" "${OUT_DIR}/"
+                else
+                    src=$(find . -name "$bin" -type f 2>/dev/null | head -1)
+                    [ -n "$src" ] && cp -f "$src" "${OUT_DIR}/"
                 fi
             done
             count=$(ls "${OUT_DIR}"/hymod-* 2>/dev/null | wc -l)

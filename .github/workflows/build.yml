@@ -174,8 +174,14 @@ jobs:
       - name: Merge hymod artifacts into build/out
         run: |
           mkdir -p build/out
+          # download-artifact: each artifact extracts to folder named after artifact, path preserved inside
           for d in hymod-arm64-v8a hymod-armeabi-v7a hymod-x86_64; do
             [ -f "$d/build/out/$d" ] && cp -f "$d/build/out/$d" build/out/
+          done
+          # fallback: find hymod binaries anywhere (merge may put build/out/hymod-* directly)
+          for bin in hymod-arm64-v8a hymod-armeabi-v7a hymod-x86_64; do
+            src=$(find . -name "$bin" -type f 2>/dev/null | head -1)
+            [ -n "$src" ] && [ ! -f "build/out/$bin" ] && cp -f "$src" build/out/
           done
           ls -la build/out/
 
