@@ -286,9 +286,15 @@ case $COMMAND in
         ;;
     package)
         build_webui
-        build_arch "arm64-v8a"
-        build_arch "armeabi-v7a"
-        build_arch "x86_64"
+        if [ -z "${HYMOD_FROM_ARTIFACTS:-}" ]; then
+            build_arch "arm64-v8a"
+            build_arch "armeabi-v7a"
+            build_arch "x86_64"
+        else
+            print_info "Using hymod binaries from CI artifacts (matrix parallel build)"
+            mkdir -p "${OUT_DIR}"
+            ls -la "${OUT_DIR}"/hymod-* 2>/dev/null || true
+        fi
         if [ -d "${PROJECT_ROOT}/.git" ]; then
             COMMIT_COUNT=$(git -C "${PROJECT_ROOT}" rev-list --count HEAD 2>/dev/null || echo "0")
             SHORT_HASH=$(git -C "${PROJECT_ROOT}" rev-parse --short=8 HEAD 2>/dev/null || echo "unknown")

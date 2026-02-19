@@ -82,8 +82,58 @@ jobs:
           name: ${{ matrix.kmi }}_hymofs_lkm.ko
           path: out/${{ matrix.kmi }}_hymofs_lkm.ko
 
+  build-hymod:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch' || github.event_name == 'pull_request' || (github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip ci]'))
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - arm64-v8a
+          - armeabi-v7a
+          - x86_64
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r25c
+        id: setup-ndk
+
+      - name: Setup CMake and Ninja
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build
+
+      - name: Build hymod for ${{ matrix.arch }}
+        env:
+          ANDROID_NDK: ${{ steps.setup-ndk.outputs.ndk-path }}
+          NDK_PATH: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: |
+          mkdir -p build/out
+          cmake -B "build/${{ matrix.arch }}" \
+            -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK}/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI="${{ matrix.arch }}" \
+            -DANDROID_PLATFORM=android-30 \
+            -DBUILD_WEBUI=OFF \
+            .
+          cmake --build "build/${{ matrix.arch }}"
+          cp "build/${{ matrix.arch }}/hymod-${{ matrix.arch }}" "build/out/"
+          ls -la build/out/
+
+      - name: Upload hymod artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hymod-${{ matrix.arch }}
+          path: build/out/hymod-${{ matrix.arch }}
+
   build:
-    needs: build-lkm
+    needs: [build-lkm, build-hymod]
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch' || github.event_name == 'pull_request' || (github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip ci]'))
 
@@ -94,7 +144,7 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Download LKM artifacts
+      - name: Download LKM and hymod artifacts
         uses: actions/download-artifact@v4
 
       - name: Read latest HymoFS commit info
@@ -119,6 +169,14 @@ jobs:
           mkdir -p module/lkm
           find . -name "*.ko" -path "*hymofs_lkm*" -exec cp {} module/lkm/ \;
           ls -la module/lkm/
+
+      - name: Merge hymod artifacts into build/out
+        run: |
+          mkdir -p build/out
+          for d in hymod-arm64-v8a hymod-armeabi-v7a hymod-x86_64; do
+            [ -f "$d/build/out/$d" ] && cp -f "$d/build/out/$d" build/out/
+          done
+          ls -la build/out/
 
       - name: Setup Android NDK
         uses: nttld/setup-ndk@v1
@@ -160,6 +218,7 @@ jobs:
         env:
           ANDROID_NDK: ${{ steps.setup-ndk.outputs.ndk-path }}
           NDK_PATH: ${{ steps.setup-ndk.outputs.ndk-path }}
+          HYMOD_FROM_ARTIFACTS: "1"
         run: |
           echo "NDK Path: $ANDROID_NDK"
           ./build.sh init
