@@ -1,5 +1,33 @@
 #!/system/bin/sh
 
+# LKM selection at install: pick matching KMI, copy to hymofs_lkm.ko, remove others
+LKM_DIR="$MODPATH/lkm"
+if [ -d "$LKM_DIR" ]; then
+    ui_print "- Detecting kernel KMI..."
+    UNAME=$(uname -r 2>/dev/null || echo "")
+    KMI=""
+    if echo "$UNAME" | grep -qE 'android[0-9]+'; then
+        ANDROID=$(echo "$UNAME" | grep -oE 'android[0-9]+')
+        KVER=$(echo "$UNAME" | grep -oE '^[0-9]+\.[0-9]+')
+        KMI="${ANDROID}-${KVER}"
+    fi
+    if [ -n "$KMI" ] && [ -f "$LKM_DIR/${KMI}_hymofs_lkm.ko" ]; then
+        cp "$LKM_DIR/${KMI}_hymofs_lkm.ko" "$MODPATH/hymofs_lkm.ko"
+        ui_print "- Selected LKM: ${KMI}_hymofs_lkm.ko"
+        ui_print "- Cleaning unused LKMs..."
+        rm -rf "$LKM_DIR"
+    else
+        FIRST_KO=$(ls "$LKM_DIR"/*_hymofs_lkm.ko 2>/dev/null | head -1)
+        if [ -n "$FIRST_KO" ]; then
+            cp "$FIRST_KO" "$MODPATH/hymofs_lkm.ko"
+            ui_print "- Using LKM: $(basename "$FIRST_KO") (no KMI match for $UNAME)"
+            rm -rf "$LKM_DIR"
+        else
+            ui_print "- No matching LKM for KMI '$KMI' (uname: $UNAME); keeping lkm/ for fallback"
+        fi
+    fi
+fi
+
 ui_print "- Detecting device architecture..."
 
 # Detect architecture using ro.product.cpu.abi
@@ -42,6 +70,15 @@ for binary in hymod-arm64-v8a hymod-armeabi-v7a hymod-x86_64; do
     ui_print "  Removed: $binary"
 done
 
+# Create symlink in KSU/APatch bin so hymod is in PATH
+for BIN_BASE in /data/adb/ksu /data/adb/ap; do
+    if [ -d "$BIN_BASE" ]; then
+        mkdir -p "$BIN_BASE/bin"
+        ln -sf $MODPATH/hymod "$BIN_BASE/bin/hymod" 2>/dev/null && \
+            ui_print "- Symlink: $BIN_BASE/bin/hymod -> $MODPATH/hymod"
+    fi
+done
+
 # Base directory setup
 BASE_DIR="/data/adb/hymo"
 mkdir -p "$BASE_DIR"
@@ -58,26 +95,14 @@ fi
 IMG_FILE="$BASE_DIR/modules.img"
 IMG_SIZE_MB=2048
 
-# Check if force_ext4 is enabled in config 
-if [ -f "$BASE_DIR/config.json" ]; then
-    if grep -q "\"fs_type\": \"ext4\"" "$BASE_DIR/config.json"; then
-        FORCE_EXT4=true
-        ui_print "- Force Ext4 mode enabled in config"
-    fi
-fi
 
 if [ ! -f "$IMG_FILE" ]; then
     # Check if kernel supports tmpfs
-    if grep -q "tmpfs" /proc/filesystems && [ "$FORCE_EXT4" = false ]; then
+    if grep -q "tmpfs" /proc/filesystems ; then
         ui_print "- Kernel supports tmpfs. Skipping ext4 image creation."
     else
-        if [ "$FORCE_EXT4" = true ]; then
-             ui_print "- Creating 2GB ext4 image (Forced Mode)..."
-        else
-             ui_print "- Creating 2GB ext4 image for module storage..."
-        fi
-        
-        # Use hymod to create image
+        ui_print "- Creating 2GB ext4 image for module storage..."
+         # Use hymod to create image
         $MODPATH/hymod config create-image "$BASE_DIR"
         
         if [ $? -ne 0 ]; then

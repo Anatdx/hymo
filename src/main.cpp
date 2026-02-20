@@ -13,6 +13,7 @@
 #include "core/executor.hpp"
 #include "core/inventory.hpp"
 #include "core/json.hpp"
+#include "core/lkm.hpp"
 #include "core/modules.hpp"
 #include "core/planner.hpp"
 #include "core/state.hpp"
@@ -75,7 +76,8 @@ static void print_help() {
     std::cout << "  api system         Complete system info with stats\n";
     std::cout << "  api storage        Storage usage information\n";
     std::cout << "  api mount-stats    Mount statistics\n";
-    std::cout << "  api partitions     Detected partitions info\n\n";
+    std::cout << "  api partitions     Detected partitions info\n";
+    std::cout << "  api lkm            LKM status (loaded, autoload) for WebUI\n\n";
 
     std::cout << "Privacy Commands (hide <subcommand>):\n";
     std::cout << "  hide list          List user-defined hide rules\n";
@@ -87,6 +89,12 @@ static void print_help() {
     std::cout << "  debug disable      Disable kernel debug logging\n";
     std::cout << "  debug stealth on|off    Enable/disable stealth mode\n";
     std::cout << "  debug set-uname <release> <version>  Set kernel version spoofing\n\n";
+
+    std::cout << "LKM Commands (lkm <subcommand>) - HymoFS kernel module:\n";
+    std::cout << "  lkm load           Load HymoFS kernel module\n";
+    std::cout << "  lkm unload         Unload HymoFS kernel module\n";
+    std::cout << "  lkm status         Show LKM status (loaded, autoload)\n";
+    std::cout << "  lkm set-autoload on|off  Enable/disable load at boot\n\n";
 
     std::cout << "Options:\n";
     std::cout << "  -c, --config FILE       Config file path\n";
@@ -243,6 +251,7 @@ int main(int argc, char* argv[]) {
             API,
             DEBUG,
             HIDE,
+            LKM,
             CLEAR,
             FIX_MOUNTS,
             RAW,
@@ -263,6 +272,8 @@ int main(int argc, char* argv[]) {
                 return Command::DEBUG;
             if (cmd == "hide")
                 return Command::HIDE;
+            if (cmd == "lkm")
+                return Command::LKM;
             if (cmd == "clear")
                 return Command::CLEAR;
             if (cmd == "fix-mounts")
@@ -954,7 +965,7 @@ int main(int argc, char* argv[]) {
 
         case Command::API: {
             if (cli.args.empty()) {
-                std::cerr << "Usage: hymod api <system|storage|mount-stats|partitions>\n";
+                std::cerr << "Usage: hymod api <system|storage|mount-stats|partitions|lkm>\n";
                 return 1;
             }
             std::string subcmd = cli.args[0];
@@ -967,9 +978,14 @@ int main(int argc, char* argv[]) {
                 std::cout << export_mount_stats_json() << std::endl;
             } else if (subcmd == "partitions") {
                 std::cout << export_partitions_json() << std::endl;
+            } else if (subcmd == "lkm") {
+                std::cout << "{\n";
+                std::cout << "  \"loaded\": " << (lkm_is_loaded() ? "true" : "false") << ",\n";
+                std::cout << "  \"autoload\": " << (lkm_get_autoload() ? "true" : "false") << "\n";
+                std::cout << "}\n";
             } else {
                 std::cerr << "Unknown api subcommand: " << subcmd << "\n";
-                std::cerr << "Available: system, storage, mount-stats, partitions\n";
+                std::cerr << "Available: system, storage, mount-stats, partitions, lkm\n";
                 return 1;
             }
             return 0;
@@ -1065,6 +1081,52 @@ int main(int argc, char* argv[]) {
                 std::cerr << "Available: enable, disable, stealth, set-uname\n";
                 return 1;
             }
+        }
+
+        case Command::LKM: {
+            if (cli.args.empty()) {
+                std::cerr << "Usage: hymod lkm <load|unload|status|set-autoload>\n";
+                return 1;
+            }
+            std::string lkm_subcmd = cli.args[0];
+
+            if (lkm_subcmd == "load") {
+                if (lkm_load()) {
+                    std::cout << "HymoFS LKM loaded.\n";
+                } else {
+                    std::cerr << "Failed to load HymoFS LKM.\n";
+                    return 1;
+                }
+            } else if (lkm_subcmd == "unload") {
+                if (lkm_unload()) {
+                    std::cout << "HymoFS LKM unloaded.\n";
+                } else {
+                    std::cerr << "Failed to unload HymoFS LKM.\n";
+                    return 1;
+                }
+            } else if (lkm_subcmd == "status") {
+                std::cout << "{\n";
+                std::cout << "  \"loaded\": " << (lkm_is_loaded() ? "true" : "false") << ",\n";
+                std::cout << "  \"autoload\": " << (lkm_get_autoload() ? "true" : "false") << "\n";
+                std::cout << "}\n";
+            } else if (lkm_subcmd == "set-autoload") {
+                if (cli.args.size() < 2) {
+                    std::cerr << "Usage: hymod lkm set-autoload <on|off>\n";
+                    return 1;
+                }
+                bool on = (cli.args[1] == "on" || cli.args[1] == "1" || cli.args[1] == "true");
+                if (lkm_set_autoload(on)) {
+                    std::cout << "Autoload at boot: " << (on ? "on" : "off") << "\n";
+                } else {
+                    std::cerr << "Failed to set autoload.\n";
+                    return 1;
+                }
+            } else {
+                std::cerr << "Unknown lkm subcommand: " << lkm_subcmd << "\n";
+                std::cerr << "Available: load, unload, status, set-autoload\n";
+                return 1;
+            }
+            return 0;
         }
 
         case Command::HIDE: {
@@ -1426,9 +1488,10 @@ int main(int argc, char* argv[]) {
             }
 
             if (!mirror_success) {
-                LOG_WARN("Mirror setup failed. Falling back to Magic Mount.");
+                LOG_WARN("Mirror setup failed. Falling back to Magic Mount + HymoFS.");
 
-                // Fallback to Magic Mount using source directory directly
+                // Fallback: use module source directly. Still add HymoFS rules so
+                // redirect/hide work even when mirror mount failed (patch/LKM inherit bug).
                 storage.mode = "tmpfs";
                 storage.mount_point = config.moduledir;
 
@@ -1455,8 +1518,16 @@ int main(int argc, char* argv[]) {
 
                     if (has_content) {
                         plan.magic_module_paths.push_back(mod.source_path);
+                        plan.hymofs_module_ids.push_back(mod.id);
                         exec_result.magic_module_ids.push_back(mod.id);
                     }
+                }
+
+                // Add HymoFS rules from module source (config.moduledir) so redirect
+                // and hide work even when mirror failed.
+                if (!plan.hymofs_module_ids.empty()) {
+                    update_hymofs_mappings(config, module_list, config.moduledir, plan);
+                    hymofs_active = true;
                 }
 
                 // Execute plan

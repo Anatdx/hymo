@@ -139,6 +139,22 @@ const mockApi = {
     console.log('[Mock] Remove hide rule:', _path)
   },
 
+  async getLkmStatus(): Promise<{ loaded: boolean; autoload: boolean }> {
+    return { loaded: true, autoload: true }
+  },
+
+  async lkmLoad(): Promise<void> {
+    console.log('[Mock] LKM load')
+  },
+
+  async lkmUnload(): Promise<void> {
+    console.log('[Mock] LKM unload')
+  },
+
+  async lkmSetAutoload(_on: boolean): Promise<void> {
+    console.log('[Mock] LKM set autoload')
+  },
+
   async hotMount(_moduleId: string): Promise<void> {
     console.log('[Mock] Hot mount')
   },
@@ -625,6 +641,59 @@ const realApi = {
     const { errno, stderr } = await ksuExec!(cmd)
     if (errno !== 0) {
       throw new Error(stderr || 'Failed to remove hide rule')
+    }
+  },
+
+  async getLkmStatus(): Promise<{ loaded: boolean; autoload: boolean }> {
+    await initKernelSU()
+    if (!ksuExec) return { loaded: false, autoload: true }
+    
+    try {
+      const cmd = `${PATHS.BINARY} api lkm`
+      const { errno, stdout } = await ksuExec!(cmd)
+      if (errno === 0 && stdout) {
+        const data = JSON.parse(stdout)
+        return {
+          loaded: data.loaded === true,
+          autoload: data.autoload !== false,
+        }
+      }
+    } catch (e) {
+      console.error('Failed to get LKM status:', e)
+    }
+    return { loaded: false, autoload: true }
+  },
+
+  async lkmLoad(): Promise<void> {
+    await initKernelSU()
+    if (!ksuExec) throw new Error('KernelSU not available')
+    
+    const cmd = `${PATHS.BINARY} lkm load`
+    const { errno, stderr } = await ksuExec!(cmd)
+    if (errno !== 0) {
+      throw new Error(stderr || 'Failed to load LKM')
+    }
+  },
+
+  async lkmUnload(): Promise<void> {
+    await initKernelSU()
+    if (!ksuExec) throw new Error('KernelSU not available')
+    
+    const cmd = `${PATHS.BINARY} lkm unload`
+    const { errno, stderr } = await ksuExec!(cmd)
+    if (errno !== 0) {
+      throw new Error(stderr || 'Failed to unload LKM')
+    }
+  },
+
+  async lkmSetAutoload(on: boolean): Promise<void> {
+    await initKernelSU()
+    if (!ksuExec) throw new Error('KernelSU not available')
+    
+    const cmd = `${PATHS.BINARY} lkm set-autoload ${on ? 'on' : 'off'}`
+    const { errno, stderr } = await ksuExec!(cmd)
+    if (errno !== 0) {
+      throw new Error(stderr || 'Failed to set LKM autoload')
     }
   },
 

@@ -1,11 +1,9 @@
 #!/system/bin/sh
-# Hymo post-fs-data.sh
-# Mount stage: earliest (before most services start)
+# Hymo post-fs-data.sh: load HymoFS LKM only. Mount runs in metamount.sh.
 
 MODDIR="${0%/*}"
 BASE_DIR="/data/adb/hymo"
 LOG_FILE="$BASE_DIR/daemon.log"
-CONFIG_FILE="$BASE_DIR/config.json"
 
 log() {
     local ts
@@ -13,29 +11,21 @@ log() {
     echo "[$ts] [Wrapper] $1" >> "$LOG_FILE"
 }
 
-# Get mount_stage from config
-get_mount_stage() {
-    if [ -f "$CONFIG_FILE" ]; then
-        # Simple JSON parsing for mount_stage
-        STAGE=$(grep -o '"mount_stage"[[:space:]]*:[[:space:]]*"[^"]*"' "$CONFIG_FILE" | sed 's/.*"\([^"]*\)"$/\1/')
-        echo "${STAGE:-metamount}"
+mkdir -p "$BASE_DIR"
+
+# LKM autoload: check /data/adb/hymo/lkm_autoload (default: load)
+AUTOLOAD=1
+[ -f "$BASE_DIR/lkm_autoload" ] && AUTOLOAD=$(cat "$BASE_DIR/lkm_autoload" 2>/dev/null | tr -d '\n\r')
+[ "$AUTOLOAD" = "0" ] || [ "$AUTOLOAD" = "off" ] && AUTOLOAD=0
+[ -z "$AUTOLOAD" ] && AUTOLOAD=1
+
+# LKM selected at install in customize.sh; just load hymofs_lkm.ko
+if [ "$AUTOLOAD" = "1" ] && [ -f "$MODDIR/hymofs_lkm.ko" ]; then
+    HYMO_SYSCALL_NR=142
+    if insmod "$MODDIR/hymofs_lkm.ko" hymo_syscall_nr="$HYMO_SYSCALL_NR" 2>/dev/null; then
+        log "post-fs-data: HymoFS LKM loaded (hymo_syscall_nr=$HYMO_SYSCALL_NR)"
     else
-        echo "metamount"
+        log "post-fs-data: HymoFS LKM insmod failed (may already be loaded or kernel mismatch)"
     fi
-}
-
-MOUNT_STAGE=$(get_mount_stage)
-
-if [ "$MOUNT_STAGE" = "post-fs-data" ]; then
-    log "post-fs-data: executing mount (stage=$MOUNT_STAGE)"
-    if [ -f "$MODDIR/hymo_mount_common.sh" ]; then
-        . "$MODDIR/hymo_mount_common.sh"
-        run_hymod_mount "$MODDIR" "post-fs-data"
-        exit $?
-    fi
-    log "post-fs-data: missing hymo_mount_common.sh"
-    exit 1
 fi
-
-log "post-fs-data: skip (stage=$MOUNT_STAGE)"
 exit 0

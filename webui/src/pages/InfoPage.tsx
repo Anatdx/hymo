@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useStore } from '@/store'
 import { Card, Button } from '@/components/ui'
-import { Gitlab, Github, BookOpen, AlertTriangle } from 'lucide-react'
+import { Gitlab, Github, BookOpen, AlertTriangle, Server } from 'lucide-react'
 
 export function InfoPage() {
   const { t } = useStore((state) => state)
@@ -99,6 +99,15 @@ export function InfoPage() {
           <Button
             variant="secondary"
             className="w-full justify-start h-[50px]"
+            onClick={() => window.open('https://github.com/Anatdx/hymo', '_blank')}
+          >
+            <Github size={20} className="mr-3" />
+            {t.info.github}
+          </Button>
+
+          <Button
+            variant="secondary"
+            className="w-full justify-start h-[50px]"
             onClick={() => window.open('https://gitlab.com/Anatdx/hymo', '_blank')}
           >
             <Gitlab size={20} className="mr-3" />
@@ -108,10 +117,10 @@ export function InfoPage() {
           <Button
             variant="secondary"
             className="w-full justify-start h-[50px]"
-            onClick={() => window.open('https://github.com/Anatdx/meta-hymo', '_blank')}
+            onClick={() => window.open('https://git.anatdx.com/Anatdx/hymo', '_blank')}
           >
-            <Github size={20} className="mr-3" />
-            {t.info.github}
+            <Server size={20} className="mr-3" />
+            {t.info.selfhosted}
           </Button>
           
           <Button

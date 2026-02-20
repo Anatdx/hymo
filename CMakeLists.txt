@@ -33,6 +33,7 @@ set(HYMO_SOURCES
     src/core/state.cpp
     src/core/sync.cpp
     src/core/modules.cpp
+    src/core/lkm.cpp
     src/core/planner.cpp
     src/core/executor.cpp
     src/core/user_rules.cpp
@@ -44,18 +45,25 @@ set(HYMO_SOURCES
     src/mount/partition_utils.cpp
 )
 
-# Common compile options
-include(CheckIPOSupported)
-check_ipo_supported(RESULT LTO_SUPPORTED OUTPUT error)
-
+# Size optimization
 set(HYMO_COMPILE_OPTIONS
-    -Os
+    -Oz
+    -DNDEBUG
     -Wall
     -Wextra
     -Wno-unused-parameter
     -fPIE
     -ffunction-sections
     -fdata-sections
+    -flto=full
+    -fvisibility=hidden
+    -fvisibility-inlines-hidden
+    -fno-rtti
+    -fno-asynchronous-unwind-tables
+    -fmerge-all-constants
+    -fno-ident
+    -faddrsig
+    -fno-semantic-interposition
 )
 
 set(HYMO_COMPILE_DEFINITIONS
@@ -66,7 +74,17 @@ set(HYMO_LINK_OPTIONS
     -static-libstdc++
     -static-libgcc
     -pie
+    -fuse-ld=lld
+    -flto=full
     -Wl,--gc-sections
+    -Wl,--icf=all
+    -Wl,--strip-all
+    -Wl,--exclude-libs,ALL
+    -Wl,-O2
+    -Wl,--lto-O3
+    -Wl,--hash-style=gnu
+    -Wl,--build-id=none
+    -Wl,-z,norelro
 )
 
 # Check if we are cross compiling for Android
@@ -79,19 +97,21 @@ if(ANDROID)
     target_compile_definitions(${TARGET_NAME} PRIVATE ${HYMO_COMPILE_DEFINITIONS})
     target_link_options(${TARGET_NAME} PRIVATE ${HYMO_LINK_OPTIONS})
 
-    if(LTO_SUPPORTED)
-        message(STATUS "LTO/IPO is supported and enabled")
-        set_property(TARGET ${TARGET_NAME} PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
-    else()
-        message(WARNING "LTO/IPO is not supported: ${error}")
+    # Optional: UPX binary compression (--best --lzma)
+    option(HYMOD_UPX "Use UPX to compress hymod binary" OFF)
+    if(HYMOD_UPX)
+        find_program(UPX_PROGRAM upx)
+        if(UPX_PROGRAM)
+            add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+                COMMAND ${UPX_PROGRAM} --best --lzma $<TARGET_FILE:${TARGET_NAME}>
+                COMMENT "UPX: compressing ${TARGET_NAME} with LZMA (--best)..."
+            )
+            message(STATUS "UPX compression ENABLED (--best --lzma)")
+        else()
+            message(WARNING "HYMOD_UPX=ON but upx not found in PATH; skipping UPX compression")
+        endif()
     endif()
-    
-    # Strip binary after build
-    add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
-        COMMAND "${CMAKE_STRIP}" "$<TARGET_FILE:${TARGET_NAME}>"
-        COMMENT "Stripping ${TARGET_NAME}"
-    )
-    
+
     # Show binary size
     add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E echo "✅ ${ANDROID_ABI}: " && du -h "$<TARGET_FILE:${TARGET_NAME}>" | cut -f1

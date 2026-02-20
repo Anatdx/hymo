@@ -1,11 +1,14 @@
 #include "hymofs.hpp"
 #include <fcntl.h>
 #include <sys/ioctl.h>
+#include <sys/prctl.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <unistd.h>
+#include <chrono>
 #include <cerrno>
 #include <cstring>
+#include <thread>
 #include "../utils.hpp"
 #include "hymo_magic.h"
 
@@ -21,10 +24,26 @@ static int get_anon_fd() {
         return s_hymo_fd;
     }
 
-    // Request anonymous fd from kernel via GET_FD syscall
-    int fd = syscall(SYS_reboot, HYMO_MAGIC1, HYMO_MAGIC2, HYMO_CMD_GET_FD, 0);
+    // Prefer prctl (SECCOMP-safe); fallback to SYS_reboot. Retry with backoff if LKM loads after us.
+    int fd = -1;
+    const int kWaitAttempts = 4;   // ~0 + 1s + 2s + 3s
+    const int kShortRetries = 2;
+    for (int wait = 0; wait < kWaitAttempts && fd < 0; ++wait) {
+        if (wait > 0) {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+        prctl(HYMO_PRCTL_GET_FD, reinterpret_cast<unsigned long>(&fd), 0, 0, 0);
+        if (fd < 0) {
+            for (int attempt = 0; attempt < kShortRetries && fd < 0; ++attempt) {
+                if (attempt > 0) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(80));
+                }
+                syscall(SYS_reboot, HYMO_MAGIC1, HYMO_MAGIC2, HYMO_CMD_GET_FD, &fd);
+            }
+        }
+    }
     if (fd < 0) {
-        LOG_ERROR("Failed to get HymoFS anonymous fd: " + std::string(strerror(errno)));
+        LOG_ERROR("Failed to get HymoFS anonymous fd (fd=" + std::to_string(fd) + ")");
         return -1;
     }
 
@@ -42,7 +61,11 @@ static int hymo_execute_cmd(unsigned int ioctl_cmd, void* arg) {
 
     int ret = ioctl(fd, ioctl_cmd, arg);
     if (ret < 0) {
-        LOG_ERROR("HymoFS ioctl failed: " + std::string(strerror(errno)));
+        if (errno == EOPNOTSUPP) {
+            LOG_VERBOSE("HymoFS ioctl not supported: " + std::string(strerror(errno)));
+        } else {
+            LOG_ERROR("HymoFS ioctl failed: " + std::string(strerror(errno)));
+        }
     }
     return ret;
 }
@@ -306,7 +329,11 @@ bool HymoFS::set_uname(const std::string& release, const std::string& version) {
     LOG_INFO("HymoFS: Setting uname: release=\"" + release + "\", version=\"" + version + "\"");
     bool ret = hymo_execute_cmd(HYMO_IOC_SET_UNAME, &uname_data) == 0;
     if (!ret) {
-        LOG_ERROR("HymoFS: set_uname failed: " + std::string(strerror(errno)));
+        if (errno == EOPNOTSUPP) {
+            LOG_VERBOSE("HymoFS: uname spoofing not supported by kernel (LKM build)");
+        } else {
+            LOG_ERROR("HymoFS: set_uname failed: " + std::string(strerror(errno)));
+        }
     } else {
         LOG_INFO("HymoFS: set_uname success");
     }
@@ -317,7 +344,11 @@ bool HymoFS::fix_mounts() {
     LOG_INFO("HymoFS: Fixing mounts (reorder mnt_id)...");
     bool ret = hymo_execute_cmd(HYMO_IOC_REORDER_MNT_ID, nullptr) == 0;
     if (!ret) {
-        LOG_ERROR("HymoFS: fix_mounts failed: " + std::string(strerror(errno)));
+        if (errno == EOPNOTSUPP) {
+            LOG_VERBOSE("HymoFS: fix_mounts not supported by kernel (LKM build)");
+        } else {
+            LOG_ERROR("HymoFS: fix_mounts failed: " + std::string(strerror(errno)));
+        }
     } else {
         LOG_INFO("HymoFS: fix_mounts success");
     }

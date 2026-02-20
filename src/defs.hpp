@@ -16,6 +16,8 @@ constexpr const char* MOUNT_STATS_FILE = "/data/adb/hymo/run/mount_stats.json";
 constexpr const char* DAEMON_LOG_FILE = "/data/adb/hymo/daemon.log";
 constexpr const char* SYSTEM_RW_DIR = "/data/adb/hymo/rw";
 constexpr const char* MODULE_PROP_FILE = "/data/adb/modules/hymo/module.prop";
+constexpr const char* LKM_KO = "/data/adb/modules/hymo/hymofs_lkm.ko";
+constexpr const char* LKM_AUTOLOAD_FILE = "/data/adb/hymo/lkm_autoload";
 
 // Marker files
 constexpr const char* CONFIG_FILENAME = "config.json";
