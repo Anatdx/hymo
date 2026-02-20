@@ -44,7 +44,7 @@ jobs:
       - name: Build HymoFS LKM for ${{ matrix.arch }}/${{ matrix.kmi }}
         env:
           HYMOFS_REPO: Anatdx/HymoFS
-          HYMOFS_REF: lkm
+          HYMOFS_REF: main
         run: |
           set -euo pipefail
           ARCH="${{ matrix.arch }}"
