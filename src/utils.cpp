@@ -26,9 +26,9 @@ Logger& Logger::getInstance() {
 }
 
 void Logger::init(bool debug, bool verbose, const fs::path& log_path) {
-    // verbose < debug: verbose shows VERBOSE; debug shows VERBOSE+DEBUG
-    verbose_ = verbose || debug;
+    // Only DEBUG is filtered (like old version); INFO/WARN/ERROR/VERBOSE always show
     debug_ = debug;
+    verbose_ = verbose;  // kept for API, not used for filtering
     log_file_.reset();
     if (!log_path.empty()) {
         try {
@@ -48,9 +48,6 @@ void Logger::init(bool debug, bool verbose, const fs::path& log_path) {
 }
 
 void Logger::log(const std::string& level, const std::string& message) {
-    if (level == "VERBOSE" && !verbose_) {
-        return;
-    }
     if (level == "DEBUG" && !debug_) {
         return;
     }

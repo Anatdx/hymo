@@ -23,24 +23,20 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Source files (minimal lib - no main, config, modules, storage, executor)
+# Source files (minimal low-level lib: HymoFS ioctl + LKM only)
 set(HYMO_SOURCES
     src/utils.cpp
-    src/core/inventory.cpp
-    src/core/state.cpp
-    src/core/sync.cpp
     src/core/lkm.cpp
-    src/core/planner.cpp
-    src/core/user_rules.cpp
     src/mount/hymofs.cpp
-    src/mount/mount_utils.cpp
-    src/mount/partition_utils.cpp
 )
 
-# Size optimization
+# Size optimization (no debug info)
+set(CMAKE_C_FLAGS_RELEASE "-DNDEBUG -g0")
+set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -g0")
 set(HYMO_COMPILE_OPTIONS
     -Oz
     -DNDEBUG
+    -g0
     -Wall
     -Wextra
     -Wno-unused-parameter

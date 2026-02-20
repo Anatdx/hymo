@@ -13,7 +13,6 @@ constexpr const char* BASE_DIR = HYMO_DATA_DIR "/";
 constexpr const char* RUN_DIR = HYMO_DATA_DIR "/run/";
 constexpr const char* STATE_FILE = HYMO_DATA_DIR "/run/daemon_state.json";
 constexpr const char* LKM_KO = "/data/adb/modules/hymo/hymofs_lkm.ko";
-constexpr const char* LKM_AUTOLOAD_FILE = HYMO_DATA_DIR "/lkm_autoload";
 constexpr const char* USER_HIDE_RULES_FILE = HYMO_DATA_DIR "/user_hide_rules";
 
 constexpr const char* DISABLE_FILE_NAME = "disable";
