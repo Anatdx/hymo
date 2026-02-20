@@ -5,6 +5,9 @@ on:
     tags:
       - "v*.*.*"
 
+permissions:
+  contents: write  # 创建 Release、上传资源、git push 到 main
+
 jobs:
   # 与 build.yml 同步：全部 KMI + 三架构 ko (arm64/arm/x86_64)
   build-lkm:
