@@ -12,10 +12,9 @@ on:
   pull_request:
     branches:
       - main
-  workflow_dispatch:
-    # 无需 inputs：hymo CI 会自行 clone HymoFS 并读取最新提交信息
-  # 由 HymoFS 仓库 call 触发：构建完整模块（与 push 时相同）
-  # 注意：repository_dispatch 只有默认分支上的 workflow 会被触发
+  # 由 HymoFS 仓库 workflow_dispatch API 触发（可指定 ref=lkm）
+  workflow_dispatch: {}
+  # repository_dispatch 只有默认分支上的 workflow 会被触发
   repository_dispatch:
     types: [build-lkm]
 
