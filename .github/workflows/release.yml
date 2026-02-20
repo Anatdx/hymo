@@ -185,7 +185,7 @@ jobs:
       - name: Read latest HymoFS commit info
         env:
           HYMOFS_REPO: Anatdx/HymoFS
-          HYMOFS_REF: lkm
+          HYMOFS_REF: main
         run: |
           git clone --depth 1 "https://github.com/${HYMOFS_REPO}.git" _hymofs_info
           (cd _hymofs_info && git fetch --depth 1 origin "${HYMOFS_REF}" && git checkout FETCH_HEAD)
