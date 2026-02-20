@@ -2,7 +2,7 @@
 
 ![Language](https://img.shields.io/badge/Language-C++-00599C?style=flat-square&logo=cplusplus)
 ![Platform](https://img.shields.io/badge/Platform-Android-3DDC84?style=flat-square&logo=android)
-![License](https://img.shields.io/badge/License-Apache--2.0-blue?style=flat-square)
+![License](https://img.shields.io/badge/License-GPL--3.0-blue?style=flat-square)
 
 A C++ module manager for KernelSU with support for HymoFS, OverlayFS and Magic Mount.
 
@@ -71,7 +71,7 @@ Config file: `/data/adb/hymo/config.json`
 
 ## License
 
-Apache License 2.0
+GPL-3.0
 
 ## Acknowledgements
 

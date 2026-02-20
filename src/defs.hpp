@@ -7,17 +7,21 @@
 
 namespace hymo {
 
+#define HYMO_DATA_DIR "/data/adb/hymo"
+#define HYMO_MODULE_DIR "/data/adb/modules/hymo"
+
 // Directories
-constexpr const char* FALLBACK_CONTENT_DIR = "/data/adb/hymo/img_mnt/";
-constexpr const char* BASE_DIR = "/data/adb/hymo/";
-constexpr const char* RUN_DIR = "/data/adb/hymo/run/";
-constexpr const char* STATE_FILE = "/data/adb/hymo/run/daemon_state.json";
-constexpr const char* MOUNT_STATS_FILE = "/data/adb/hymo/run/mount_stats.json";
-constexpr const char* DAEMON_LOG_FILE = "/data/adb/hymo/daemon.log";
-constexpr const char* SYSTEM_RW_DIR = "/data/adb/hymo/rw";
-constexpr const char* MODULE_PROP_FILE = "/data/adb/modules/hymo/module.prop";
-constexpr const char* LKM_KO = "/data/adb/modules/hymo/hymofs_lkm.ko";
-constexpr const char* LKM_AUTOLOAD_FILE = "/data/adb/hymo/lkm_autoload";
+constexpr const char* FALLBACK_CONTENT_DIR = HYMO_DATA_DIR "/img_mnt/";
+constexpr const char* BASE_DIR = HYMO_DATA_DIR "/";
+constexpr const char* RUN_DIR = HYMO_DATA_DIR "/run/";
+constexpr const char* STATE_FILE = HYMO_DATA_DIR "/run/daemon_state.json";
+constexpr const char* MOUNT_STATS_FILE = HYMO_DATA_DIR "/run/mount_stats.json";
+constexpr const char* DAEMON_LOG_FILE = HYMO_DATA_DIR "/daemon.log";
+constexpr const char* SYSTEM_RW_DIR = HYMO_DATA_DIR "/rw";
+constexpr const char* MODULE_PROP_FILE = HYMO_MODULE_DIR "/module.prop";
+constexpr const char* LKM_KO = HYMO_MODULE_DIR "/hymofs_lkm.ko";
+constexpr const char* LKM_AUTOLOAD_FILE = HYMO_DATA_DIR "/lkm_autoload";
+constexpr const char* USER_HIDE_RULES_FILE = HYMO_DATA_DIR "/user_hide_rules.json";
 
 // Marker files
 constexpr const char* CONFIG_FILENAME = "config.json";

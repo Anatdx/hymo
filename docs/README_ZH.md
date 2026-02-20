@@ -2,7 +2,7 @@
 
 ![Language](https://img.shields.io/badge/Language-C++-00599C?style=flat-square&logo=cplusplus)
 ![Platform](https://img.shields.io/badge/Platform-Android-3DDC84?style=flat-square&logo=android)
-![License](https://img.shields.io/badge/License-Apache--2.0-blue?style=flat-square)
+![License](https://img.shields.io/badge/License-GPL--3.0-blue?style=flat-square)
 
 KernelSU 的 C++ 模块管理器，支持 HymoFS、OverlayFS 和 Magic Mount。
 
@@ -71,7 +71,7 @@ hymod stealth <on|off>              # 开关隐身模式
 
 ## 许可证
 
-Apache License 2.0
+GPL-3.0
 
 ## 感谢
 

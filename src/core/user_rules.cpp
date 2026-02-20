@@ -1,13 +1,12 @@
 // core/user_rules.cpp - User-defined HymoFS rules management
 #include "user_rules.hpp"
+#include "../defs.hpp"
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include "../mount/hymofs.hpp"
 #include "../utils.hpp"
 #include "json.hpp"
-
-#define USER_HIDE_RULES_FILE "/data/adb/hymo/user_hide_rules.json"
 
 namespace hymo {
 
