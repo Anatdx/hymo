@@ -1,9 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 project(Hymo VERSION 1.0.0 LANGUAGES C CXX)
 
-# Options
-option(BUILD_WEBUI "Build WebUI before compiling" ON)
-
 # Read version from module.prop
 file(READ "${CMAKE_SOURCE_DIR}/module/module.prop" MODULE_PROP_CONTENT)
 string(REGEX MATCH "version=([^\n]+)" _ ${MODULE_PROP_CONTENT})
@@ -37,9 +34,6 @@ set(HYMO_SOURCES
     src/core/planner.cpp
     src/core/executor.cpp
     src/core/user_rules.cpp
-    src/core/webui.cpp
-    src/mount/overlay.cpp
-    src/mount/magic.cpp
     src/mount/hymofs.cpp
     src/mount/mount_utils.cpp
     src/mount/partition_utils.cpp
@@ -115,25 +109,6 @@ if(ANDROID)
     # Show binary size
     add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E echo "✅ ${ANDROID_ABI}: " && du -h "$<TARGET_FILE:${TARGET_NAME}>" | cut -f1
-        VERBATIM
-    )
-endif()
-
-# WebUI target
-if(BUILD_WEBUI)
-    add_custom_target(webui
-        COMMAND ${CMAKE_COMMAND} -E echo "🎨 Building WebUI..."
-        COMMAND npm install
-        COMMAND npm run build
-        COMMAND ${CMAKE_COMMAND} -E echo "Cleaning old webroot..."
-        COMMAND ${CMAKE_COMMAND} -E remove_directory "${CMAKE_SOURCE_DIR}/module/webroot"
-        COMMAND ${CMAKE_COMMAND} -E echo "Creating webroot..."
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/module/webroot"
-        COMMAND ${CMAKE_COMMAND} -E echo "Copying files..."
-        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/webui/dist" "${CMAKE_SOURCE_DIR}/module/webroot"
-        COMMAND ${CMAKE_COMMAND} -E echo "✅ WebUI built to module/webroot"
-        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/webui"
-        COMMENT "Building WebUI with npm"
         VERBATIM
     )
 endif()

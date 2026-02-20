@@ -1,4 +1,4 @@
-// core/executor.hpp - Mount execution
+// core/executor.hpp - Mount execution (HymoFS-only minimal: no-op)
 #pragma once
 
 #include "../conf/config.hpp"
@@ -9,10 +9,10 @@
 namespace hymo {
 
 struct ExecutionResult {
-  std::vector<std::string> overlay_module_ids;
-  std::vector<std::string> magic_module_ids;
+    std::vector<std::string> overlay_module_ids;
+    std::vector<std::string> magic_module_ids;
 };
 
 ExecutionResult execute_plan(const MountPlan& plan, const Config& config, bool hymofs_active);
 
-} // namespace hymo
+}  // namespace hymo

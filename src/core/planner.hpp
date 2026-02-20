@@ -1,4 +1,4 @@
-// core/planner.hpp - Mount planning
+// core/planner.hpp - Mount planning (HymoFS-only minimal)
 #pragma once
 
 #include "../conf/config.hpp"
@@ -11,20 +11,8 @@ namespace fs = std::filesystem;
 
 namespace hymo {
 
-struct OverlayOperation {
-  std::string target;
-  std::vector<fs::path>
-      lowerdirs; // Ordered from top to bottom (higher priority first)
-};
-
 struct MountPlan {
-  std::vector<OverlayOperation> overlay_ops;
-  std::vector<fs::path> magic_module_paths;
-  std::vector<std::string> overlay_module_ids;
-  std::vector<std::string> magic_module_ids;
   std::vector<std::string> hymofs_module_ids;
-
-  bool is_covered_by_overlay(const std::string &path) const;
 };
 
 MountPlan generate_plan(const Config &config,

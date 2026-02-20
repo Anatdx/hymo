@@ -148,7 +148,6 @@ build_arch() {
         -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK}/build/cmake/android.toolchain.cmake" \
         -DANDROID_ABI="${ARCH}" \
         -DANDROID_PLATFORM=android-30 \
-        -DBUILD_WEBUI=OFF \
         ${UPX_ARG} \
         ${EXTRA_ARGS} \
         "${PROJECT_ROOT}"
@@ -172,80 +171,13 @@ build_arch() {
     fi
 }
 
-# Download WebUI fonts
-download_fonts() {
-    local FONTS_DIR="${PROJECT_ROOT}/webui/public/fonts"
-    
-    # Check if fonts already exist
-    if [ -f "${FONTS_DIR}/Inter-Regular.woff2" ] && \
-       [ -f "${FONTS_DIR}/NotoSansSC-Regular.woff2" ] && \
-       [ -f "${FONTS_DIR}/JetBrainsMono-Regular.woff2" ]; then
-        print_info "Fonts already downloaded, skipping..."
-        return
-    fi
-    
-    print_info "Downloading WebUI fonts..."
-    mkdir -p "${FONTS_DIR}"
-    
-    # Download Inter
-    curl -sL -o "${FONTS_DIR}/Inter-Regular.woff2" 'https://fonts.gstatic.com/s/inter/v12/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa1ZL7.woff2'
-    curl -sL -o "${FONTS_DIR}/Inter-Medium.woff2" 'https://fonts.gstatic.com/s/inter/v12/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa25L7.woff2'
-    curl -sL -o "${FONTS_DIR}/Inter-SemiBold.woff2" 'https://fonts.gstatic.com/s/inter/v12/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa5ZL7.woff2'
-    curl -sL -o "${FONTS_DIR}/Inter-Bold.woff2" 'https://fonts.gstatic.com/s/inter/v12/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa2JL7.woff2'
-    
-    # Download Noto Sans SC
-    curl -sL -o "${FONTS_DIR}/NotoSansSC-Regular.woff2" 'https://fonts.gstatic.com/s/notosanssc/v26/k3kCo84MPvpLmixcA63oeALhL4iJ-Q7m8w.woff2'
-    curl -sL -o "${FONTS_DIR}/NotoSansSC-Medium.woff2" 'https://fonts.gstatic.com/s/notosanssc/v26/k3kCo84MPvpLmixcA63oeALhL4iJ-RLm8w.woff2'
-    curl -sL -o "${FONTS_DIR}/NotoSansSC-Bold.woff2" 'https://fonts.gstatic.com/s/notosanssc/v26/k3kCo84MPvpLmixcA63oeALhL4iJ-Xbm8w.woff2'
-    
-    # Download JetBrains Mono
-    curl -sL -o "${FONTS_DIR}/JetBrainsMono-Regular.woff2" 'https://fonts.gstatic.com/s/jetbrainsmono/v13/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yK1jPVmUsaaDhw.woff2'
-    curl -sL -o "${FONTS_DIR}/JetBrainsMono-Medium.woff2" 'https://fonts.gstatic.com/s/jetbrainsmono/v13/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKxjPVmUsaaDhw.woff2'
-    curl -sL -o "${FONTS_DIR}/JetBrainsMono-Bold.woff2" 'https://fonts.gstatic.com/s/jetbrainsmono/v13/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKwOPVmUsaaDhw.woff2'
-    
-    print_success "Fonts downloaded successfully"
-}
-
-# WebUI Builder
-build_webui() {
-    if [[ $NO_WEBUI -eq 0 ]]; then
-        download_fonts
-        print_info "Building WebUI..."
-        mkdir -p "${BUILD_DIR}/webui_build"
-        
-        # Check if Node.js is installed
-        if ! command -v npm &> /dev/null; then
-            print_warning "Node.js/npm not found. Skipping WebUI build."
-            if [ "$OS_TYPE" = "macos" ]; then
-                print_info "Install with: brew install node"
-            else
-                print_info "Install Node.js from your package manager"
-            fi
-            return
-        fi
-        
-        cmake -B "${BUILD_DIR}/webui_build" \
-            -G Ninja \
-            -DBUILD_WEBUI=ON \
-            -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK}/build/cmake/android.toolchain.cmake" \
-            -DANDROID_ABI="arm64-v8a" \
-            -DANDROID_PLATFORM=android-30 \
-            "${PROJECT_ROOT}" > /dev/null
-        
-        cmake --build "${BUILD_DIR}/webui_build" --target webui
-        print_success "WebUI built"
-    fi
-}
-
 # Main
 COMMAND="${1:-all}"
 shift || true
-NO_WEBUI=0
 VERBOSE=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --no-webui) NO_WEBUI=1; shift ;;
         --verbose|-v) VERBOSE="--verbose"; shift ;;
         *) shift ;;
     esac
@@ -266,12 +198,7 @@ case $COMMAND in
         mkdir -p "${BUILD_DIR}"
         print_success "Initialized."
         ;;
-    webui)
-        NO_WEBUI=0
-        build_webui
-        ;;
     all)
-        build_webui
         build_arch "arm64-v8a"
         build_arch "armeabi-v7a"
         build_arch "x86_64"
@@ -292,7 +219,6 @@ case $COMMAND in
     package)
         if [ -n "${HYMOD_FROM_ARTIFACTS:-}" ]; then
             # ========== CI path: artifacts from matrix build, pure shell packaging ==========
-            build_webui
             print_info "Using hymod binaries from CI artifacts (matrix parallel build)"
 
             mkdir -p "${OUT_DIR}"
@@ -319,7 +245,6 @@ case $COMMAND in
             ls -la "${OUT_DIR}"/hymod-*
         else
             # ========== Local path: build all arch ==========
-            build_webui
             build_arch "arm64-v8a"
             build_arch "armeabi-v7a"
             build_arch "x86_64"
@@ -360,7 +285,6 @@ case $COMMAND in
         fi
         ;;
     testzip)
-        build_webui
         build_arch "arm64-v8a"
         print_info "Packaging Test Zip..."
         cmake --build "${BUILD_DIR}/arm64-v8a" --target testzip
@@ -370,11 +294,10 @@ case $COMMAND in
         print_success "Cleaned."
         ;;
     *)
-        echo "Usage: $0 {init|all|webui|arm64|armv7|x86_64|package|testzip|clean} [--no-webui] [--verbose]"
+        echo "Usage: $0 {init|all|arm64|armv7|x86_64|package|testzip|clean} [--verbose]"
         echo ""
         echo "Commands:"
         echo "  init     - Initialize build directory"
-        echo "  webui    - Build WebUI only"
         echo "  all      - Build all architectures (default)"
         echo "  arm64    - Build arm64-v8a only"
         echo "  armv7    - Build armeabi-v7a only"
@@ -384,7 +307,6 @@ case $COMMAND in
         echo "  clean    - Clean build directory"
         echo ""
         echo "Options:"
-        echo "  --no-webui  - Skip WebUI build"
         echo "  --verbose   - Verbose build output"
         echo ""
         echo "Detected OS: $OS_TYPE"

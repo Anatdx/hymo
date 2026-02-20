@@ -20,7 +20,6 @@
 #include "core/storage.hpp"
 #include "core/sync.hpp"
 #include "core/user_rules.hpp"
-#include "core/webui.hpp"
 #include "defs.hpp"
 #include "mount/hymofs.hpp"
 #include "utils.hpp"
@@ -59,7 +58,7 @@ static void print_help() {
     std::cout << "  module delete <id> Delete module from HymoFS\n";
     std::cout << "  module hot-mount <id>    Hot mount a module\n";
     std::cout << "  module hot-unmount <id>  Hot unmount a module\n";
-    std::cout << "  module set-mode <id> <mode>  Set mount mode (auto/hymofs/overlay/magic/none)\n";
+    std::cout << "  module set-mode <id> <mode>  Set mount mode (auto/hymofs/none)\n";
     std::cout << "  module add-rule <id> <path> <mode>  Add custom mount rule\n";
     std::cout << "  module remove-rule <id> <path>  Remove custom mount rule\n";
     std::cout << "  module check-conflicts  Check for file conflicts between modules\n\n";
@@ -71,13 +70,6 @@ static void print_help() {
     std::cout << "  hymofs version     Show HymoFS protocol version\n";
     std::cout << "  hymofs set-mirror <path>  Set custom mirror path\n";
     std::cout << "  hymofs raw <cmd> ...  Execute raw HymoFS command\n\n";
-
-    std::cout << "API Commands (api <subcommand>) - JSON output for WebUI:\n";
-    std::cout << "  api system         Complete system info with stats\n";
-    std::cout << "  api storage        Storage usage information\n";
-    std::cout << "  api mount-stats    Mount statistics\n";
-    std::cout << "  api partitions     Detected partitions info\n";
-    std::cout << "  api lkm            LKM status (loaded, autoload) for WebUI\n\n";
 
     std::cout << "Privacy Commands (hide <subcommand>):\n";
     std::cout << "  hide list          List user-defined hide rules\n";
@@ -111,48 +103,8 @@ static void print_help() {
     std::cout << "  hymod mount                    # Mount all modules\n";
     std::cout << "  hymod config show              # Show configuration\n";
     std::cout << "  hymod module list              # List modules\n";
-    std::cout << "  hymod api system               # Get system info (JSON)\n";
     std::cout << "  hymod hide add /path           # Add hide rule\n";
     std::cout << "  hymod debug enable             # Enable debug mode\n";
-}
-
-// Helper to segregate custom rules (Overlay/Magic) from HymoFS source tree
-static void segregate_custom_rules(MountPlan& plan, const fs::path& mirror_dir) {
-    fs::path staging_dir = mirror_dir / ".overlay_staging";
-
-    // Process Overlay Ops ONLY
-    // This function should only segregate overlay custom rules, not magic mount paths
-    for (auto& op : plan.overlay_ops) {
-        for (auto& layer : op.lowerdirs) {
-            // Check if path starts with mirror_dir
-            std::string layer_str = layer.string();
-            std::string mirror_str = mirror_dir.string();
-
-            if (layer_str.find(mirror_str) == 0) {
-                // It is inside mirror. Move it to staging.
-                // Construct relative path from mirror root
-                fs::path rel = fs::relative(layer, mirror_dir);
-                fs::path target = staging_dir / rel;
-
-                try {
-                    if (fs::exists(layer)) {
-                        fs::create_directories(target.parent_path());
-                        fs::rename(layer, target);
-                        // Update the layer path in the plan
-                        layer = target;
-                        LOG_DEBUG("Segregated overlay custom rule: " + layer_str + " -> " +
-                                  target.string());
-                    }
-                } catch (const std::exception& e) {
-                    LOG_WARN("Failed to segregate overlay custom rule: " + layer_str + " - " +
-                             e.what());
-                }
-            }
-        }
-    }
-
-    // DO NOT process Magic Mounts - they should use their original paths
-    // Magic mount paths are module source directories, not overlay layers
 }
 
 static CliOptions parse_args(int argc, char* argv[]) {
@@ -251,7 +203,6 @@ int main(int argc, char* argv[]) {
             CONFIG,
             MODULE,
             HYMOFS,
-            API,
             DEBUG,
             HIDE,
             LKM,
@@ -269,8 +220,6 @@ int main(int argc, char* argv[]) {
                 return Command::MODULE;
             if (cmd == "hymofs")
                 return Command::HYMOFS;
-            if (cmd == "api")
-                return Command::API;
             if (cmd == "debug")
                 return Command::DEBUG;
             if (cmd == "hide")
@@ -966,34 +915,6 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        case Command::API: {
-            if (cli.args.empty()) {
-                std::cerr << "Usage: hymod api <system|storage|mount-stats|partitions|lkm>\n";
-                return 1;
-            }
-            std::string subcmd = cli.args[0];
-
-            if (subcmd == "system") {
-                std::cout << export_system_info_json() << std::endl;
-            } else if (subcmd == "storage") {
-                print_storage_status();
-            } else if (subcmd == "mount-stats") {
-                std::cout << export_mount_stats_json() << std::endl;
-            } else if (subcmd == "partitions") {
-                std::cout << export_partitions_json() << std::endl;
-            } else if (subcmd == "lkm") {
-                std::cout << "{\n";
-                std::cout << "  \"loaded\": " << (lkm_is_loaded() ? "true" : "false") << ",\n";
-                std::cout << "  \"autoload\": " << (lkm_get_autoload() ? "true" : "false") << "\n";
-                std::cout << "}\n";
-            } else {
-                std::cerr << "Unknown api subcommand: " << subcmd << "\n";
-                std::cerr << "Available: system, storage, mount-stats, partitions, lkm\n";
-                return 1;
-            }
-            return 0;
-        }
-
         case Command::DEBUG: {
             if (cli.args.empty()) {
                 std::cerr << "Usage: hymod debug <enable|disable|stealth|set-uname>\n";
@@ -1217,7 +1138,7 @@ int main(int argc, char* argv[]) {
         }
 
         // Load and merge configuration
-        Config config = load_config(cli);
+        config = load_config(cli);
         config.merge_with_cli(cli.moduledir, cli.tempdir, cli.mountsource, cli.verbose,
                               cli.partitions);
 
@@ -1230,9 +1151,6 @@ int main(int argc, char* argv[]) {
         }
 
         LOG_INFO("Hymo Daemon Starting...");
-
-        // Reset mount statistics at daemon start
-        reset_mount_statistics();
 
         if (config.disable_umount) {
             LOG_WARN("Namespace Detach (try_umount) is DISABLED.");
@@ -1429,7 +1347,6 @@ int main(int argc, char* argv[]) {
 
                         // Plan should be generated from the mirrored storage root.
                         plan = generate_plan(config, module_list, MIRROR_DIR);
-                        segregate_custom_rules(plan, MIRROR_DIR);
                         update_hymofs_mappings(config, module_list, MIRROR_DIR, plan);
                         exec_result = execute_plan(plan, config, hymofs_active);
 
@@ -1469,7 +1386,6 @@ int main(int argc, char* argv[]) {
                         plan = generate_plan(config, module_list, MIRROR_DIR);
 
                         // Prepare plan and update mappings
-                        segregate_custom_rules(plan, MIRROR_DIR);
                         update_hymofs_mappings(config, module_list, MIRROR_DIR, plan);
                         exec_result = execute_plan(plan, config, hymofs_active);
 
@@ -1491,113 +1407,25 @@ int main(int argc, char* argv[]) {
             }
 
             if (!mirror_success) {
-                LOG_WARN("Mirror setup failed. Falling back to Magic Mount + HymoFS.");
-
-                // Fallback: use module source directly. Still add HymoFS rules so
-                // redirect/hide work even when mirror mount failed (patch/LKM inherit bug).
-                storage.mode = "tmpfs";
-                storage.mount_point = config.moduledir;
-
-                module_list = scan_modules(config.moduledir, config);
-
-                // Manually construct a Magic Mount plan
-                plan.overlay_ops.clear();
-                plan.hymofs_module_ids.clear();
-                plan.magic_module_paths.clear();
-
-                for (const auto& mod : module_list) {
-                    // Check if module has content
-                    bool has_content = false;
-                    std::vector<std::string> all_partitions = BUILTIN_PARTITIONS;
-                    for (const auto& part : config.partitions)
-                        all_partitions.push_back(part);
-
-                    for (const auto& part : all_partitions) {
-                        if (has_files_recursive(mod.source_path / part)) {
-                            has_content = true;
-                            break;
-                        }
-                    }
-
-                    if (has_content) {
-                        plan.magic_module_paths.push_back(mod.source_path);
-                        plan.hymofs_module_ids.push_back(mod.id);
-                        exec_result.magic_module_ids.push_back(mod.id);
-                    }
-                }
-
-                // Add HymoFS rules from module source (config.moduledir) so redirect
-                // and hide work even when mirror failed.
-                if (!plan.hymofs_module_ids.empty()) {
-                    update_hymofs_mappings(config, module_list, config.moduledir, plan);
-                    hymofs_active = true;
-                }
-
-                // Execute plan
-                exec_result = execute_plan(plan, config, hymofs_active);
+                LOG_ERROR("Mirror setup failed. HymoFS minimal build has no fallback.");
+                update_module_description(false, "error", false, 0, 0, 0, "", false);
+                return 1;
             }
 
         } else {
-            // **Legacy/Overlay Path**
+            // **Minimal: HymoFS required - no overlay/magic fallback**
+            LOG_ERROR("HymoFS not available. Minimal build requires HymoFS LKM.");
             if (hymofs_status == HymoFSStatus::KernelTooOld) {
-                LOG_WARN("HymoFS Protocol Mismatch! Kernel is too old.");
-                warning_msg = "⚠️Kernel version is lower than module version. Please "
-                              "update your kernel.";
+                LOG_WARN("Kernel version is lower than module version. Please update your kernel.");
             } else if (hymofs_status == HymoFSStatus::ModuleTooOld) {
-                LOG_WARN("HymoFS Protocol Mismatch! Module is too old.");
-                warning_msg = "⚠️Module version is lower than kernel version. Please "
-                              "update your module.";
+                LOG_WARN("Module version is lower than kernel version. Please update your module.");
             }
-
-            LOG_INFO("Mode: Standard Overlay/Magic (Copy)");
-
-            // **Step 1: Setup Storage**
-            fs::path mnt_base(FALLBACK_CONTENT_DIR);
-            fs::path img_path = fs::path(BASE_DIR) / "modules.img";
-
-            storage = setup_storage(mnt_base, img_path, config.fs_type);
-
-            // **Step 2: Scan Modules**
-            module_list = scan_modules(config.moduledir, config);
-            LOG_INFO("Scanned " + std::to_string(module_list.size()) + " active modules.");
-
-            // **Step 3: Sync Content**
-            if (storage.mode == "erofs") {
-                // EROFS is read-only: stage content first, then build+mount.
-                fs::path staging_dir = fs::path(BASE_DIR) / "erofs_staging";
-                try {
-                    if (fs::exists(staging_dir)) {
-                        fs::remove_all(staging_dir);
-                    }
-                } catch (...) {
-                    LOG_WARN("Failed to clean EROFS staging dir");
-                }
-                ensure_dir_exists(staging_dir);
-
-                perform_sync(module_list, staging_dir, config);
-                storage = setup_erofs_storage(mnt_base, staging_dir,
-                                              fs::path(BASE_DIR) / "modules.erofs");
-            } else {
-                perform_sync(module_list, storage.mount_point, config);
-
-                // **FIX 1: Fix permissions after sync**
-                if (storage.mode == "ext4") {
-                    finalize_storage_permissions(storage.mount_point);
-                }
-            }
-
-            // **Step 4: Generate Plan**
-            LOG_INFO("Generating mount plan...");
-            plan = generate_plan(config, module_list, storage.mount_point);
-
-            // **Step 5: Execute Plan**
-            exec_result = execute_plan(plan, config, hymofs_active);
+            update_module_description(false, "error", false, 0, 0, 0,
+                "HymoFS LKM required", false);
+            return 1;
         }
 
-        LOG_INFO("Plan: " + std::to_string(exec_result.overlay_module_ids.size()) +
-                 " OverlayFS modules, " + std::to_string(exec_result.magic_module_ids.size()) +
-                 " Magic modules, " + std::to_string(plan.hymofs_module_ids.size()) +
-                 " HymoFS modules");
+        LOG_INFO("Plan: " + std::to_string(plan.hymofs_module_ids.size()) + " HymoFS modules");
 
         // **Step 6: KSU Nuke (Stealth)**
         bool nuke_active = false;
@@ -1615,8 +1443,8 @@ int main(int argc, char* argv[]) {
         RuntimeState state;
         state.storage_mode = storage.mode;
         state.mount_point = storage.mount_point.string();
-        state.overlay_module_ids = exec_result.overlay_module_ids;
-        state.magic_module_ids = exec_result.magic_module_ids;
+        state.overlay_module_ids = {};
+        state.magic_module_ids = {};
         state.hymofs_module_ids = plan.hymofs_module_ids;
         state.nuke_active = nuke_active;
         state.pid = getpid();
@@ -1629,9 +1457,7 @@ int main(int argc, char* argv[]) {
 
             for (const auto& part : all_parts) {
                 bool active = false;
-                // Check if any HymoFS module has this partition
                 for (const auto& mod_id : plan.hymofs_module_ids) {
-                    // Find module by ID (inefficient but works)
                     for (const auto& m : module_list) {
                         if (m.id == mod_id) {
                             if (fs::exists(m.source_path / part)) {
@@ -1644,58 +1470,6 @@ int main(int argc, char* argv[]) {
                         break;
                 }
                 if (active)
-                    state.active_mounts.push_back(part);
-            }
-        }
-
-        // Also add OverlayFS targets
-        for (const auto& op : plan.overlay_ops) {
-            // op.target is like "/system"
-            fs::path p(op.target);
-            std::string name = p.filename().string();
-            // Avoid duplicates
-            bool exists = false;
-            for (const auto& existing : state.active_mounts) {
-                if (existing == name) {
-                    exists = true;
-                    break;
-                }
-            }
-            if (!exists)
-                state.active_mounts.push_back(name);
-        }
-
-        // Track Magic Mount targets
-        if (!plan.magic_module_paths.empty()) {
-            std::vector<std::string> all_parts = BUILTIN_PARTITIONS;
-            for (const auto& p : config.partitions)
-                all_parts.push_back(p);
-
-            for (const auto& part : all_parts) {
-                bool active = false;
-                // Check if any Magic module has this partition
-                for (const auto& mod_id : plan.magic_module_ids) {
-                    for (const auto& m : module_list) {
-                        if (m.id == mod_id) {
-                            if (fs::exists(m.source_path / part)) {
-                                active = true;
-                                break;
-                            }
-                        }
-                    }
-                    if (active)
-                        break;
-                }
-
-                // Avoid duplicates
-                bool exists = false;
-                for (const auto& existing : state.active_mounts) {
-                    if (existing == part) {
-                        exists = true;
-                        break;
-                    }
-                }
-                if (active && !exists)
                     state.active_mounts.push_back(part);
             }
         }
@@ -1715,9 +1489,7 @@ int main(int argc, char* argv[]) {
         }
 
         // Update module description
-        update_module_description(true, storage.mode, nuke_active,
-                                  exec_result.overlay_module_ids.size(),
-                                  exec_result.magic_module_ids.size(),
+        update_module_description(true, storage.mode, nuke_active, 0, 0,
                                   plan.hymofs_module_ids.size(), warning_msg, hymofs_active);
 
         // Apply HymoFS Enable/Disable at the very end to avoid race conditions/crashes during setup
