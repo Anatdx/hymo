@@ -263,12 +263,12 @@ jobs:
           ls -la
 
       - name: Import GPG key
-        uses: crazy-max/ghaction-import-gpg@v6
-        with:
-          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-          passphrase: ${{ secrets.GPG_PASSPHRASE }}
-          fingerprint: "942F2C75D1DC540F"
-          trust_level: 5
+        if: github.actor == 'Anatdx'
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+        run: |
+          gpg --batch --import <<< "$GPG_PRIVATE_KEY"
+          gpg --list-secret-keys --keyid-format long
 
       - name: Sign Module with GPG
         run: |
@@ -339,6 +339,7 @@ jobs:
           prerelease: false
           files: |
             build/out/*.zip
+            module/lkm/*.ko
             build/out/*.asc
           body_path: /tmp/changelog.md
 
