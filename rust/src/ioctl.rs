@@ -41,6 +41,24 @@ use ioc::{_IO, _IOR, _IOW, _IOWR};
 
 const HYMO_IOC_MAGIC: u32 = b'H' as u32;
 
+/// Raw ioctl command numbers (for raw_ioctl)
+pub mod cmd {
+    use super::*;
+    pub const ADD_RULE: u32 = _IOW(HYMO_IOC_MAGIC, 1, std::mem::size_of::<hymo_syscall_arg>() as u32);
+    pub const DEL_RULE: u32 = _IOW(HYMO_IOC_MAGIC, 2, std::mem::size_of::<hymo_syscall_arg>() as u32);
+    pub const HIDE_RULE: u32 = _IOW(HYMO_IOC_MAGIC, 3, std::mem::size_of::<hymo_syscall_arg>() as u32);
+    pub const CLEAR_ALL: u32 = _IO(HYMO_IOC_MAGIC, 5);
+    pub const GET_VERSION: u32 = _IOR(HYMO_IOC_MAGIC, 6, 4);
+    pub const LIST_RULES: u32 = _IOWR(HYMO_IOC_MAGIC, 7, std::mem::size_of::<hymo_syscall_list_arg>() as u32);
+    pub const SET_DEBUG: u32 = _IOW(HYMO_IOC_MAGIC, 8, 4);
+    pub const REORDER_MNT_ID: u32 = _IO(HYMO_IOC_MAGIC, 9);
+    pub const SET_STEALTH: u32 = _IOW(HYMO_IOC_MAGIC, 10, 4);
+    pub const ADD_MERGE_RULE: u32 = _IOW(HYMO_IOC_MAGIC, 12, std::mem::size_of::<hymo_syscall_arg>() as u32);
+    pub const SET_MIRROR_PATH: u32 = _IOW(HYMO_IOC_MAGIC, 14, std::mem::size_of::<hymo_syscall_arg>() as u32);
+    pub const SET_UNAME: u32 = _IOW(HYMO_IOC_MAGIC, 17, std::mem::size_of::<hymo_spoof_uname>() as u32);
+    pub const SET_ENABLED: u32 = _IOW(HYMO_IOC_MAGIC, 20, 4);
+}
+
 // Ioctl numbers - computed from hymo_magic.h struct sizes (Linux formula)
 fn ioctl_add_rule() -> u32 {
     _IOW(HYMO_IOC_MAGIC, 1, std::mem::size_of::<hymo_syscall_arg>() as u32)
@@ -143,6 +161,12 @@ impl HymoIoctl {
     }
 
     fn ioctl(&self, cmd: u32, arg: *mut c_void) -> Result<(), std::io::Error> {
+        self.raw_ioctl(cmd, arg)
+    }
+
+    /// Raw ioctl call - use with `cmd::*` constants and kernel structs.
+    /// For full control when high-level API is insufficient.
+    pub fn raw_ioctl(&self, cmd: u32, arg: *mut c_void) -> Result<(), std::io::Error> {
         #[cfg(any(target_os = "android", target_os = "linux"))]
         let ret = unsafe { libc::ioctl(self.fd, cmd as libc::c_int, arg) };
         #[cfg(not(any(target_os = "android", target_os = "linux")))]
@@ -152,6 +176,11 @@ impl HymoIoctl {
         } else {
             Ok(())
         }
+    }
+
+    /// Get raw fd for direct use (e.g. poll, select)
+    pub fn as_raw_fd(&self) -> c_int {
+        self.fd
     }
 
     pub fn get_version(&self) -> Result<i32, std::io::Error> {

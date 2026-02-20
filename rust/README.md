@@ -45,6 +45,8 @@ int hymo_set_enabled(int);     // 启用/禁用 HymoFS
 
 ## Rust API
 
+### 高层接口 (High-level)
+
 ```rust
 use hymo_minimal::{HymoFS, HymoFSStatus};
 
@@ -53,4 +55,31 @@ if HymoFS::is_available() {
     HymoFS::add_rule("/system/app/foo", "/data/adb/modules/bar/system/app/foo", 8)?;
     HymoFS::set_enabled(true)?;
 }
+```
+
+### 底层接口 (Raw)
+
+直接 ioctl，适合需要完全控制的场景：
+
+```rust
+use hymo_minimal::{HymoIoctl, raw_cmd, hymo_syscall_arg};
+use std::ffi::CString;
+
+let io = HymoIoctl::get_fd()?;
+
+// 方式 1：使用封装方法
+io.add_rule("/path/target", "/path/source", 8)?;
+
+// 方式 2：raw_ioctl + 内核结构体
+let src = CString::new("/path/source")?;
+let target = CString::new("/path/target")?;
+let arg = hymo_syscall_arg {
+    src: src.as_ptr(),
+    target: target.as_ptr(),
+    type_: 8,
+};
+io.raw_ioctl(raw_cmd::ADD_RULE, &arg as *const _ as *mut _)?;
+
+// 获取原始 fd（poll/select 等）
+let fd = io.as_raw_fd();
 ```
