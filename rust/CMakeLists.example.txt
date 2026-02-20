@@ -1,0 +1,22 @@
+# Example: Link hymo-minimal static lib in your Android CMake project
+#
+# 1. Build: cd rust && ./build-ndk.sh
+# 2. Set HYMO_RUST_DIR to path of rust crate
+
+set(HYMO_RUST_DIR "${CMAKE_SOURCE_DIR}/../rust" CACHE PATH "Path to hymo-minimal rust crate")
+
+if(ANDROID_ABI STREQUAL "arm64-v8a")
+    set(HYMO_LIB_PATH "${HYMO_RUST_DIR}/target/aarch64-linux-android/release/libhymo_minimal.a")
+elseif(ANDROID_ABI STREQUAL "armeabi-v7a")
+    set(HYMO_LIB_PATH "${HYMO_RUST_DIR}/target/armv7-linux-androideabi/release/libhymo_minimal.a")
+elseif(ANDROID_ABI STREQUAL "x86_64")
+    set(HYMO_LIB_PATH "${HYMO_RUST_DIR}/target/x86_64-linux-android/release/libhymo_minimal.a")
+else()
+    message(FATAL_ERROR "Unsupported ABI: ${ANDROID_ABI}")
+endif()
+
+add_library(hymo_minimal STATIC IMPORTED)
+set_target_properties(hymo_minimal PROPERTIES IMPORTED_LOCATION ${HYMO_LIB_PATH})
+
+target_include_directories(your_target PRIVATE ${HYMO_RUST_DIR}/include)
+target_link_libraries(your_target hymo_minimal)

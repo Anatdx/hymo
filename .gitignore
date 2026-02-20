@@ -1,6 +1,7 @@
 # Build outputs
 /out
 /build
+rust/target/
 
 # CMake
 CMakeCache.txt

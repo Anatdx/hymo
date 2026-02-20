@@ -19,26 +19,6 @@ bool RuntimeState::save() const {
     file << "{\n";
     file << "  \"storage_mode\": \"" << storage_mode << "\",\n";
     file << "  \"mount_point\": \"" << mount_point << "\",\n";
-    file << "  \"nuke_active\": " << (nuke_active ? "true" : "false") << ",\n";
-    file << "  \"hymofs_mismatch\": " << (hymofs_mismatch ? "true" : "false") << ",\n";
-    file << "  \"mismatch_message\": \"" << mismatch_message << "\",\n";
-
-    file << "  \"overlay_module_ids\": [";
-    for (size_t i = 0; i < overlay_module_ids.size(); ++i) {
-        file << "\"" << overlay_module_ids[i] << "\"";
-        if (i < overlay_module_ids.size() - 1)
-            file << ", ";
-    }
-    file << "],\n";
-
-    file << "  \"magic_module_ids\": [";
-    for (size_t i = 0; i < magic_module_ids.size(); ++i) {
-        file << "\"" << magic_module_ids[i] << "\"";
-        if (i < magic_module_ids.size() - 1)
-            file << ", ";
-    }
-    file << "],\n";
-
     file << "  \"hymofs_module_ids\": [";
     for (size_t i = 0; i < hymofs_module_ids.size(); ++i) {
         file << "\"" << hymofs_module_ids[i] << "\"";
@@ -46,17 +26,7 @@ bool RuntimeState::save() const {
             file << ", ";
     }
     file << "],\n";
-
-    file << "  \"active_mounts\": [";
-    for (size_t i = 0; i < active_mounts.size(); ++i) {
-        file << "\"" << active_mounts[i] << "\"";
-        if (i < active_mounts.size() - 1)
-            file << ", ";
-    }
-    file << "],\n";
-
     file << "  \"pid\": " << pid << "\n";
-
     file << "}\n";
 
     return true;
@@ -111,18 +81,8 @@ RuntimeState load_runtime_state() {
             if (end != std::string::npos) {
                 state.mount_point = line.substr(start, end - start);
             }
-        } else if (line.find("\"nuke_active\"") != std::string::npos) {
-            state.nuke_active = line.find("true") != std::string::npos;
-        } else if (line.find("\"hymofs_mismatch\"") != std::string::npos) {
-            state.hymofs_mismatch = line.find("true") != std::string::npos;
-        } else if (line.find("\"overlay_module_ids\"") != std::string::npos) {
-            state.overlay_module_ids = parse_json_array(line);
-        } else if (line.find("\"magic_module_ids\"") != std::string::npos) {
-            state.magic_module_ids = parse_json_array(line);
         } else if (line.find("\"hymofs_module_ids\"") != std::string::npos) {
             state.hymofs_module_ids = parse_json_array(line);
-        } else if (line.find("\"active_mounts\"") != std::string::npos) {
-            state.active_mounts = parse_json_array(line);
         } else if (line.find("\"pid\"") != std::string::npos) {
             if (line.find(":") != std::string::npos) {
                 try {

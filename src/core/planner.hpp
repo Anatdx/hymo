@@ -1,10 +1,9 @@
 // core/planner.hpp - Mount planning (HymoFS-only minimal)
 #pragma once
 
-#include "../conf/config.hpp"
 #include "inventory.hpp"
+#include "params.hpp"
 #include <filesystem>
-#include <map>
 #include <vector>
 
 namespace fs = std::filesystem;
@@ -12,15 +11,12 @@ namespace fs = std::filesystem;
 namespace hymo {
 
 struct MountPlan {
-  std::vector<std::string> hymofs_module_ids;
+    std::vector<std::string> hymofs_module_ids;
 };
 
-MountPlan generate_plan(const Config &config,
-                        const std::vector<Module> &modules,
-                        const fs::path &storage_root);
+MountPlan generate_plan(const HymoParams& params, const std::vector<Module>& modules);
 
-void update_hymofs_mappings(const Config &config,
-                            const std::vector<Module> &modules,
-                            const fs::path &storage_root, MountPlan &plan);
+void update_hymofs_mappings(const HymoParams& params, const std::vector<Module>& modules,
+                            MountPlan& plan);
 
-} // namespace hymo
+}  // namespace hymo

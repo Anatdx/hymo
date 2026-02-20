@@ -1,7 +1,6 @@
-// core/inventory.hpp - Module inventory
+// core/inventory.hpp - Module inventory (no config)
 #pragma once
 
-#include "../conf/config.hpp"
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -11,23 +10,17 @@ namespace fs = std::filesystem;
 namespace hymo {
 
 struct ModuleRule {
-  std::string path;
-  std::string mode; // "hymofs", "overlay", "magic", "none"
+    std::string path;
+    std::string mode;  // "hymofs", "none", "hide"
 };
 
 struct Module {
-  std::string id;
-  fs::path source_path;
-  std::string mode; // "auto", "magic", etc.
-  std::string name = "";
-  std::string version = "";
-  std::string author = "";
-  std::string description = "";
-  std::vector<ModuleRule> rules;
+    std::string id;
+    fs::path source_path;
+    std::string mode;  // "auto", "hymofs", "none"
+    std::vector<ModuleRule> rules;
 };
 
-std::vector<Module> scan_modules(const fs::path &source_dir,
-                                 const Config &config);
-std::vector<std::string> scan_partition_candidates(const fs::path &source_dir);
+std::vector<Module> scan_modules(const fs::path& source_dir);
 
-} // namespace hymo
+}  // namespace hymo

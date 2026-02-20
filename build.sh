@@ -155,18 +155,14 @@ build_arch() {
     # Build
     cmake --build "${BUILD_SUBDIR}" $VERBOSE
     
-    # Check for binary
-    local BIN_NAME="hymod-${ARCH}"
-    local BUILT_BIN="${BUILD_SUBDIR}/${BIN_NAME}"
-    
-    if [ -f "$BUILT_BIN" ]; then
-        cp "$BUILT_BIN" "${OUT_DIR}/"
-        
-        # Show size
-        local SIZE=$(du -h "$BUILT_BIN" | cut -f1)
-        print_success "Built ${BIN_NAME} (${SIZE})"
+    # Check for static library (libhymo-${ARCH}.a)
+    local BUILT_LIB=$(find "${BUILD_SUBDIR}" -name "libhymo*.a" -type f 2>/dev/null | head -1)
+    if [ -n "$BUILT_LIB" ] && [ -f "$BUILT_LIB" ]; then
+        cp "$BUILT_LIB" "${OUT_DIR}/"
+        local SIZE=$(du -h "$BUILT_LIB" | cut -f1)
+        print_success "Built $(basename "$BUILT_LIB") (${SIZE})"
     else
-        print_error "Binary ${BIN_NAME} not found!"
+        print_error "Library libhymo*.a not found!"
         exit 1
     fi
 }
@@ -217,6 +213,12 @@ case $COMMAND in
         build_arch "x86_64"
         ;;
     package)
+        build_arch "arm64-v8a"
+        build_arch "armeabi-v7a"
+        build_arch "x86_64"
+        print_info "Libraries: $(ls ${OUT_DIR}/libhymo*.a 2>/dev/null | tr '\n' ' ')"
+        ;;
+    package-legacy)
         if [ -n "${HYMOD_FROM_ARTIFACTS:-}" ]; then
             # ========== CI path: artifacts from matrix build, pure shell packaging ==========
             print_info "Using hymod binaries from CI artifacts (matrix parallel build)"

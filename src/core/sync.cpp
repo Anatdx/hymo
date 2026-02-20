@@ -136,19 +136,17 @@ static void repair_module_contexts(const fs::path& module_root, const std::strin
     }
 }
 
-void perform_sync(const std::vector<Module>& modules, const fs::path& storage_root,
-                  const Config& config) {
-    LOG_INFO("Syncing modules to " + storage_root.string());
+void perform_sync(const std::vector<Module>& modules, const HymoParams& params) {
+    LOG_INFO("Syncing modules to " + params.storage_root.string());
 
     std::vector<std::string> all_partitions = BUILTIN_PARTITIONS;
-    for (const auto& part : config.partitions) {
+    for (const auto& part : params.partitions)
         all_partitions.push_back(part);
-    }
 
-    prune_orphaned_modules(modules, storage_root);
+    prune_orphaned_modules(modules, params.storage_root);
 
     for (const auto& module : modules) {
-        fs::path dst = storage_root / module.id;
+        fs::path dst = params.storage_root / module.id;
 
         if (!has_content(module.source_path, all_partitions)) {
             LOG_DEBUG("Skipping empty module: " + module.id);

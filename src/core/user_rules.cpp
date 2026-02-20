@@ -1,53 +1,40 @@
-// core/user_rules.cpp - User-defined HymoFS rules management
+// core/user_rules.cpp - User-defined HymoFS rules management (line format)
 #include "user_rules.hpp"
 #include "../defs.hpp"
 #include <fstream>
 #include <iostream>
-#include <sstream>
 #include "../mount/hymofs.hpp"
 #include "../utils.hpp"
-#include "json.hpp"
 
 namespace hymo {
 
 std::vector<UserHideRule> load_user_hide_rules() {
     std::vector<UserHideRule> rules;
     std::ifstream file(USER_HIDE_RULES_FILE);
+    if (!file.is_open())
+        return rules;
 
-    if (!file.is_open()) {
-        return rules;  // File doesn't exist yet, return empty
+    std::string line;
+    while (std::getline(file, line)) {
+        size_t start = line.find_first_not_of(" \t");
+        if (start == std::string::npos || line[start] == '#')
+            continue;
+        std::string path = line.substr(start);
+        size_t end = path.find_last_not_of(" \t\r\n");
+        if (end != std::string::npos)
+            path = path.substr(0, end + 1);
+        if (!path.empty() && path[0] == '/')
+            rules.push_back({path});
     }
-
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    file.close();
-
-    try {
-        auto root = json::parse(buffer.str());
-        if (root.type == json::Type::Array) {
-            for (const auto& val : root.as_array()) {
-                if (val.type == json::Type::String) {
-                    rules.push_back({val.as_string()});
-                }
-            }
-        }
-    } catch (const std::exception& e) {
-        LOG_ERROR("Failed to parse user rules JSON: " + std::string(e.what()));
-    }
-
     LOG_VERBOSE("Loaded " + std::to_string(rules.size()) + " user hide rules");
     return rules;
 }
 
 bool save_user_hide_rules(const std::vector<UserHideRule>& rules) {
-    // Ensure directory exists
     fs::path file_path(USER_HIDE_RULES_FILE);
-    fs::path dir = file_path.parent_path();
-
     try {
-        if (!fs::exists(dir)) {
-            fs::create_directories(dir);
-        }
+        if (!fs::exists(file_path.parent_path()))
+            fs::create_directories(file_path.parent_path());
     } catch (const std::exception& e) {
         LOG_ERROR("Failed to create directory: " + std::string(e.what()));
         return false;
@@ -58,13 +45,8 @@ bool save_user_hide_rules(const std::vector<UserHideRule>& rules) {
         LOG_ERROR("Failed to open user hide rules file for writing");
         return false;
     }
-
-    json::Value root = json::Value::array();
-    for (const auto& rule : rules) {
-        root.push_back(json::Value(rule.path));
-    }
-
-    file << json::dump(root, 2);
+    for (const auto& rule : rules)
+        file << rule.path << "\n";
     file.close();
     LOG_INFO("Saved " + std::to_string(rules.size()) + " user hide rules");
     return true;
@@ -144,12 +126,8 @@ bool remove_user_hide_rule(const std::string& path) {
 
 void list_user_hide_rules() {
     auto rules = load_user_hide_rules();
-
-    json::Value root = json::Value::array();
-    for (const auto& rule : rules) {
-        root.push_back(json::Value(rule.path));
-    }
-    std::cout << json::dump(root, 2) << "\n";
+    for (const auto& rule : rules)
+        std::cout << rule.path << "\n";
 }
 
 void apply_user_hide_rules() {

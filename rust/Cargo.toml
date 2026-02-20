@@ -1,0 +1,25 @@
+[package]
+name = "hymo-minimal"
+version = "0.1.0"
+edition = "2021"
+description = "HymoFS minimal - Rust static library for Android NDK"
+license = "MIT OR Apache-2.0"
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[[bin]]
+name = "hymod"
+path = "src/main.rs"
+
+[dependencies]
+libc = { version = "0.2", features = ["extra_traits"] }
+
+[build-dependencies]
+bindgen = "0.69"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = "z"
+strip = true

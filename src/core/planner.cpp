@@ -75,26 +75,23 @@ static std::string resolve_path_for_hymofs(const std::string& path_str) {
     }
 }
 
-MountPlan generate_plan(const Config& config, const std::vector<Module>& modules,
-                        const fs::path& storage_root) {
+MountPlan generate_plan(const HymoParams& params, const std::vector<Module>& modules) {
     MountPlan plan;
 
     std::vector<std::string> target_partitions = BUILTIN_PARTITIONS;
-    for (const auto& part : config.partitions) {
+    for (const auto& part : params.partitions)
         target_partitions.push_back(part);
-    }
 
     HymoFSStatus status = HymoFS::check_status();
     bool use_hymofs = (status == HymoFSStatus::Available) ||
-                      (config.ignore_protocol_mismatch && (status == HymoFSStatus::KernelTooOld ||
-                                                           status == HymoFSStatus::ModuleTooOld));
+                      (params.ignore_protocol_mismatch &&
+                       (status == HymoFSStatus::KernelTooOld || status == HymoFSStatus::ModuleTooOld));
 
-    if (!use_hymofs) {
-        return plan;  // No HymoFS, no modules to mount
-    }
+    if (!use_hymofs)
+        return plan;
 
     for (const auto& module : modules) {
-        fs::path content_path = storage_root / module.id;
+        fs::path content_path = params.storage_root / module.id;
 
         if (!fs::exists(content_path))
             continue;
@@ -164,18 +161,16 @@ struct AddRule {
     int type;
 };
 
-void update_hymofs_mappings(const Config& config, const std::vector<Module>& modules,
-                            const fs::path& storage_root, MountPlan& plan) {
+void update_hymofs_mappings(const HymoParams& params, const std::vector<Module>& modules,
+                            MountPlan& plan) {
     if (!HymoFS::is_available())
         return;
 
-    // Clear existing mappings
     HymoFS::clear_rules();
 
     std::vector<std::string> target_partitions = BUILTIN_PARTITIONS;
-    for (const auto& part : config.partitions) {
+    for (const auto& part : params.partitions)
         target_partitions.push_back(part);
-    }
 
     std::vector<AddRule> add_rules;
     std::vector<AddRule> merge_rules;
@@ -214,7 +209,7 @@ void update_hymofs_mappings(const Config& config, const std::vector<Module>& mod
         if (!is_hymofs)
             continue;
 
-        fs::path mod_path = storage_root / module.id;
+        fs::path mod_path = params.storage_root / module.id;
 
         std::string default_mode = module.mode;
         if (default_mode == "auto" || default_mode == "overlay" || default_mode == "magic")
