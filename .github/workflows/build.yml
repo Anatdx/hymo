@@ -218,14 +218,7 @@ jobs:
           echo "MODULE_VERSION=$VERSION_TAG" >> $GITHUB_ENV
           sed -i "s/^version=.*/version=${VERSION_TAG}/" module/module.prop
           sed -i "s/^versionCode=.*/versionCode=${COMMIT_COUNT}/" module/module.prop
-          python3 -c "
-import json
-with open('update.json', 'r') as f: d = json.load(f)
-d['versionCode'] = int('${COMMIT_COUNT}')
-d['version'] = '${VERSION_TAG}'
-with open('update.json', 'w') as f: json.dump(d, f, indent=2)
-print('update.json updated')
-"
+          jq --arg v "$VERSION_TAG" --argjson c "$COMMIT_COUNT" '.version = $v | .versionCode = c' update.json > update.json.tmp && mv update.json.tmp update.json
           echo "Building version: $VERSION_TAG (versionCode=$COMMIT_COUNT), zip: hymo-${VERSION_TAG}-${SHORT_HASH}.zip"
 
       - name: Build Project
