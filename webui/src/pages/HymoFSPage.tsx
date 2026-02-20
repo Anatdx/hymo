@@ -1,8 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { useStore } from '@/store'
 import { Card, Button, Input, Switch } from '@/components/ui'
-import { Plus, Trash2, Eye, Wrench, AlertCircle, CheckCircle, FolderOpen, FileText } from 'lucide-react'
+import { Plus, Trash2, Eye, Wrench, AlertCircle, CheckCircle, FolderOpen, FileText, Cpu, Loader2 } from 'lucide-react'
 import { api } from '@/services/api'
+
+interface LkmStatus {
+  loaded: boolean
+  autoload: boolean
+}
 
 interface HymoFSRule {
   type: string
@@ -38,10 +43,16 @@ export function HymoFSPage() {
   const [loading, setLoading] = useState(true)
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [filteredSuggestions, setFilteredSuggestions] = useState<string[]>([])
+  const [lkmStatus, setLkmStatus] = useState<LkmStatus | null>(null)
+  const [lkmLoading, setLkmLoading] = useState(false)
   const pathScrollTouchRef = useRef<{ x: number; y: number; locked: 'h' | 'v' | null }>({ x: 0, y: 0, locked: null })
 
   useEffect(() => {
     loadRules()
+  }, [])
+
+  useEffect(() => {
+    api.getLkmStatus().then(setLkmStatus).catch(() => setLkmStatus(null))
   }, [])
 
   useEffect(() => {
@@ -115,6 +126,46 @@ export function HymoFSPage() {
   const userRuleCount = userRules.length
   const totalRuleCount = allRules.length
 
+  const refreshLkmStatus = () => {
+    api.getLkmStatus().then(setLkmStatus).catch(() => setLkmStatus(null))
+  }
+
+  const handleLkmLoad = async () => {
+    try {
+      setLkmLoading(true)
+      await api.lkmLoad()
+      showToast(t.hymofs?.lkm?.loadSuccess ?? 'LKM loaded', 'success')
+      refreshLkmStatus()
+    } catch (e) {
+      showToast(t.hymofs?.lkm?.loadFailed ?? 'Failed to load LKM', 'error')
+    } finally {
+      setLkmLoading(false)
+    }
+  }
+
+  const handleLkmUnload = async () => {
+    try {
+      setLkmLoading(true)
+      await api.lkmUnload()
+      showToast(t.hymofs?.lkm?.unloadSuccess ?? 'LKM unloaded', 'success')
+      refreshLkmStatus()
+    } catch (e) {
+      showToast(t.hymofs?.lkm?.unloadFailed ?? 'Failed to unload LKM', 'error')
+    } finally {
+      setLkmLoading(false)
+    }
+  }
+
+  const handleLkmAutoload = async (on: boolean) => {
+    try {
+      await api.lkmSetAutoload(on)
+      showToast(t.hymofs?.lkm?.autoloadSuccess ?? 'Autoload updated', 'success')
+      setLkmStatus(prev => prev ? { ...prev, autoload: on } : null)
+    } catch (e) {
+      showToast(t.hymofs?.lkm?.autoloadFailed ?? 'Failed to set autoload', 'error')
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4">
@@ -126,6 +177,61 @@ export function HymoFSPage() {
             </p>
           </div>
         </div>
+
+        {/* LKM Management */}
+        <Card>
+          <div className="flex items-start gap-3 mb-4">
+            <div className="p-3 bg-amber-500/20 rounded-lg">
+              <Cpu size={24} className="text-amber-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                {t.hymofs?.lkm?.title ?? 'HymoFS Kernel Module (LKM)'}
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                {t.hymofs?.lkm?.desc ?? 'Load/unload the HymoFS kernel module. Autoload controls boot-time loading.'}
+              </p>
+            </div>
+            <span
+              className={`px-3 py-1 rounded-full text-sm font-medium flex-shrink-0 ${
+                lkmStatus?.loaded
+                  ? 'bg-green-500/20 text-green-400'
+                  : 'bg-gray-500/20 text-gray-400'
+              }`}
+            >
+              {lkmStatus?.loaded
+                ? (t.hymofs?.lkm?.loaded ?? 'Loaded')
+                : (t.hymofs?.lkm?.notLoaded ?? 'Not Loaded')}
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Switch
+              checked={lkmStatus?.autoload ?? true}
+              onChange={handleLkmAutoload}
+              label={t.hymofs?.lkm?.autoload ?? 'Autoload at boot'}
+              disabled={lkmStatus === null}
+            />
+            <div className="flex gap-2">
+              <Button
+                onClick={handleLkmLoad}
+                disabled={lkmLoading || lkmStatus?.loaded}
+                size="sm"
+                variant="success"
+              >
+                {lkmLoading ? <Loader2 size={16} className="animate-spin" /> : null}
+                <span>{lkmLoading ? (t.common.loading ?? 'Loading...') : (t.hymofs?.lkm?.load ?? 'Load')}</span>
+              </Button>
+              <Button
+                onClick={handleLkmUnload}
+                disabled={lkmLoading || !lkmStatus?.loaded}
+                size="sm"
+                variant="danger"
+              >
+                {t.hymofs?.lkm?.unload ?? 'Unload'}
+              </Button>
+            </div>
+          </div>
+        </Card>
 
         {/* Enable HymoFS Switch */}
         <Card>

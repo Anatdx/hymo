@@ -30,3 +30,5 @@ compile_commands.json
 
 # Telegram bot session (contains auth, do not commit)
 script/.hymobot_session
+
+.cache/

@@ -1,6 +1,6 @@
 #!/system/bin/sh
 
-# LKM selection at install (like hymod binary selection): pick matching KMI, remove others
+# LKM selection at install: pick matching KMI, copy to hymofs_lkm.ko, remove others
 LKM_DIR="$MODPATH/lkm"
 if [ -d "$LKM_DIR" ]; then
     ui_print "- Detecting kernel KMI..."
@@ -17,7 +17,14 @@ if [ -d "$LKM_DIR" ]; then
         ui_print "- Cleaning unused LKMs..."
         rm -rf "$LKM_DIR"
     else
-        ui_print "- No matching LKM for KMI '$KMI' (uname: $UNAME); keeping lkm/ for runtime fallback"
+        FIRST_KO=$(ls "$LKM_DIR"/*_hymofs_lkm.ko 2>/dev/null | head -1)
+        if [ -n "$FIRST_KO" ]; then
+            cp "$FIRST_KO" "$MODPATH/hymofs_lkm.ko"
+            ui_print "- Using LKM: $(basename "$FIRST_KO") (no KMI match for $UNAME)"
+            rm -rf "$LKM_DIR"
+        else
+            ui_print "- No matching LKM for KMI '$KMI' (uname: $UNAME); keeping lkm/ for fallback"
+        fi
     fi
 fi
 

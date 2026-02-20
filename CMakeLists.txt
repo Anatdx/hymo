@@ -33,6 +33,7 @@ set(HYMO_SOURCES
     src/core/state.cpp
     src/core/sync.cpp
     src/core/modules.cpp
+    src/core/lkm.cpp
     src/core/planner.cpp
     src/core/executor.cpp
     src/core/user_rules.cpp
