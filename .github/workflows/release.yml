@@ -122,7 +122,23 @@ jobs:
       - name: Setup CMake, Ninja and UPX
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build upx-ucl
+          sudo apt-get install -y cmake ninja-build upx-ucl ccache
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-hymod-${{ runner.os }}-ndkr25c-${{ matrix.arch }}-${{ hashFiles('CMakeLists.txt', 'src/**/*.c', 'src/**/*.cpp', 'src/**/*.h', 'src/**/*.hpp') }}
+          restore-keys: |
+            ccache-hymod-${{ runner.os }}-ndkr25c-${{ matrix.arch }}-
+
+      - name: Cache CMake build (hymod)
+        uses: actions/cache@v4
+        with:
+          path: build
+          key: cmake-hymod-${{ runner.os }}-ndkr25c-${{ matrix.arch }}-${{ hashFiles('CMakeLists.txt', 'src/**/*.c', 'src/**/*.cpp', 'src/**/*.h', 'src/**/*.hpp') }}
+          restore-keys: |
+            cmake-hymod-${{ runner.os }}-ndkr25c-${{ matrix.arch }}-
 
       - name: Build hymod for ${{ matrix.arch }}
         env:
@@ -137,6 +153,8 @@ jobs:
             -DANDROID_PLATFORM=android-30 \
             -DBUILD_WEBUI=OFF \
             -DHYMOD_UPX=ON \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             .
           cmake --build "build/${{ matrix.arch }}"
           cp "build/${{ matrix.arch }}/hymod-${{ matrix.arch }}" "build/out/"
