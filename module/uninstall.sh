@@ -19,6 +19,11 @@ if mountpoint -q "$MNT_DIR"; then
     umount "$MNT_DIR" 2>/dev/null || umount -l "$MNT_DIR"
 fi
 
+# Remove symlinks created at install
+for BIN_BASE in /data/adb/ksu /data/adb/ap; do
+    [ -L "$BIN_BASE/bin/hymod" ] && rm -f "$BIN_BASE/bin/hymod"
+done
+
 rm -rf "$BASE_DIR"
 
 exit 0
