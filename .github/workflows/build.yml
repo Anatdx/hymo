@@ -6,6 +6,7 @@ on:
       - main
       - dev
       - lkm
+    # 不包含 tags：标签由 release.yml 触发编译
     paths-ignore:
       - '**.md'
       - '.gitignore'
@@ -20,7 +21,7 @@ on:
 
 jobs:
   build-lkm:
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch' || github.event_name == 'pull_request' || (github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip ci]'))
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch' || github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref_type != 'tag' && !contains(github.event.head_commit.message, '[skip ci]'))
     strategy:
       fail-fast: false
       matrix:
@@ -82,7 +83,7 @@ jobs:
           path: out/${{ matrix.kmi }}_hymofs_lkm.ko
 
   build-hymod:
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch' || github.event_name == 'pull_request' || (github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip ci]'))
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch' || github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref_type != 'tag' && !contains(github.event.head_commit.message, '[skip ci]'))
     strategy:
       fail-fast: false
       matrix:
@@ -135,7 +136,7 @@ jobs:
   build:
     needs: [build-lkm, build-hymod]
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch' || github.event_name == 'pull_request' || (github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip ci]'))
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch' || github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref_type != 'tag' && !contains(github.event.head_commit.message, '[skip ci]'))
 
     steps:
       - name: Checkout Code
