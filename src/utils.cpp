@@ -28,8 +28,22 @@ Logger& Logger::getInstance() {
 void Logger::init(bool debug, bool verbose, const fs::path& log_path) {
     debug_ = debug || verbose;
     verbose_ = verbose;
-    (void)log_path;
     log_file_.reset();
+    if (!log_path.empty()) {
+        try {
+            fs::path parent = log_path.parent_path();
+            if (!parent.empty())
+                ensure_dir_exists(parent);
+            std::ofstream* f = new std::ofstream(log_path.string(), std::ios::app);
+            if (f->is_open()) {
+                log_file_.reset(f);
+            } else {
+                delete f;
+            }
+        } catch (...) {
+            /* ignore */
+        }
+    }
 }
 
 void Logger::log(const std::string& level, const std::string& message) {
@@ -47,6 +61,11 @@ void Logger::log(const std::string& level, const std::string& message) {
     std::string log_line = std::string("[") + time_buf + "] [" + level + "] " + message + "\n";
 
     std::cerr << log_line;
+    std::cerr.flush();
+    if (log_file_ && log_file_->is_open()) {
+        *log_file_ << log_line;
+        log_file_->flush();
+    }
 }
 
 // File system utilities

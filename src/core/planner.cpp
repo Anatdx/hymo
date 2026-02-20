@@ -486,8 +486,10 @@ void update_hymofs_mappings(const Config& config, const std::vector<Module>& mod
     // Apply user-defined hide rules
     apply_user_hide_rules();
 
-    // Restore enabled state (CLEAR_ALL must not disable; re-apply in case of old kernel)
-    HymoFS::set_enabled(config.hymofs_enabled);
+    // Activate rules: we just added them, kernel must have hymofs_enabled=true for
+    // redirect/hide to take effect. Do not use config.hymofs_enabled here — if we
+    // reached update_hymofs_mappings we intend to use HymoFS.
+    HymoFS::set_enabled(true);
 
     LOG_INFO("HymoFS mappings updated.");
 }
