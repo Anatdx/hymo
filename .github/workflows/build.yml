@@ -5,17 +5,13 @@ on:
     branches:
       - main
       - dev
-      - lkm
-    # 不包含 tags：标签由 release.yml 触发编译
     paths-ignore:
       - '**.md'
       - '.gitignore'
   pull_request:
     branches:
       - main
-  # 由 HymoFS 仓库 workflow_dispatch API 触发（可指定 ref=lkm）
   workflow_dispatch: {}
-  # repository_dispatch 只有默认分支上的 workflow 会被触发
   repository_dispatch:
     types: [build-lkm]
 
@@ -43,7 +39,7 @@ jobs:
       - name: Build HymoFS LKM for ${{ matrix.kmi }}
         env:
           HYMOFS_REPO: Anatdx/HymoFS
-          HYMOFS_REF: ${{ github.event.inputs.hymofs_ref || github.event.client_payload.ref || 'lkm' }}
+          HYMOFS_REF: ${{ github.event.inputs.hymofs_ref || github.event.client_payload.ref || 'main' }}
         run: |
           set -euo pipefail
           KMI="${{ matrix.kmi }}"
