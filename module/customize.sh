@@ -4,11 +4,12 @@
 LKM_DIR="$MODPATH/lkm"
 if [ -d "$LKM_DIR" ]; then
     ui_print "- Detecting kernel KMI..."
-    UNAME=$(uname -r 2>/dev/null || echo "")
+    # Use /proc to avoid uname spoofing; only match X.Y.Z-androidN-xxx format (no patch in KMI)
+    UNAME=$(cat /proc/sys/kernel/osrelease 2>/dev/null || echo "")
     KMI=""
-    if echo "$UNAME" | grep -qE 'android[0-9]+'; then
-        ANDROID=$(echo "$UNAME" | grep -oE 'android[0-9]+')
+    if echo "$UNAME" | grep -qE '^[0-9]+\.[0-9]+(\.[0-9]+)?-android[0-9]+'; then
         KVER=$(echo "$UNAME" | grep -oE '^[0-9]+\.[0-9]+')
+        ANDROID=$(echo "$UNAME" | grep -oE 'android[0-9]+')
         KMI="${ANDROID}-${KVER}"
     fi
     if [ -n "$KMI" ] && [ -f "$LKM_DIR/${KMI}_hymofs_lkm.ko" ]; then
