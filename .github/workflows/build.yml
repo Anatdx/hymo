@@ -29,6 +29,10 @@ jobs:
           - android14-6.1
           - android15-6.6
           - android16-6.12
+        arch:
+          - arm64
+          - armv7
+          - x86_64
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -36,47 +40,84 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Build HymoFS LKM for ${{ matrix.kmi }}
+      - name: Build HymoFS LKM for ${{ matrix.kmi }} (${{ matrix.arch }})
         env:
           HYMOFS_REPO: Anatdx/HymoFS
           HYMOFS_REF: ${{ github.event.inputs.hymofs_ref || github.event.client_payload.ref || 'main' }}
         run: |
           set -euo pipefail
           KMI="${{ matrix.kmi }}"
+          ARCH="${{ matrix.arch }}"
+          SRC="$GITHUB_WORKSPACE/hymofs_src/src"
+          CC_EXTRA=""
           echo "Cloning HymoFS (ref: ${HYMOFS_REF})..."
           git clone --depth 1 "https://github.com/${HYMOFS_REPO}.git" hymofs_src
           (cd hymofs_src && git fetch --depth 1 origin "${HYMOFS_REF}" && git checkout FETCH_HEAD)
           echo "Cloning kernel tree (${KMI})..."
           git clone --depth 1 -b "${KMI}" https://android.googlesource.com/kernel/common kernel_src
           sudo apt-get update
-          sudo apt-get install -y git make clang lld llvm gcc gcc-aarch64-linux-gnu flex bison bc rsync cpio libelf-dev libssl-dev libdw-dev pahole zip
-          # 5.10: ubuntu clang has arm64 "sp" register issues; use GCC cross-compiler
+          sudo apt-get install -y git make clang lld llvm gcc gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi flex bison bc rsync cpio libelf-dev libssl-dev libdw-dev pahole zip
+
+          # 5.10: use GCC cross (no LLVM); else LLVM=1
           if [[ "$KMI" == android12-5.10 ]] || [[ "$KMI" == android13-5.10 ]]; then
             LLVM_ARGS=""
-            CROSS_ARGS="CROSS_COMPILE=aarch64-linux-gnu-"
+            case "$ARCH" in
+              arm64)   CROSS_ARGS="CROSS_COMPILE=aarch64-linux-gnu-" ;;
+              armv7)   CROSS_ARGS="CROSS_COMPILE=arm-linux-gnueabi-" ;;
+              x86_64)  CROSS_ARGS="" ;;
+              *) echo "Unknown arch: $ARCH"; exit 1 ;;
+            esac
           else
             LLVM_ARGS="LLVM=1 LLVM_IAS=1"
-            CROSS_ARGS=""
+            case "$ARCH" in
+              arm64)   CROSS_ARGS="" ;;
+              armv7)   CROSS_ARGS="CROSS_COMPILE=arm-linux-gnueabi-"
+                WRAP_DIR="$GITHUB_WORKSPACE/.ccache_clang_wrap"
+                mkdir -p "$WRAP_DIR"
+                printf '%s\n' '#!/bin/bash' 'args=()' 'for a in "$@"; do' '  [[ "$a" == "-r" ]] && a="--relocatable"' '  args+=("$a")' 'done' 'exec clang "${args[@]}"' > "$WRAP_DIR/clang"
+                chmod +x "$WRAP_DIR/clang"
+                CC_EXTRA="CC=$WRAP_DIR/clang" ;;
+              x86_64)  CROSS_ARGS="" ;;
+              *) echo "Unknown arch: $ARCH"; exit 1 ;;
+            esac
           fi
-          make -C kernel_src ARCH=arm64 $CROSS_ARGS $LLVM_ARGS gki_defconfig 2>/dev/null || \
-            make -C kernel_src ARCH=arm64 $CROSS_ARGS $LLVM_ARGS defconfig
-          # 6.12: disable gendwarfksyms to avoid dwarf.h dependency
-          if [[ "$KMI" == *"6.12"* ]] && [ -f kernel_src/scripts/config ]; then
-            kernel_src/scripts/config --file kernel_src/.config -d GENDWARFKSYMS 2>/dev/null || true
-            make -C kernel_src ARCH=arm64 $CROSS_ARGS $LLVM_ARGS olddefconfig 2>/dev/null || true
-          fi
-          make -C kernel_src ARCH=arm64 $CROSS_ARGS $LLVM_ARGS modules_prepare
-          make -C kernel_src ARCH=arm64 $CROSS_ARGS $LLVM_ARGS M="$GITHUB_WORKSPACE/hymofs_src/src" KBUILD_MODPOST_WARN=1 modules
+
           mkdir -p out
-          cp hymofs_src/src/hymofs_lkm.ko "out/${KMI}_arm64_hymofs_lkm.ko"
-          llvm-strip -d "out/${KMI}_arm64_hymofs_lkm.ko" 2>/dev/null || true
+          if [[ "$ARCH" == "arm64" ]]; then
+            make -C kernel_src ARCH=arm64 $CROSS_ARGS $LLVM_ARGS gki_defconfig 2>/dev/null || make -C kernel_src ARCH=arm64 $CROSS_ARGS $LLVM_ARGS defconfig
+            if [[ "$KMI" == *"6.12"* ]] && [ -f kernel_src/scripts/config ]; then
+              kernel_src/scripts/config --file kernel_src/.config -d GENDWARFKSYMS 2>/dev/null || true
+              make -C kernel_src ARCH=arm64 $CROSS_ARGS $LLVM_ARGS olddefconfig 2>/dev/null || true
+            fi
+            make -C kernel_src ARCH=arm64 $CROSS_ARGS $LLVM_ARGS modules_prepare
+            make -C kernel_src ARCH=arm64 $CROSS_ARGS $LLVM_ARGS M="$SRC" KBUILD_MODPOST_WARN=1 modules
+          elif [[ "$ARCH" == "armv7" ]]; then
+            make -C kernel_src ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- $CROSS_ARGS $LLVM_ARGS $CC_EXTRA multi_v7_defconfig 2>/dev/null || make -C kernel_src ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- $CROSS_ARGS $LLVM_ARGS $CC_EXTRA defconfig
+            if [[ "$KMI" == *"6.12"* ]] && [ -f kernel_src/scripts/config ]; then
+              kernel_src/scripts/config --file kernel_src/.config -d GENDWARFKSYMS 2>/dev/null || true
+              make -C kernel_src ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- $CROSS_ARGS $LLVM_ARGS $CC_EXTRA olddefconfig 2>/dev/null || true
+            fi
+            make -C kernel_src ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- $CROSS_ARGS $LLVM_ARGS $CC_EXTRA modules_prepare
+            make -C kernel_src ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- $CROSS_ARGS $LLVM_ARGS $CC_EXTRA M="$SRC" KBUILD_MODPOST_WARN=1 modules
+          else
+            make -C kernel_src ARCH=x86 $CROSS_ARGS $LLVM_ARGS gki_defconfig 2>/dev/null || make -C kernel_src ARCH=x86 $CROSS_ARGS $LLVM_ARGS x86_64_defconfig
+            if [[ "$KMI" == *"6.12"* ]] && [ -f kernel_src/scripts/config ]; then
+              kernel_src/scripts/config --file kernel_src/.config -d GENDWARFKSYMS 2>/dev/null || true
+              make -C kernel_src ARCH=x86 $CROSS_ARGS $LLVM_ARGS olddefconfig 2>/dev/null || true
+            fi
+            make -C kernel_src ARCH=x86 $CROSS_ARGS $LLVM_ARGS modules_prepare
+            make -C kernel_src ARCH=x86 $CROSS_ARGS $LLVM_ARGS M="$SRC" KBUILD_MODPOST_WARN=1 modules
+          fi
+
+          cp "$SRC/hymofs_lkm.ko" "out/${KMI}_${ARCH}_hymofs_lkm.ko"
+          llvm-strip -d "out/${KMI}_${ARCH}_hymofs_lkm.ko" 2>/dev/null || true
           ls -la out/
 
       - name: Upload LKM artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.kmi }}_arm64_hymofs_lkm.ko
-          path: out/${{ matrix.kmi }}_arm64_hymofs_lkm.ko
+          name: ${{ matrix.kmi }}_${{ matrix.arch }}_hymofs_lkm.ko
+          path: out/${{ matrix.kmi }}_${{ matrix.arch }}_hymofs_lkm.ko
 
   build-hymod:
     needs: [build-lkm]
@@ -95,8 +136,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Download LKM artifacts
+      - name: Download LKM artifacts for ${{ matrix.arch }}
         uses: actions/download-artifact@v4
+        with:
+          pattern: '*_${{ matrix.arch == 'arm64-v8a' && 'arm64' || (matrix.arch == 'armeabi-v7a' && 'armv7' || 'x86_64') }}_hymofs_lkm.ko'
+          merge-multiple: true
 
       - name: Prepare assets
         run: |
@@ -172,8 +216,11 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Download LKM and hymod artifacts
+      - name: Download hymod artifacts
         uses: actions/download-artifact@v4
+        with:
+          pattern: hymod-*
+          merge-multiple: true
 
       - name: Read latest HymoFS commit info
         env:
