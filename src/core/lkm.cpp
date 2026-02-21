@@ -18,17 +18,71 @@ namespace hymo {
 
 static constexpr int HYMO_SYSCALL_NR = 142;
 
-// finit_module syscall numbers
+// finit_module and init_module syscall numbers
 #if defined(__aarch64__)
+#define SYS_init_module_num 105
 #define SYS_finit_module_num 379
 #define SYS_delete_module_num 106
 #elif defined(__x86_64__) || defined(__i386__)
+#define SYS_init_module_num 175
 #define SYS_finit_module_num 313
 #define SYS_delete_module_num 176
+#elif defined(__arm__)
+#define SYS_init_module_num 128
+#define SYS_finit_module_num 379
+#define SYS_delete_module_num 129
 #else
+#define SYS_init_module_num 105
 #define SYS_finit_module_num 379
 #define SYS_delete_module_num 106
 #endif
+
+static bool load_module_via_init(const char* ko_path, const char* params) {
+    int fd = open(ko_path, O_RDONLY | O_CLOEXEC);
+    if (fd < 0) {
+        LOG_ERROR(std::string("lkm: open ") + ko_path + " failed: " + strerror(errno));
+        return false;
+    }
+
+    struct stat st;
+    if (fstat(fd, &st) != 0) {
+        LOG_ERROR(std::string("lkm: fstat failed: ") + strerror(errno));
+        close(fd);
+        return false;
+    }
+
+    size_t size = st.st_size;
+    void* image = malloc(size);
+    if (!image) {
+        LOG_ERROR("lkm: malloc failed");
+        close(fd);
+        return false;
+    }
+
+    size_t bytes_read = 0;
+    while (bytes_read < size) {
+        ssize_t r = read(fd, (char*)image + bytes_read, size - bytes_read);
+        if (r < 0) {
+            if (errno == EINTR) continue;
+            LOG_ERROR(std::string("lkm: read failed: ") + strerror(errno));
+            free(image);
+            close(fd);
+            return false;
+        }
+        if (r == 0) break; // EOF
+        bytes_read += r;
+    }
+    close(fd);
+
+    int ret = syscall(SYS_init_module_num, image, size, params);
+    free(image);
+
+    if (ret != 0) {
+        LOG_ERROR(std::string("lkm: init_module ") + ko_path + " failed: " + strerror(errno));
+        return false;
+    }
+    return true;
+}
 
 static bool load_module_via_finit(const char* ko_path, const char* params) {
     const int fd = open(ko_path, O_RDONLY | O_CLOEXEC);
@@ -39,6 +93,10 @@ static bool load_module_via_finit(const char* ko_path, const char* params) {
     const int ret = syscall(SYS_finit_module_num, fd, params, 0);
     close(fd);
     if (ret != 0) {
+        if (errno == ENOSYS) {
+            LOG_WARN("finit_module not implemented, falling back to init_module");
+            return load_module_via_init(ko_path, params);
+        }
         LOG_ERROR(std::string("lkm: finit_module ") + ko_path + " failed: " + strerror(errno));
         return false;
     }

@@ -158,6 +158,10 @@ static Node* collect_all_modules(const std::vector<fs::path>& module_paths,
 
     LOG_INFO("Collecting files from modules directory");
 
+    std::vector<std::string> partitions_to_check = {"system"};
+    partitions_to_check.insert(partitions_to_check.end(), extra_partitions.begin(),
+                               extra_partitions.end());
+
     for (const auto& module_path : module_paths) {
         std::string module_id = module_path.filename().string();
 
@@ -168,16 +172,49 @@ static Node* collect_all_modules(const std::vector<fs::path>& module_paths,
             continue;
         }
 
-        // Check if module has system partition
-        fs::path module_system = module_path / "system";
-        if (!fs::is_directory(module_system)) {
-            LOG_DEBUG("Module " + module_id + " has no system directory");
+        bool module_modified = false;
+        for (const auto& p : partitions_to_check) {
+            if (fs::is_directory(module_path / p)) {
+                module_modified = true;
+                break;
+            }
+        }
+
+        if (!module_modified) {
+            LOG_DEBUG("Module " + module_id + " has no relevant partitions");
             continue;
         }
 
         LOG_INFO("Processing module: " + module_id);
         try {
-            bool module_has_file = collect_module_files(system, module_system, module_id);
+            bool module_has_file = false;
+            for (const auto& p : partitions_to_check) {
+                fs::path part_path = module_path / p;
+                if (fs::exists(part_path) && fs::is_directory(part_path)) {
+                    if (p == "system") {
+                        if (collect_module_files(system, part_path, module_id)) {
+                            module_has_file = true;
+                        }
+                    } else {
+                        // For top-level partitions like vendor/, product/ (KernelSU style)
+                        // Add them to system's children so they get extracted properly later
+                        auto it = system.children.find(p);
+                        if (it == system.children.end()) {
+                            Node p_node;
+                            p_node.name = p;
+                            p_node.file_type = NodeFileType::Directory;
+                            p_node.module_path = part_path;
+                            p_node.module_name = module_id;
+                            system.children[p] = p_node;
+                            it = system.children.find(p);
+                        }
+                        if (collect_module_files(it->second, part_path, module_id)) {
+                            module_has_file = true;
+                        }
+                    }
+                }
+            }
+            
             has_file |= module_has_file;
             if (module_has_file) {
                 LOG_INFO("  Module " + module_id + " has files to mount");
@@ -277,7 +314,7 @@ static bool mount_mirror(const fs::path& src_path, const fs::path& dst_path,
 
         if (S_ISREG(st.st_mode)) {
             // Regular file: create empty file then bind mount
-            int fd = open(dst.c_str(), O_CREAT | O_WRONLY, st.st_mode & 07777);
+            int fd = open(dst.c_str(), O_CREAT | O_WRONLY | O_TRUNC, st.st_mode & 07777);
             if (fd < 0) {
                 LOG_ERROR("Failed to create mirror file: " + dst.string());
                 return false;
@@ -458,7 +495,9 @@ static bool mount_directory_children(const fs::path& path, const fs::path& work_
         }
 
         fs::path real_path = path / name;
-        if (!fs::exists(real_path) && !node.replace) {
+        bool processed_in_first_loop = fs::exists(real_path) && !node.replace;
+        
+        if (!processed_in_first_loop) {
             if (!do_magic_mount(path, work_dir_path, child_node, has_tmpfs, disable_umount)) {
                 ok = false;
             }
