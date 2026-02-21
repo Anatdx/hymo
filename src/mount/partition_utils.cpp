@@ -85,11 +85,10 @@ std::vector<PartitionInfo> detect_partitions() {
         PartitionInfo info;
         if (parse_mount_line(line, info)) {
             partitions.push_back(info);
-            LOG_DEBUG("Detected partition: " + info.name + " at " + info.mount_point.string() +
-                      " (fs=" + info.fs_type + ", ro=" + std::to_string(info.is_read_only) + ")");
         }
     }
 
+    LOG_DEBUG("Detected " + std::to_string(partitions.size()) + " partitions");
     return partitions;
 }
 
@@ -108,7 +107,6 @@ std::vector<std::string> get_extra_partitions(const std::vector<PartitionInfo>& 
 
         if (!is_standard) {
             extra.push_back(part.name);
-            LOG_DEBUG("Found extra partition: " + part.name);
         }
     }
 

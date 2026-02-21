@@ -48,7 +48,7 @@ static int get_anon_fd() {
     }
 
     s_hymo_fd = fd;
-    LOG_VERBOSE("HymoFS: Got anonymous fd " + std::to_string(fd));
+    LOG_VERBOSE("HymoFS: Got fd " + std::to_string(fd));
     return fd;
 }
 
@@ -78,7 +78,6 @@ int HymoFS::get_protocol_version() {
 
     int version = 0;
     if (ioctl(fd, HYMO_IOC_GET_VERSION, &version) == 0) {
-        LOG_VERBOSE("get_protocol_version returned: " + std::to_string(version));
         return version;
     }
 
@@ -88,7 +87,6 @@ int HymoFS::get_protocol_version() {
 
 HymoFSStatus HymoFS::check_status() {
     if (s_status_checked) {
-        LOG_VERBOSE("HymoFS check_status: Cached (" + std::to_string((int)s_cached_status) + ")");
         return s_cached_status;
     }
 
@@ -115,7 +113,7 @@ HymoFSStatus HymoFS::check_status() {
         return HymoFSStatus::ModuleTooOld;
     }
 
-    LOG_VERBOSE("HymoFS check_status: Available (version " + std::to_string(k_ver) + ")");
+    LOG_VERBOSE("HymoFS: Available (protocol v" + std::to_string(k_ver) + ")");
     s_cached_status = HymoFSStatus::Available;
     s_status_checked = true;
     return HymoFSStatus::Available;
@@ -261,7 +259,6 @@ std::string HymoFS::get_active_rules() {
 
     struct hymo_syscall_list_arg arg = {.buf = raw_buf, .size = buf_size};
 
-    LOG_VERBOSE("HymoFS: Listing active rules...");
     int ret = hymo_execute_cmd(HYMO_IOC_LIST_RULES, &arg);
     if (ret < 0) {
         std::string err = "Error: command failed: ";
@@ -273,7 +270,6 @@ std::string HymoFS::get_active_rules() {
     }
 
     std::string result(raw_buf);
-    LOG_VERBOSE("HymoFS: get_active_rules returned " + std::to_string(result.length()) + " bytes");
 
     free(raw_buf);
     return result;
