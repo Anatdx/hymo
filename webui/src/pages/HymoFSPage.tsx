@@ -231,6 +231,19 @@ export function HymoFSPage() {
               </Button>
             </div>
           </div>
+          {systemInfo.hooks && (
+            <div className="mt-4 pt-4 border-t border-gray-700/50">
+              <h4 className="text-sm font-medium text-gray-400 mb-2">
+                {t.hymofs?.hooks?.title ?? 'Kernel Hooks'}
+              </h4>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                {t.hymofs?.hooks?.desc ?? 'HymoFS LKM hook status (tracepoint, ftrace, kretprobe)'}
+              </p>
+              <pre className="text-xs font-mono text-gray-300 bg-gray-900/50 rounded-lg p-4 overflow-x-auto whitespace-pre-wrap break-words max-h-48 overflow-y-auto">
+                {systemInfo.hooks}
+              </pre>
+            </div>
+          )}
         </Card>
 
         {/* Enable HymoFS Switch */}

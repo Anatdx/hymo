@@ -870,10 +870,14 @@ int main(int argc, char* argv[]) {
                         first = false;
                     }
                     std::cout << "],\n";
+
+                    std::string hooks = HymoFS::get_hooks();
+                    std::cout << "  \"hooks\": \"" << json::escape_string(hooks) << "\",\n";
                 } else {
                     std::cout << "  \"kernel_version\": 0,\n";
                     std::cout << "  \"protocol_mismatch\": false,\n";
                     std::cout << "  \"active_modules\": [],\n";
+                    std::cout << "  \"hooks\": \"\",\n";
                 }
 
                 RuntimeState state = load_runtime_state();
@@ -968,7 +972,7 @@ int main(int argc, char* argv[]) {
 
         case Command::API: {
             if (cli.args.empty()) {
-                std::cerr << "Usage: hymod api <system|storage|mount-stats|partitions|lkm>\n";
+                std::cerr << "Usage: hymod api <system|storage|mount-stats|partitions|lkm|hooks>\n";
                 return 1;
             }
             std::string subcmd = cli.args[0];
@@ -986,9 +990,14 @@ int main(int argc, char* argv[]) {
                 std::cout << "  \"loaded\": " << (lkm_is_loaded() ? "true" : "false") << ",\n";
                 std::cout << "  \"autoload\": " << (lkm_get_autoload() ? "true" : "false") << "\n";
                 std::cout << "}\n";
+            } else if (subcmd == "hooks") {
+                std::string hooks = HymoFS::is_available() ? HymoFS::get_hooks() : "";
+                std::cout << "{\n";
+                std::cout << "  \"hooks\": \"" << json::escape_string(hooks) << "\"\n";
+                std::cout << "}\n";
             } else {
                 std::cerr << "Unknown api subcommand: " << subcmd << "\n";
-                std::cerr << "Available: system, storage, mount-stats, partitions, lkm\n";
+                std::cerr << "Available: system, storage, mount-stats, partitions, lkm, hooks\n";
                 return 1;
             }
             return 0;

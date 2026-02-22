@@ -70,6 +70,7 @@ export type SystemInfo = {
   hymofsModules?: string[]
   hymofsMismatch?: boolean
   mismatchMessage?: string
+  hooks?: string
   mountStats?: MountStatistics
   detectedPartitions?: PartitionInfo[]
 }

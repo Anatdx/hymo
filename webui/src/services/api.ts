@@ -92,6 +92,7 @@ const mockApi = {
       mountBase: '/dev/hymofs',
       hymofsModules: ['example_module'],
       hymofsMismatch: false,
+      hooks: 'GET_FD: tracepoint (sys_enter/sys_exit)\npath: tracepoint (sys_enter)\nvfs_getattr,d_path,iterate_dir,vfs_getxattr: ftrace+kretprobe\nuname: kretprobe\ncmdline: tracepoint (sys_enter/sys_exit)',
       mountStats: {
         total_mounts: 45,
         successful_mounts: 44,
@@ -478,6 +479,7 @@ const realApi = {
         hymofsModules: mountData.active_modules || [],
         hymofsMismatch: mountData.protocol_mismatch || false,
         mismatchMessage: mountData.mismatch_message,
+        hooks: mountData.hooks || '',
         mountStats: systemData.mountStats,
         detectedPartitions: systemData.detectedPartitions,
       }
