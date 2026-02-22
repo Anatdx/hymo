@@ -270,7 +270,7 @@ int main(int argc, char* argv[]) {
 
         LogRedirector log_redirector(DAEMON_LOG_FILE);
         Logger::getInstance().init(config.debug, config.verbose);
-        LOG_INFO("hymod started, command=" + (cli.command.empty() ? "mount" : cli.command));
+        LOG_VERBOSE("hymod started, command=" + (cli.command.empty() ? "mount" : cli.command));
 
         if (cli.command.empty()) {
             print_help();
@@ -1286,7 +1286,8 @@ int main(int argc, char* argv[]) {
         bool hymofs_active = false;
 
         LOG_INFO("HymoFS status=" + std::to_string((int)hymofs_status) +
-                 " (0=Available,1=KernelTooOld,2=ModuleTooOld,3=Error)");
+                 " (0=Available,1=NotPresent,2=KernelTooOld,3=ModuleTooOld)");
+        std::clog.flush();
         bool can_use_hymofs = (hymofs_status == HymoFSStatus::Available);
 
         // Auto-select default tempdir if not set by user
@@ -1583,7 +1584,9 @@ int main(int argc, char* argv[]) {
 
         } else {
             // **Legacy/Overlay Path**
-            LOG_INFO("Mode: Standard Overlay/Magic (HymoFS not available)");
+            LOG_INFO("Mode: Standard Overlay/Magic (HymoFS not available, status=" +
+                    std::to_string((int)hymofs_status) + ")");
+            std::clog.flush();
             if (hymofs_status == HymoFSStatus::KernelTooOld) {
                 LOG_WARN("HymoFS Protocol Mismatch! Kernel is too old.");
                 warning_msg = "⚠️Kernel version is lower than module version. Please "
