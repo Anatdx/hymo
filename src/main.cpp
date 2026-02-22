@@ -40,6 +40,32 @@ struct CliOptions {
     std::vector<std::string> args;
 };
 
+// Redirect clog to log file; Logger writes to clog -> file (no shell redirect dependency)
+struct LogRedirector {
+    std::streambuf* old_clog = nullptr;
+    std::ofstream file;
+
+    LogRedirector(const char* log_path) {
+        fs::path p(log_path);
+        if (!p.parent_path().empty())
+            fs::create_directories(p.parent_path());
+        file.open(log_path, std::ios::app);
+        if (!file.is_open())
+            return;
+        old_clog = std::clog.rdbuf(file.rdbuf());
+        std::clog << std::unitbuf;
+    }
+
+    ~LogRedirector() {
+        if (old_clog) {
+            std::clog.flush();
+            if (file.is_open())
+                file.flush();
+            std::clog.rdbuf(old_clog);
+        }
+    }
+};
+
 static void print_help() {
     std::cerr << "Usage: hymod [OPTIONS] <command> [args...]\n\n";
     std::cerr << "Main Commands:\n";
@@ -231,19 +257,20 @@ static Config load_config(const CliOptions& opts) {
 }
 
 int main(int argc, char* argv[]) {
-    // Disable buffering: flush after every output (kpm_support style)
     std::cout.setf(std::ios_base::unitbuf);
     std::cerr.setf(std::ios_base::unitbuf);
+    std::clog.setf(std::ios_base::unitbuf);
 
     try {
         CliOptions cli = parse_args(argc, argv);
 
-        // Load config first so Logger uses config.debug/config.verbose
         Config config = load_config(cli);
         config.merge_with_cli(cli.moduledir, cli.tempdir, cli.mountsource, cli.verbose,
                               cli.partitions);
 
+        LogRedirector log_redirector(DAEMON_LOG_FILE);
         Logger::getInstance().init(config.debug, config.verbose);
+        LOG_INFO("hymod started, command=" + (cli.command.empty() ? "mount" : cli.command));
 
         if (cli.command.empty()) {
             print_help();
