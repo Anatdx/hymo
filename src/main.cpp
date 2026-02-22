@@ -1329,6 +1329,8 @@ int main(int argc, char* argv[]) {
             // Kernel defaults to hymofs_enabled=false; must set from config on every mount
             if (HymoFS::set_enabled(config.hymofs_enabled)) {
                 LOG_INFO("HymoFS enabled=" + std::string(config.hymofs_enabled ? "true" : "false"));
+                if (config.hymofs_enabled)
+                    hymofs_active = true;  // Module name "Hymo - HymoFS Enabled" when kernel supports and enabled
             } else {
                 LOG_WARN("Failed to set HymoFS enabled state.");
             }
