@@ -275,6 +275,28 @@ std::string HymoFS::get_active_rules() {
     return result;
 }
 
+std::string HymoFS::get_hooks() {
+    size_t buf_size = 4 * 1024;  // 4KB buffer
+    char* raw_buf = (char*)malloc(buf_size);
+    if (!raw_buf) {
+        return "";
+    }
+    memset(raw_buf, 0, buf_size);
+
+    struct hymo_syscall_list_arg arg = {.buf = raw_buf, .size = buf_size};
+
+    int ret = hymo_execute_cmd(HYMO_IOC_GET_HOOKS, &arg);
+    if (ret < 0) {
+        LOG_VERBOSE("HymoFS: get_hooks not supported or failed: " + std::string(strerror(errno)));
+        free(raw_buf);
+        return "";
+    }
+
+    std::string result(raw_buf);
+    free(raw_buf);
+    return result;
+}
+
 bool HymoFS::set_debug(bool enable) {
     int val = enable ? 1 : 0;
     LOG_VERBOSE("HymoFS: Setting debug=" + std::string(enable ? "true" : "false"));

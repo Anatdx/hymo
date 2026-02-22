@@ -79,11 +79,12 @@ for binary in hymod-arm64-v8a hymod-armeabi-v7a hymod-x86_64; do
 done
 
 # Create symlink in KSU/APatch bin
+HYMO_MODULE_PATH="/data/adb/modules/hymo"
 for BIN_BASE in /data/adb/ksu /data/adb/ap; do
     if [ -d "$BIN_BASE" ]; then
         mkdir -p "$BIN_BASE/bin"
-        ln -sf $MODPATH/hymod "$BIN_BASE/bin/hymod" 2>/dev/null && \
-            ui_print "- Symlink: $BIN_BASE/bin/hymod -> $MODPATH/hymod"
+        ln -sf "$HYMO_MODULE_PATH/hymod" "$BIN_BASE/bin/hymod" 2>/dev/null && \
+            ui_print "- Symlink: $BIN_BASE/bin/hymod -> $HYMO_MODULE_PATH/hymod"
     fi
 done
 

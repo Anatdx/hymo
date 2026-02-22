@@ -40,80 +40,105 @@ struct CliOptions {
     std::vector<std::string> args;
 };
 
+// Redirect clog to log file; Logger writes to clog -> file (no shell redirect dependency)
+struct LogRedirector {
+    std::streambuf* old_clog = nullptr;
+    std::ofstream file;
+
+    LogRedirector(const char* log_path) {
+        fs::path p(log_path);
+        if (!p.parent_path().empty())
+            fs::create_directories(p.parent_path());
+        file.open(log_path, std::ios::app);
+        if (!file.is_open())
+            return;
+        old_clog = std::clog.rdbuf(file.rdbuf());
+        std::clog << std::unitbuf;
+    }
+
+    ~LogRedirector() {
+        if (old_clog) {
+            std::clog.flush();
+            if (file.is_open())
+                file.flush();
+            std::clog.rdbuf(old_clog);
+        }
+    }
+};
+
 static void print_help() {
-    std::cout << "Usage: hymod [OPTIONS] <command> [args...]\n\n";
-    std::cout << "Main Commands:\n";
-    std::cout << "  mount              Mount all modules (default action)\n";
-    std::cout << "  clear              Clear all HymoFS mappings\n";
-    std::cout << "  fix-mounts         Fix mount namespace issues\n\n";
+    std::cerr << "Usage: hymod [OPTIONS] <command> [args...]\n\n";
+    std::cerr << "Main Commands:\n";
+    std::cerr << "  mount              Mount all modules (default action)\n";
+    std::cerr << "  clear              Clear all HymoFS mappings\n";
+    std::cerr << "  fix-mounts         Fix mount namespace issues\n\n";
 
-    std::cout << "Configuration Commands (config <subcommand>):\n";
-    std::cout << "  config gen         Generate default config file\n";
-    std::cout << "  config show        Show current configuration\n";
-    std::cout << "  config sync-partitions  Scan and auto-add partitions\n";
-    std::cout << "  config create-image [dir]  Create modules.img\n\n";
+    std::cerr << "Configuration Commands (config <subcommand>):\n";
+    std::cerr << "  config gen         Generate default config file\n";
+    std::cerr << "  config show        Show current configuration\n";
+    std::cerr << "  config sync-partitions  Scan and auto-add partitions\n";
+    std::cerr << "  config create-image [dir]  Create modules.img\n\n";
 
-    std::cout << "Module Commands (module <subcommand>):\n";
-    std::cout << "  module list        List all modules\n";
-    std::cout << "  module add <id>    Add module to HymoFS\n";
-    std::cout << "  module delete <id> Delete module from HymoFS\n";
-    std::cout << "  module hot-mount <id>    Hot mount a module\n";
-    std::cout << "  module hot-unmount <id>  Hot unmount a module\n";
-    std::cout << "  module set-mode <id> <mode>  Set mount mode (auto/hymofs/overlay/magic/none)\n";
-    std::cout << "  module add-rule <id> <path> <mode>  Add custom mount rule\n";
-    std::cout << "  module remove-rule <id> <path>  Remove custom mount rule\n";
-    std::cout << "  module check-conflicts  Check for file conflicts between modules\n\n";
+    std::cerr << "Module Commands (module <subcommand>):\n";
+    std::cerr << "  module list        List all modules\n";
+    std::cerr << "  module add <id>    Add module to HymoFS\n";
+    std::cerr << "  module delete <id> Delete module from HymoFS\n";
+    std::cerr << "  module hot-mount <id>    Hot mount a module\n";
+    std::cerr << "  module hot-unmount <id>  Hot unmount a module\n";
+    std::cerr << "  module set-mode <id> <mode>  Set mount mode (auto/hymofs/overlay/magic/none)\n";
+    std::cerr << "  module add-rule <id> <path> <mode>  Add custom mount rule\n";
+    std::cerr << "  module remove-rule <id> <path>  Remove custom mount rule\n";
+    std::cerr << "  module check-conflicts  Check for file conflicts between modules\n\n";
 
-    std::cout << "HymoFS Commands (hymofs <subcommand>):\n";
-    std::cout << "  hymofs enable      Enable HymoFS (Protocol 11+)\n";
-    std::cout << "  hymofs disable     Disable HymoFS\n";
-    std::cout << "  hymofs list        List all active HymoFS rules\n";
-    std::cout << "  hymofs version     Show HymoFS protocol version\n";
-    std::cout << "  hymofs set-mirror <path>  Set custom mirror path\n";
-    std::cout << "  hymofs raw <cmd> ...  Execute raw HymoFS command\n\n";
+    std::cerr << "HymoFS Commands (hymofs <subcommand>):\n";
+    std::cerr << "  hymofs enable      Enable HymoFS (Protocol 11+)\n";
+    std::cerr << "  hymofs disable     Disable HymoFS\n";
+    std::cerr << "  hymofs list        List all active HymoFS rules\n";
+    std::cerr << "  hymofs version     Show HymoFS protocol version\n";
+    std::cerr << "  hymofs set-mirror <path>  Set custom mirror path\n";
+    std::cerr << "  hymofs raw <cmd> ...  Execute raw HymoFS command\n\n";
 
-    std::cout << "API Commands (api <subcommand>) - JSON output for WebUI:\n";
-    std::cout << "  api system         Complete system info with stats\n";
-    std::cout << "  api storage        Storage usage information\n";
-    std::cout << "  api mount-stats    Mount statistics\n";
-    std::cout << "  api partitions     Detected partitions info\n";
-    std::cout << "  api lkm            LKM status (loaded, autoload) for WebUI\n\n";
+    std::cerr << "API Commands (api <subcommand>) - JSON output for WebUI:\n";
+    std::cerr << "  api system         Complete system info with stats\n";
+    std::cerr << "  api storage        Storage usage information\n";
+    std::cerr << "  api mount-stats    Mount statistics\n";
+    std::cerr << "  api partitions     Detected partitions info\n";
+    std::cerr << "  api lkm            LKM status (loaded, autoload) for WebUI\n\n";
 
-    std::cout << "Privacy Commands (hide <subcommand>):\n";
-    std::cout << "  hide list          List user-defined hide rules\n";
-    std::cout << "  hide add <path>    Add a hide rule\n";
-    std::cout << "  hide remove <path> Remove a hide rule\n\n";
+    std::cerr << "Privacy Commands (hide <subcommand>):\n";
+    std::cerr << "  hide list          List user-defined hide rules\n";
+    std::cerr << "  hide add <path>    Add a hide rule\n";
+    std::cerr << "  hide remove <path> Remove a hide rule\n\n";
 
-    std::cout << "Debug Commands (debug <subcommand>):\n";
-    std::cout << "  debug enable       Enable kernel debug logging\n";
-    std::cout << "  debug disable      Disable kernel debug logging\n";
-    std::cout << "  debug stealth on|off    Enable/disable stealth mode\n";
-    std::cout << "  debug set-uname <release> <version>  Set kernel version spoofing\n\n";
+    std::cerr << "Debug Commands (debug <subcommand>):\n";
+    std::cerr << "  debug enable       Enable kernel debug logging\n";
+    std::cerr << "  debug disable      Disable kernel debug logging\n";
+    std::cerr << "  debug stealth on|off    Enable/disable stealth mode\n";
+    std::cerr << "  debug set-uname <release> <version>  Set kernel version spoofing\n\n";
 
-    std::cout << "LKM Commands (lkm <subcommand>) - HymoFS kernel module:\n";
-    std::cout << "  lkm load           Load HymoFS kernel module\n";
-    std::cout << "  lkm unload         Unload HymoFS kernel module\n";
-    std::cout << "  lkm status         Show LKM status (loaded, autoload)\n";
-    std::cout << "  lkm set-autoload on|off  Enable/disable load at boot\n\n";
+    std::cerr << "LKM Commands (lkm <subcommand>) - HymoFS kernel module:\n";
+    std::cerr << "  lkm load           Load HymoFS kernel module\n";
+    std::cerr << "  lkm unload         Unload HymoFS kernel module\n";
+    std::cerr << "  lkm status         Show LKM status (loaded, autoload)\n";
+    std::cerr << "  lkm set-autoload on|off  Enable/disable load at boot\n\n";
 
-    std::cout << "Options:\n";
-    std::cout << "  -c, --config FILE       Config file path\n";
-    std::cout << "  -m, --moduledir DIR     Module directory\n";
-    std::cout << "  -t, --tempdir DIR       Temporary directory\n";
-    std::cout << "  -s, --mountsource NAME  Mount source name\n";
-    std::cout << "  -v, --verbose           Verbose logging\n";
-    std::cout << "  -p, --partition NAME    Add partition (can be used multiple "
+    std::cerr << "Options:\n";
+    std::cerr << "  -c, --config FILE       Config file path\n";
+    std::cerr << "  -m, --moduledir DIR     Module directory\n";
+    std::cerr << "  -t, --tempdir DIR       Temporary directory\n";
+    std::cerr << "  -s, --mountsource NAME  Mount source name\n";
+    std::cerr << "  -v, --verbose           Verbose logging\n";
+    std::cerr << "  -p, --partition NAME    Add partition (can be used multiple "
                  "times)\n";
-    std::cout << "  -o, --output FILE       Output file (for gen-config)\n";
-    std::cout << "  -h, --help              Show this help\n";
-    std::cout << "\nExamples:\n";
-    std::cout << "\nExamples:\n";
-    std::cout << "  hymod mount                    # Mount all modules\n";
-    std::cout << "  hymod config show              # Show configuration\n";
-    std::cout << "  hymod module list              # List modules\n";
-    std::cout << "  hymod api system               # Get system info (JSON)\n";
-    std::cout << "  hymod hide add /path           # Add hide rule\n";
-    std::cout << "  hymod debug enable             # Enable debug mode\n";
+    std::cerr << "  -o, --output FILE       Output file (for gen-config)\n";
+    std::cerr << "  -h, --help              Show this help\n";
+    std::cerr << "\nExamples:\n";
+    std::cerr << "  hymod mount                    # Mount all modules\n";
+    std::cerr << "  hymod config show              # Show configuration\n";
+    std::cerr << "  hymod module list              # List modules\n";
+    std::cerr << "  hymod api system               # Get system info (JSON)\n";
+    std::cerr << "  hymod hide add /path           # Add hide rule\n";
+    std::cerr << "  hymod debug enable             # Enable debug mode\n";
 }
 
 // Helper to segregate custom rules (Overlay/Magic) from HymoFS source tree
@@ -232,14 +257,20 @@ static Config load_config(const CliOptions& opts) {
 }
 
 int main(int argc, char* argv[]) {
+    std::cout.setf(std::ios_base::unitbuf);
+    std::cerr.setf(std::ios_base::unitbuf);
+    std::clog.setf(std::ios_base::unitbuf);
+
     try {
         CliOptions cli = parse_args(argc, argv);
 
-        // Load config first so Logger uses config.debug/config.verbose
         Config config = load_config(cli);
         config.merge_with_cli(cli.moduledir, cli.tempdir, cli.mountsource, cli.verbose,
                               cli.partitions);
-        Logger::getInstance().init(config.debug, config.verbose, DAEMON_LOG_FILE);
+
+        LogRedirector log_redirector(DAEMON_LOG_FILE);
+        Logger::getInstance().init(config.debug, config.verbose);
+        LOG_VERBOSE("hymod started, command=" + (cli.command.empty() ? "mount" : cli.command));
 
         if (cli.command.empty()) {
             print_help();
@@ -299,7 +330,7 @@ int main(int argc, char* argv[]) {
             if (subcmd == "gen") {
                 std::string output = cli.output.empty() ? CONFIG_FILENAME : cli.output;
                 Config().save_to_file(output);
-                std::cout << "Generated config: " << output << "\n";
+                std::cerr << "Generated config: " << output << "\n";
                 return 0;
             } else if (subcmd == "show") {
                 Config config = load_config(cli);
@@ -364,7 +395,7 @@ int main(int argc, char* argv[]) {
 
                     if (!exists) {
                         config.partitions.push_back(cand);
-                        std::cout << "Added partition: " << cand << "\n";
+                        std::cerr << "Added partition: " << cand << "\n";
                         added++;
                     }
                 }
@@ -374,20 +405,20 @@ int main(int argc, char* argv[]) {
                                                ? (fs::path(BASE_DIR) / CONFIG_FILENAME)
                                                : fs::path(cli.config_file);
                     if (config.save_to_file(config_path)) {
-                        std::cout << "Updated config with " << added << " new partitions.\n";
+                        std::cerr << "Updated config with " << added << " new partitions.\n";
                     } else {
                         std::cerr << "Failed to save config to " << config_path << "\n";
                         return 1;
                     }
                 } else {
-                    std::cout << "No new partitions found.\n";
+                    std::cerr << "No new partitions found.\n";
                 }
                 return 0;
             } else if (subcmd == "create-image") {
                 std::string dir = cli.args.size() >= 2 ? cli.args[1] : "/data/adb";
                 fs::path img_dir(dir);
                 if (create_image(img_dir)) {
-                    std::cout << "Successfully created modules.img in " << dir << "\n";
+                    std::cerr << "Successfully created modules.img in " << dir << "\n";
                     LOG_INFO("Created modules.img via CLI");
                     return 0;
                 } else {
@@ -444,14 +475,14 @@ int main(int argc, char* argv[]) {
                             fs::path target_base = fs::path("/") / part;
                             if (HymoFS::add_rules_from_directory(target_base, src_dir)) {
                                 if (config.verbose)
-                                    std::cout << "Added rules for " << src_dir << "\n";
+                                    std::cerr << "Added rules for " << src_dir << "\n";
                                 success_count++;
                             }
                         }
                     }
 
                     if (success_count > 0) {
-                        std::cout << "Successfully added module " << module_id << "\n";
+                        std::cerr << "Successfully added module " << module_id << "\n";
                         LOG_INFO("CLI: Added module " + module_id);
 
                         RuntimeState state = load_runtime_state();
@@ -467,7 +498,7 @@ int main(int argc, char* argv[]) {
                             state.save();
                         }
                     } else {
-                        std::cout << "No content found to add for module " << module_id << "\n";
+                        std::cerr << "No content found to add for module " << module_id << "\n";
                     }
                 } else {  // delete
                     for (const auto& part : all_partitions) {
@@ -476,14 +507,14 @@ int main(int argc, char* argv[]) {
                             fs::path target_base = fs::path("/") / part;
                             if (HymoFS::remove_rules_from_directory(target_base, src_dir)) {
                                 if (config.verbose)
-                                    std::cout << "Deleted rules for " << src_dir << "\n";
+                                    std::cerr << "Deleted rules for " << src_dir << "\n";
                                 success_count++;
                             }
                         }
                     }
 
                     if (success_count > 0) {
-                        std::cout << "Successfully removed " << success_count
+                        std::cerr << "Successfully removed " << success_count
                                   << " rules for module " << module_id << "\n";
                         LOG_INFO("CLI: Removed rules for module " + module_id);
 
@@ -495,7 +526,7 @@ int main(int argc, char* argv[]) {
                             state.save();
                         }
                     } else {
-                        std::cout << "No active rules found or removed for module " << module_id
+                        std::cerr << "No active rules found or removed for module " << module_id
                                   << "\n";
                     }
                 }
@@ -536,14 +567,14 @@ int main(int argc, char* argv[]) {
                             fs::path target_base = fs::path("/") / part;
                             if (HymoFS::add_rules_from_directory(target_base, src_dir)) {
                                 if (config.verbose)
-                                    std::cout << "Added rules for " << src_dir << "\n";
+                                    std::cerr << "Added rules for " << src_dir << "\n";
                                 success_count++;
                             }
                         }
                     }
 
                     if (success_count > 0) {
-                        std::cout << "Successfully added module " << mod_id << "\n";
+                        std::cerr << "Successfully added module " << mod_id << "\n";
                         LOG_INFO("CLI: Hot mounted module " + mod_id);
 
                         RuntimeState state = load_runtime_state();
@@ -559,7 +590,7 @@ int main(int argc, char* argv[]) {
                             state.save();
                         }
                     } else {
-                        std::cout << "No content found to add for module " << mod_id << "\n";
+                        std::cerr << "No content found to add for module " << mod_id << "\n";
                     }
                 } else {  // hot-unmount
                     fs::path hot_unmounted_dir = fs::path(RUN_DIR) / "hot_unmounted";
@@ -586,7 +617,7 @@ int main(int argc, char* argv[]) {
                     }
 
                     if (success_count > 0) {
-                        std::cout << "Successfully hot unmounted module " << mod_id << "\n";
+                        std::cerr << "Successfully hot unmounted module " << mod_id << "\n";
                         LOG_INFO("CLI: Hot unmounted module " + mod_id);
 
                         RuntimeState state = load_runtime_state();
@@ -597,7 +628,7 @@ int main(int argc, char* argv[]) {
                             state.save();
                         }
                     } else {
-                        std::cout << "No active rules found for module " << mod_id << "\n";
+                        std::cerr << "No active rules found for module " << mod_id << "\n";
                     }
                 }
                 return 0;
@@ -613,7 +644,7 @@ int main(int argc, char* argv[]) {
                 modes[mod_id] = mode;
 
                 if (save_module_modes(modes)) {
-                    std::cout << "Set mode for " << mod_id << " to " << mode << "\n";
+                    std::cerr << "Set mode for " << mod_id << " to " << mode << "\n";
                 } else {
                     std::cerr << "Failed to save module modes.\n";
                     return 1;
@@ -642,7 +673,7 @@ int main(int argc, char* argv[]) {
                 }
 
                 if (save_module_rules(rules)) {
-                    std::cout << "Added rule for " << mod_id << ": " << path << " -> " << mode
+                    std::cerr << "Added rule for " << mod_id << ": " << path << " -> " << mode
                               << "\n";
                 } else {
                     std::cerr << "Failed to save module rules.\n";
@@ -667,16 +698,16 @@ int main(int argc, char* argv[]) {
                     if (it != mod_rules.end()) {
                         mod_rules.erase(it, mod_rules.end());
                         if (save_module_rules(rules)) {
-                            std::cout << "Removed rule for " << mod_id << ": " << path << "\n";
+                            std::cerr << "Removed rule for " << mod_id << ": " << path << "\n";
                         } else {
                             std::cerr << "Failed to save module rules.\n";
                             return 1;
                         }
                     } else {
-                        std::cout << "Rule not found.\n";
+                        std::cerr << "Rule not found.\n";
                     }
                 } else {
-                    std::cout << "Module not found in rules.\n";
+                    std::cerr << "Module not found in rules.\n";
                 }
                 return 0;
             } else if (subcmd == "check-conflicts") {
@@ -765,7 +796,7 @@ int main(int argc, char* argv[]) {
                 bool enable = (subcmd == "enable");
                 if (HymoFS::is_available()) {
                     if (HymoFS::set_enabled(enable)) {
-                        std::cout << "HymoFS " << (enable ? "enabled" : "disabled") << ".\n";
+                        std::cerr << "HymoFS " << (enable ? "enabled" : "disabled") << ".\n";
                         LOG_INFO("HymoFS " + std::string(enable ? "enabled" : "disabled"));
                     } else {
                         std::cerr << "Failed to set HymoFS enable state.\n";
@@ -870,10 +901,14 @@ int main(int argc, char* argv[]) {
                         first = false;
                     }
                     std::cout << "],\n";
+
+                    std::string hooks = HymoFS::get_hooks();
+                    std::cout << "  \"hooks\": " << json::escape_string(hooks) << ",\n";
                 } else {
                     std::cout << "  \"kernel_version\": 0,\n";
                     std::cout << "  \"protocol_mismatch\": false,\n";
                     std::cout << "  \"active_modules\": [],\n";
+                    std::cout << "  \"hooks\": \"\",\n";
                 }
 
                 RuntimeState state = load_runtime_state();
@@ -895,10 +930,10 @@ int main(int argc, char* argv[]) {
                                            ? (fs::path(BASE_DIR) / "config.toml")
                                            : fs::path(cli.config_file);
                 if (config.save_to_file(config_path)) {
-                    std::cout << "Mirror path set to: " << path << "\n";
+                    std::cerr << "Mirror path set to: " << path << "\n";
                     if (HymoFS::is_available()) {
                         if (HymoFS::set_mirror_path(path)) {
-                            std::cout << "Applied mirror path to kernel.\n";
+                            std::cerr << "Applied mirror path to kernel.\n";
                         } else {
                             std::cerr << "Failed to apply mirror path to kernel.\n";
                         }
@@ -951,7 +986,7 @@ int main(int argc, char* argv[]) {
                 }
 
                 if (success) {
-                    std::cout << "Command executed successfully.\n";
+                    std::cerr << "Command executed successfully.\n";
                     LOG_INFO("Executed raw command: " + cmd);
                 } else {
                     std::cerr << "Command failed.\n";
@@ -968,7 +1003,7 @@ int main(int argc, char* argv[]) {
 
         case Command::API: {
             if (cli.args.empty()) {
-                std::cerr << "Usage: hymod api <system|storage|mount-stats|partitions|lkm>\n";
+                std::cerr << "Usage: hymod api <system|storage|mount-stats|partitions|lkm|hooks>\n";
                 return 1;
             }
             std::string subcmd = cli.args[0];
@@ -986,9 +1021,14 @@ int main(int argc, char* argv[]) {
                 std::cout << "  \"loaded\": " << (lkm_is_loaded() ? "true" : "false") << ",\n";
                 std::cout << "  \"autoload\": " << (lkm_get_autoload() ? "true" : "false") << "\n";
                 std::cout << "}\n";
+            } else if (subcmd == "hooks") {
+                std::string hooks = HymoFS::is_available() ? HymoFS::get_hooks() : "";
+                std::cout << "{\n";
+                std::cout << "  \"hooks\": " << json::escape_string(hooks) << "\n";
+                std::cout << "}\n";
             } else {
                 std::cerr << "Unknown api subcommand: " << subcmd << "\n";
-                std::cerr << "Available: system, storage, mount-stats, partitions, lkm\n";
+                std::cerr << "Available: system, storage, mount-stats, partitions, lkm, hooks\n";
                 return 1;
             }
             return 0;
@@ -1005,7 +1045,7 @@ int main(int argc, char* argv[]) {
                 bool enable = (subcmd == "enable");
                 if (HymoFS::is_available()) {
                     if (HymoFS::set_debug(enable)) {
-                        std::cout << "Kernel debug logging " << (enable ? "enabled" : "disabled")
+                        std::cerr << "Kernel debug logging " << (enable ? "enabled" : "disabled")
                                   << ".\n";
                         LOG_INFO("Kernel debug logging " +
                                  std::string(enable ? "enabled" : "disabled"));
@@ -1029,7 +1069,7 @@ int main(int argc, char* argv[]) {
 
                 if (HymoFS::is_available()) {
                     if (HymoFS::set_stealth(enable)) {
-                        std::cout << "Stealth mode " << (enable ? "enabled" : "disabled") << ".\n";
+                        std::cerr << "Stealth mode " << (enable ? "enabled" : "disabled") << ".\n";
                         LOG_INFO("Stealth mode " + std::string(enable ? "enabled" : "disabled"));
                     } else {
                         std::cerr << "Failed to set stealth mode.\n";
@@ -1060,12 +1100,12 @@ int main(int argc, char* argv[]) {
                                                : fs::path(cli.config_file);
 
                     if (config.save_to_file(config_path)) {
-                        std::cout << "Kernel version spoofing configured:\n";
-                        std::cout << "  Release: " << release << "\n";
-                        std::cout << "  Version: " << version << "\n";
+                        std::cerr << "Kernel version spoofing configured:\n";
+                        std::cerr << "  Release: " << release << "\n";
+                        std::cerr << "  Version: " << version << "\n";
 
                         if (HymoFS::set_uname(release, version)) {
-                            std::cout << "Applied uname spoofing to kernel.\n";
+                            std::cerr << "Applied uname spoofing to kernel.\n";
                             LOG_INFO("Kernel uname updated: " + release + " " + version);
                         } else {
                             std::cerr << "Warning: Failed to apply uname to kernel.\n";
@@ -1095,23 +1135,23 @@ int main(int argc, char* argv[]) {
 
             if (lkm_subcmd == "load") {
                 if (lkm_load()) {
-                    std::cout << "HymoFS LKM loaded.\n";
+                    std::cerr << "HymoFS LKM loaded.\n";
                 } else {
                     std::cerr << "Failed to load HymoFS LKM.\n";
                     return 1;
                 }
             } else if (lkm_subcmd == "unload") {
                 if (lkm_unload()) {
-                    std::cout << "HymoFS LKM unloaded.\n";
+                    std::cerr << "HymoFS LKM unloaded.\n";
                 } else {
                     std::cerr << "Failed to unload HymoFS LKM.\n";
                     return 1;
                 }
             } else if (lkm_subcmd == "status") {
-                std::cout << "{\n";
-                std::cout << "  \"loaded\": " << (lkm_is_loaded() ? "true" : "false") << ",\n";
-                std::cout << "  \"autoload\": " << (lkm_get_autoload() ? "true" : "false") << "\n";
-                std::cout << "}\n";
+                std::cerr << "{\n";
+                std::cerr << "  \"loaded\": " << (lkm_is_loaded() ? "true" : "false") << ",\n";
+                std::cerr << "  \"autoload\": " << (lkm_get_autoload() ? "true" : "false") << "\n";
+                std::cerr << "}\n";
             } else if (lkm_subcmd == "set-autoload") {
                 if (cli.args.size() < 2) {
                     std::cerr << "Usage: hymod lkm set-autoload <on|off>\n";
@@ -1119,7 +1159,7 @@ int main(int argc, char* argv[]) {
                 }
                 bool on = (cli.args[1] == "on" || cli.args[1] == "1" || cli.args[1] == "true");
                 if (lkm_set_autoload(on)) {
-                    std::cout << "Autoload at boot: " << (on ? "on" : "off") << "\n";
+                    std::cerr << "Autoload at boot: " << (on ? "on" : "off") << "\n";
                 } else {
                     std::cerr << "Failed to set autoload.\n";
                     return 1;
@@ -1166,7 +1206,7 @@ int main(int argc, char* argv[]) {
         case Command::CLEAR: {
             if (HymoFS::is_available()) {
                 if (HymoFS::clear_rules()) {
-                    std::cout << "Successfully cleared all HymoFS rules.\n";
+                    std::cerr << "Successfully cleared all HymoFS rules.\n";
                     LOG_INFO("User manually cleared all HymoFS rules via CLI");
 
                     RuntimeState state = load_runtime_state();
@@ -1187,7 +1227,7 @@ int main(int argc, char* argv[]) {
         case Command::FIX_MOUNTS: {
             if (HymoFS::is_available()) {
                 if (HymoFS::fix_mounts()) {
-                    std::cout << "Mount namespace fixed (mnt_id reordered).\n";
+                    std::cerr << "Mount namespace fixed (mnt_id reordered).\n";
                     LOG_INFO("Mount namespace fixed via CLI.");
                 } else {
                     std::cerr << "Failed to fix mount namespace.\n";
@@ -1216,8 +1256,8 @@ int main(int argc, char* argv[]) {
             return 1;
         }
 
-        // config already loaded and merged at start of main(); re-init logger for mount
-        Logger::getInstance().init(config.debug, config.verbose, DAEMON_LOG_FILE);
+        // Re-init logger with merged config for mount
+        Logger::getInstance().init(config.debug, config.verbose);
 
         // Camouflage process
         if (!camouflage_process("kworker/u9:1")) {
@@ -1245,6 +1285,9 @@ int main(int argc, char* argv[]) {
         std::string warning_msg = "";
         bool hymofs_active = false;
 
+        LOG_INFO("HymoFS status=" + std::to_string((int)hymofs_status) +
+                 " (0=Available,1=NotPresent,2=KernelTooOld,3=ModuleTooOld)");
+        std::clog.flush();
         bool can_use_hymofs = (hymofs_status == HymoFSStatus::Available);
 
         // Auto-select default tempdir if not set by user
@@ -1287,6 +1330,8 @@ int main(int argc, char* argv[]) {
             // Kernel defaults to hymofs_enabled=false; must set from config on every mount
             if (HymoFS::set_enabled(config.hymofs_enabled)) {
                 LOG_INFO("HymoFS enabled=" + std::string(config.hymofs_enabled ? "true" : "false"));
+                if (config.hymofs_enabled)
+                    hymofs_active = true;  // Module name "Hymo - HymoFS Enabled" when kernel supports and enabled
             } else {
                 LOG_WARN("Failed to set HymoFS enabled state.");
             }
@@ -1341,7 +1386,9 @@ int main(int argc, char* argv[]) {
             }
 
             // Scan modules first to determine mount strategy
+            LOG_INFO("Scanning modules from: " + config.moduledir.string());
             module_list = scan_modules(config.moduledir, config);
+            LOG_INFO("Scanned " + std::to_string(module_list.size()) + " modules (pre-filter)");
 
             // Filter modules: only consider modules with actual content
             std::vector<Module> active_modules;
@@ -1365,6 +1412,7 @@ int main(int argc, char* argv[]) {
             }
 
             module_list = active_modules;
+            LOG_INFO("Active modules with content: " + std::to_string(module_list.size()));
 
             // **Mirror Strategy (Tmpfs/Ext4)**
             // To avoid SELinux/permission issues on /data, we mirror active modules
@@ -1374,6 +1422,8 @@ int main(int argc, char* argv[]) {
             bool mirror_success = false;
 
             try {
+                LOG_INFO("Setting up storage at " + MIRROR_DIR.string() +
+                         ", fs_type=" + filesystem_type_to_string(config.fs_type));
                 // Handle Tmpfs -> EROFS -> Ext4 fallback
                 try {
                     storage = setup_storage(MIRROR_DIR, img_path, config.fs_type);
@@ -1534,6 +1584,9 @@ int main(int argc, char* argv[]) {
 
         } else {
             // **Legacy/Overlay Path**
+            LOG_INFO("Mode: Standard Overlay/Magic (HymoFS not available, status=" +
+                    std::to_string((int)hymofs_status) + ")");
+            std::clog.flush();
             if (hymofs_status == HymoFSStatus::KernelTooOld) {
                 LOG_WARN("HymoFS Protocol Mismatch! Kernel is too old.");
                 warning_msg = "⚠️Kernel version is lower than module version. Please "
@@ -1544,9 +1597,8 @@ int main(int argc, char* argv[]) {
                               "update your module.";
             }
 
-            LOG_INFO("Mode: Standard Overlay/Magic (Copy)");
-
             // **Step 1: Setup Storage**
+            LOG_INFO("Overlay path: setting up storage at " + std::string(FALLBACK_CONTENT_DIR));
             fs::path mnt_base(FALLBACK_CONTENT_DIR);
             fs::path img_path = fs::path(BASE_DIR) / "modules.img";
 
@@ -1729,8 +1781,11 @@ int main(int argc, char* argv[]) {
     } catch (const std::exception& e) {
         std::cerr << "Fatal Error: " << e.what() << "\n";
         LOG_ERROR("Fatal Error: " + std::string(e.what()));
-        // Update with failure emoji
-        update_module_description(false, "error", false, 0, 0, 0, "", false);
+        try {
+            update_module_description(false, "error", false, 0, 0, 0, "", false);
+        } catch (...) {
+            /* ignore */
+        }
         return 1;
     }
     return 0;

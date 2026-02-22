@@ -3,6 +3,9 @@ import { PATHS, DEFAULT_CONFIG, type Config, type Module, type StorageInfo, type
 const isDev = import.meta.env.DEV
 let ksuExec: ((cmd: string) => Promise<{ errno: number; stdout: string; stderr: string }>) | null = null
 
+// API JSON to stdout (KernelSU exec may not capture stderr); fallback to stderr
+const apiOutput = (r: { stdout: string; stderr: string }) => (r.stdout || r.stderr || '').trim()
+
 // Initialize KernelSU API
 async function initKernelSU() {
   if (ksuExec !== null) return ksuExec
@@ -92,6 +95,7 @@ const mockApi = {
       mountBase: '/dev/hymofs',
       hymofsModules: ['example_module'],
       hymofsMismatch: false,
+      hooks: 'GET_FD: tracepoint (sys_enter/sys_exit)\npath: tracepoint (sys_enter)\nvfs_getattr,d_path,iterate_dir,vfs_getxattr: ftrace+kretprobe\nuname: kretprobe\ncmdline: tracepoint (sys_enter/sys_exit)',
       mountStats: {
         total_mounts: 45,
         successful_mounts: 44,
@@ -171,9 +175,10 @@ const realApi = {
     
     const cmd = `${PATHS.BINARY} config show`
     try {
-      const { errno, stdout } = await ksuExec!(cmd)
-      if (errno === 0 && stdout) {
-        return JSON.parse(stdout)
+      const res = await ksuExec!(cmd)
+      const out = apiOutput(res)
+      if (res.errno === 0 && out) {
+        return JSON.parse(out)
       }
       return DEFAULT_CONFIG
     } catch (e) {
@@ -230,9 +235,10 @@ const realApi = {
     
     const cmd = `${PATHS.BINARY} module list`
     try {
-      const { errno, stdout } = await ksuExec!(cmd)
-      if (errno === 0 && stdout) {
-        const data = JSON.parse(stdout)
+      const res = await ksuExec!(cmd)
+      const out = apiOutput(res)
+      if (res.errno === 0 && out) {
+        const data = JSON.parse(out)
         const modules = data.modules || data || []
         return modules.map((m: any) => ({
           id: m.id,
@@ -275,9 +281,10 @@ const realApi = {
     
     const cmd = `${PATHS.BINARY} module check-conflicts`
     try {
-      const { errno, stdout } = await ksuExec!(cmd)
-      if (errno === 0 && stdout) {
-        return JSON.parse(stdout)
+      const res = await ksuExec!(cmd)
+      const out = apiOutput(res)
+      if (res.errno === 0 && out) {
+        return JSON.parse(out)
       }
     } catch (e) {
       console.error('Check conflicts failed:', e)
@@ -363,10 +370,11 @@ const realApi = {
     
     try {
       const cmd = `${PATHS.BINARY} api storage`
-      const { errno, stdout } = await ksuExec!(cmd)
+      const { errno, stdout, stderr } = await ksuExec!(cmd)
+      const out = apiOutput({ stdout, stderr })
       
-      if (errno === 0 && stdout) {
-        const data = JSON.parse(stdout)
+      if (errno === 0 && out) {
+        const data = JSON.parse(out)
         
         // Handle "Not mounted" error or valid stats
         if (data.error) {
@@ -451,8 +459,8 @@ const realApi = {
       const cmdSystem = `${PATHS.BINARY} api system`
       let systemData: any = {}
       try {
-        const { stdout: outSystem } = await ksuExec!(cmdSystem)
-        systemData = JSON.parse(outSystem || '{}')
+        const res = await ksuExec!(cmdSystem)
+        systemData = JSON.parse(apiOutput(res) || '{}')
         console.log('[SystemInfo] api system output:', systemData)
       } catch (e) { 
         console.warn('Failed to get system info', e) 
@@ -462,8 +470,8 @@ const realApi = {
       const cmdMount = `${PATHS.BINARY} hymofs version`
       let mountData: any = {}
       try {
-        const { stdout: outMount } = await ksuExec!(cmdMount)
-        mountData = JSON.parse(outMount || '{}')
+        const res = await ksuExec!(cmdMount)
+        mountData = JSON.parse(apiOutput(res) || '{}')
         console.log('[SystemInfo] hymofs version output:', mountData)
       } catch (e) { 
         console.warn('Failed to get mount info', e) 
@@ -478,6 +486,7 @@ const realApi = {
         hymofsModules: mountData.active_modules || [],
         hymofsMismatch: mountData.protocol_mismatch || false,
         mismatchMessage: mountData.mismatch_message,
+        hooks: mountData.hooks || '',
         mountStats: systemData.mountStats,
         detectedPartitions: systemData.detectedPartitions,
       }
@@ -517,17 +526,18 @@ const realApi = {
     
     try {
       const cmd = `${PATHS.BINARY} hide list`
-      const { errno, stdout } = await ksuExec!(cmd)
+      const { errno, stdout, stderr } = await ksuExec!(cmd)
+      const out = apiOutput({ stdout, stderr })
       
-      if (errno === 0 && stdout) {
+      if (errno === 0 && out) {
         try {
-          const rules = JSON.parse(stdout)
+          const rules = JSON.parse(out)
           if (Array.isArray(rules)) {
             return rules
           }
         } catch (e) {
           // Fallback
-          return stdout
+          return out
             .split('\n')
             .map(line => line.trim())
             .filter(line => line && line.startsWith('/'))
@@ -552,10 +562,11 @@ const realApi = {
       const userSet = new Set(userRules)
       const rules: Array<{ type: string; path: string; target?: string; source?: string; isUserDefined: boolean }> = []
       
-      if (allOutput.errno === 0 && allOutput.stdout) {
+      const out = apiOutput(allOutput)
+      if (allOutput.errno === 0 && out) {
         let parsed = false
         try {
-          const data = JSON.parse(allOutput.stdout)
+          const data = JSON.parse(out)
           if (Array.isArray(data)) {
             parsed = true
             data.forEach((rule: any) => {
@@ -576,7 +587,7 @@ const realApi = {
 
         if (!parsed) {
           // Parse legacy format (line-based)
-          const lines = allOutput.stdout.split('\n')
+          const lines = out.split('\n')
           for (const line of lines) {
             const trimmed = line.trim()
             if (!trimmed) continue
@@ -650,9 +661,10 @@ const realApi = {
     
     try {
       const cmd = `${PATHS.BINARY} api lkm`
-      const { errno, stdout } = await ksuExec!(cmd)
-      if (errno === 0 && stdout) {
-        const data = JSON.parse(stdout)
+      const res = await ksuExec!(cmd)
+      const out = apiOutput(res)
+      if (res.errno === 0 && out) {
+        const data = JSON.parse(out)
         return {
           loaded: data.loaded === true,
           autoload: data.autoload !== false,

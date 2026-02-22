@@ -37,6 +37,10 @@ export const translations = {
         unloadFailed: 'Failed to unload LKM',
         autoloadFailed: 'Failed to set autoload',
       },
+      hooks: {
+        title: 'Kernel Hooks',
+        desc: 'HymoFS LKM hook status (tracepoint, ftrace, kretprobe)',
+      },
     },
     status: {
       title: 'System Status',
@@ -244,6 +248,10 @@ export const translations = {
         loadFailed: '加载 LKM 失败',
         unloadFailed: '卸载 LKM 失败',
         autoloadFailed: '设置自启失败',
+      },
+      hooks: {
+        title: '内核 Hooks',
+        desc: 'HymoFS LKM 内核钩子状态（tracepoint、ftrace、kretprobe）',
       },
     },
     status: {
@@ -453,6 +461,10 @@ export const translations = {
         unloadFailed: '卸載 LKM 失敗',
         autoloadFailed: '設定自啟失敗',
       },
+      hooks: {
+        title: '內核 Hooks',
+        desc: 'HymoFS LKM 內核鉤子狀態（tracepoint、ftrace、kretprobe）',
+      },
     },
     status: {
       title: '系統狀態',
@@ -660,6 +672,10 @@ export const translations = {
         loadFailed: 'Échec du chargement LKM',
         unloadFailed: 'Échec du déchargement LKM',
         autoloadFailed: 'Échec de la configuration autoload',
+      },
+      hooks: {
+        title: 'Hooks du noyau',
+        desc: 'État des hooks HymoFS LKM (tracepoint, ftrace, kretprobe)',
       },
     },
     status: {
@@ -869,6 +885,10 @@ export const translations = {
         unloadFailed: 'Error al descargar LKM',
         autoloadFailed: 'Error al configurar autoload',
       },
+      hooks: {
+        title: 'Hooks del kernel',
+        desc: 'Estado de hooks HymoFS LKM (tracepoint, ftrace, kretprobe)',
+      },
     },
     status: {
       title: 'Estado del sistema',
@@ -1076,6 +1096,10 @@ export const translations = {
         loadFailed: 'Ошибка загрузки LKM',
         unloadFailed: 'Ошибка выгрузки LKM',
         autoloadFailed: 'Ошибка настройки autoload',
+      },
+      hooks: {
+        title: 'Ядерные Hooks',
+        desc: 'Состояние хуков HymoFS LKM (tracepoint, ftrace, kretprobe)',
       },
     },
     status: {
@@ -1285,6 +1309,10 @@ export const translations = {
         unloadFailed: 'LKM アンロード失敗',
         autoloadFailed: 'Autoload 設定失敗',
       },
+      hooks: {
+        title: 'カーネル Hooks',
+        desc: 'HymoFS LKM フック状態（tracepoint、ftrace、kretprobe）',
+      },
     },
     status: {
       title: 'システムステータス',
@@ -1493,6 +1521,10 @@ export const translations = {
         unloadFailed: 'LKM 언로드 실패',
         autoloadFailed: 'Autoload 설정 실패',
       },
+      hooks: {
+        title: '커널 Hooks',
+        desc: 'HymoFS LKM 훅 상태 (tracepoint, ftrace, kretprobe)',
+      },
     },
     status: {
       title: '시스템 상태',
@@ -1700,6 +1732,10 @@ export const translations = {
         loadFailed: 'فشل تحميل LKM',
         unloadFailed: 'فشل إلغاء تحميل LKM',
         autoloadFailed: 'فشل إعداد Autoload',
+      },
+      hooks: {
+        title: 'Hooks النواة',
+        desc: 'حالة خطاطيف HymoFS LKM (tracepoint, ftrace, kretprobe)',
       },
     },
     status: {
