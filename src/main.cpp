@@ -903,7 +903,7 @@ int main(int argc, char* argv[]) {
                     std::cout << "],\n";
 
                     std::string hooks = HymoFS::get_hooks();
-                    std::cout << "  \"hooks\": \"" << json::escape_string(hooks) << "\",\n";
+                    std::cout << "  \"hooks\": " << json::escape_string(hooks) << ",\n";
                 } else {
                     std::cout << "  \"kernel_version\": 0,\n";
                     std::cout << "  \"protocol_mismatch\": false,\n";
@@ -1024,7 +1024,7 @@ int main(int argc, char* argv[]) {
             } else if (subcmd == "hooks") {
                 std::string hooks = HymoFS::is_available() ? HymoFS::get_hooks() : "";
                 std::cout << "{\n";
-                std::cout << "  \"hooks\": \"" << json::escape_string(hooks) << "\"\n";
+                std::cout << "  \"hooks\": " << json::escape_string(hooks) << "\n";
                 std::cout << "}\n";
             } else {
                 std::cerr << "Unknown api subcommand: " << subcmd << "\n";
