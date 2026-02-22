@@ -62,8 +62,12 @@ void Logger::log(const std::string& level, const std::string& message) {
 
     std::string log_line = std::string("[") + time_buf + "] [" + level + "] " + message + "\n";
 
-    std::cerr << log_line;
-    std::cerr.flush();
+    // Only write to stderr when no log file: avoid polluting stdout/stderr when WebUI
+    // or KernelSU exec captures output (API JSON must be clean for parsing).
+    if (!(log_file_ && log_file_->is_open())) {
+        std::cerr << log_line;
+        std::cerr.flush();
+    }
     if (log_file_ && log_file_->is_open()) {
         *log_file_ << log_line;
         log_file_->flush();
