@@ -29,25 +29,9 @@ Logger& Logger::getInstance() {
     return instance;
 }
 
-void Logger::init(bool debug, bool verbose, const fs::path& log_path) {
+void Logger::init(bool debug, bool verbose) {
     debug_ = debug;
     verbose_ = verbose;
-    log_file_.reset();
-    if (!log_path.empty()) {
-        try {
-            fs::path parent = log_path.parent_path();
-            if (!parent.empty())
-                ensure_dir_exists(parent);
-            std::ofstream* f = new std::ofstream(log_path.string(), std::ios::app);
-            if (f->is_open()) {
-                log_file_.reset(f);
-            } else {
-                delete f;
-            }
-        } catch (...) {
-            /* ignore */
-        }
-    }
 }
 
 void Logger::log(const std::string& level, const std::string& message) {
@@ -62,16 +46,9 @@ void Logger::log(const std::string& level, const std::string& message) {
 
     std::string log_line = std::string("[") + time_buf + "] [" + level + "] " + message + "\n";
 
-    // Only write to stderr when no log file: avoid polluting stdout/stderr when WebUI
-    // or KernelSU exec captures output (API JSON must be clean for parsing).
-    if (!(log_file_ && log_file_->is_open())) {
-        std::cerr << log_line;
-        std::cerr.flush();
-    }
-    if (log_file_ && log_file_->is_open()) {
-        *log_file_ << log_line;
-        log_file_->flush();
-    }
+    // Logs go to clog (redirected to file by LogRedirector in main)
+    std::clog << log_line;
+    std::clog.flush();
 }
 
 // File system utilities
