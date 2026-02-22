@@ -46,9 +46,9 @@ void Logger::log(const std::string& level, const std::string& message) {
 
     std::string log_line = std::string("[") + time_buf + "] [" + level + "] " + message + "\n";
 
-    // Logs go to clog (redirected to file by LogRedirector in main)
-    std::clog << log_line;
-    std::clog.flush();
+    // Logs to stderr; metamount.sh captures via 2>> daemon.log (kpm_support style)
+    std::cerr << log_line;
+    std::cerr.flush();
 }
 
 // File system utilities

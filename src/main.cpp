@@ -40,32 +40,6 @@ struct CliOptions {
     std::vector<std::string> args;
 };
 
-// Redirect clog to log file so Logger output goes to file instead of stderr
-struct LogRedirector {
-    std::streambuf* old_clog = nullptr;
-    std::ofstream file;
-
-    LogRedirector(const char* log_path) {
-        fs::path p(log_path);
-        if (!p.parent_path().empty())
-            fs::create_directories(p.parent_path());
-        file.open(log_path, std::ios::app);
-        if (!file.is_open())
-            return;
-        old_clog = std::clog.rdbuf(file.rdbuf());
-        std::clog << std::unitbuf;
-    }
-
-    ~LogRedirector() {
-        if (old_clog) {
-            std::clog.flush();
-            if (file.is_open())
-                file.flush();
-            std::clog.rdbuf(old_clog);
-        }
-    }
-};
-
 static void print_help() {
     std::cerr << "Usage: hymod [OPTIONS] <command> [args...]\n\n";
     std::cerr << "Main Commands:\n";
@@ -257,10 +231,9 @@ static Config load_config(const CliOptions& opts) {
 }
 
 int main(int argc, char* argv[]) {
-    // Disable buffering: flush after every output
+    // Disable buffering: flush after every output (kpm_support style)
     std::cout.setf(std::ios_base::unitbuf);
     std::cerr.setf(std::ios_base::unitbuf);
-    std::clog.setf(std::ios_base::unitbuf);
 
     try {
         CliOptions cli = parse_args(argc, argv);
@@ -270,7 +243,6 @@ int main(int argc, char* argv[]) {
         config.merge_with_cli(cli.moduledir, cli.tempdir, cli.mountsource, cli.verbose,
                               cli.partitions);
 
-        LogRedirector log_redirector(DAEMON_LOG_FILE);
         Logger::getInstance().init(config.debug, config.verbose);
 
         if (cli.command.empty()) {
@@ -1257,7 +1229,7 @@ int main(int argc, char* argv[]) {
             return 1;
         }
 
-        // config already loaded and merged at start of main(); re-init logger for mount
+        // Re-init logger with merged config for mount
         Logger::getInstance().init(config.debug, config.verbose);
 
         // Camouflage process
@@ -1286,6 +1258,8 @@ int main(int argc, char* argv[]) {
         std::string warning_msg = "";
         bool hymofs_active = false;
 
+        LOG_INFO("HymoFS status=" + std::to_string((int)hymofs_status) +
+                 " (0=Available,1=KernelTooOld,2=ModuleTooOld,3=Error)");
         bool can_use_hymofs = (hymofs_status == HymoFSStatus::Available);
 
         // Auto-select default tempdir if not set by user
@@ -1382,7 +1356,9 @@ int main(int argc, char* argv[]) {
             }
 
             // Scan modules first to determine mount strategy
+            LOG_INFO("Scanning modules from: " + config.moduledir.string());
             module_list = scan_modules(config.moduledir, config);
+            LOG_INFO("Scanned " + std::to_string(module_list.size()) + " modules (pre-filter)");
 
             // Filter modules: only consider modules with actual content
             std::vector<Module> active_modules;
@@ -1406,6 +1382,7 @@ int main(int argc, char* argv[]) {
             }
 
             module_list = active_modules;
+            LOG_INFO("Active modules with content: " + std::to_string(module_list.size()));
 
             // **Mirror Strategy (Tmpfs/Ext4)**
             // To avoid SELinux/permission issues on /data, we mirror active modules
@@ -1415,6 +1392,8 @@ int main(int argc, char* argv[]) {
             bool mirror_success = false;
 
             try {
+                LOG_INFO("Setting up storage at " + MIRROR_DIR.string() +
+                         ", fs_type=" + filesystem_type_to_string(config.fs_type));
                 // Handle Tmpfs -> EROFS -> Ext4 fallback
                 try {
                     storage = setup_storage(MIRROR_DIR, img_path, config.fs_type);
@@ -1575,6 +1554,7 @@ int main(int argc, char* argv[]) {
 
         } else {
             // **Legacy/Overlay Path**
+            LOG_INFO("Mode: Standard Overlay/Magic (HymoFS not available)");
             if (hymofs_status == HymoFSStatus::KernelTooOld) {
                 LOG_WARN("HymoFS Protocol Mismatch! Kernel is too old.");
                 warning_msg = "⚠️Kernel version is lower than module version. Please "
@@ -1585,9 +1565,8 @@ int main(int argc, char* argv[]) {
                               "update your module.";
             }
 
-            LOG_INFO("Mode: Standard Overlay/Magic (Copy)");
-
             // **Step 1: Setup Storage**
+            LOG_INFO("Overlay path: setting up storage at " + std::string(FALLBACK_CONTENT_DIR));
             fs::path mnt_base(FALLBACK_CONTENT_DIR);
             fs::path img_path = fs::path(BASE_DIR) / "modules.img";
 
@@ -1770,8 +1749,11 @@ int main(int argc, char* argv[]) {
     } catch (const std::exception& e) {
         std::cerr << "Fatal Error: " << e.what() << "\n";
         LOG_ERROR("Fatal Error: " + std::string(e.what()));
-        // Update with failure emoji
-        update_module_description(false, "error", false, 0, 0, 0, "", false);
+        try {
+            update_module_description(false, "error", false, 0, 0, 0, "", false);
+        } catch (...) {
+            /* ignore */
+        }
         return 1;
     }
     return 0;
