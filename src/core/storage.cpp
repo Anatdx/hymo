@@ -434,7 +434,7 @@ void print_storage_status() {
     struct statfs stats;
     if (statfs(path.c_str(), &stats) != 0) {
         root["error"] = json::Value("statvfs failed: " + std::string(strerror(errno)));
-        std::cout << json::dump(root) << "\n";
+        std::cerr << json::dump(root) << "\n";
         return;
     }
 
@@ -482,7 +482,7 @@ void print_storage_status() {
     root["percent"] = json::Value(percent);
     root["mode"] = json::Value(fs_type);
 
-    std::cout << json::dump(root) << "\n";
+    std::cerr << json::dump(root) << "\n";
 }
 
 }  // namespace hymo

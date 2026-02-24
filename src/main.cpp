@@ -270,7 +270,7 @@ int main(int argc, char* argv[]) {
 
         LogRedirector log_redirector(DAEMON_LOG_FILE);
         Logger::getInstance().init(config.debug, config.verbose);
-        LOG_VERBOSE("hymod started, command=" + (cli.command.empty() ? "mount" : cli.command));
+        LOG_INFO("hymod started, command=" + (cli.command.empty() ? "mount" : cli.command));
 
         if (cli.command.empty()) {
             print_help();
@@ -927,7 +927,7 @@ int main(int argc, char* argv[]) {
                 config.mirror_path = path;
 
                 fs::path config_path = cli.config_file.empty()
-                                           ? (fs::path(BASE_DIR) / "config.toml")
+                                           ? (fs::path(BASE_DIR) / "config.json")
                                            : fs::path(cli.config_file);
                 if (config.save_to_file(config_path)) {
                     std::cerr << "Mirror path set to: " << path << "\n";
@@ -1096,7 +1096,7 @@ int main(int argc, char* argv[]) {
                     config.uname_version = version;
 
                     fs::path config_path = cli.config_file.empty()
-                                               ? (fs::path(BASE_DIR) / "config.toml")
+                                               ? (fs::path(BASE_DIR) / "config.json")
                                                : fs::path(cli.config_file);
 
                     if (config.save_to_file(config_path)) {
