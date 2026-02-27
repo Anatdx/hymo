@@ -1,9 +1,9 @@
 // core/user_rules.cpp - User-defined HymoFS rules management
 #include "user_rules.hpp"
-#include "../defs.hpp"
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include "../defs.hpp"
 #include "../mount/hymofs.hpp"
 #include "../utils.hpp"
 #include "json.hpp"

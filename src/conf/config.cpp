@@ -61,16 +61,20 @@ Config Config::from_file(const fs::path& path) {
                 config.enable_kernel_debug = o.at("enable_kernel_debug").as_bool();
             if (o.count("enable_stealth"))
                 config.enable_stealth = o.at("enable_stealth").as_bool();
+            if (o.count("enable_hidexattr"))
+                config.enable_hidexattr = o.at("enable_hidexattr").as_bool();
             if (o.count("hymofs_enabled"))
                 config.hymofs_enabled = o.at("hymofs_enabled").as_bool();
-            if (o.count("mirror_path"))
+            if (o.count("mirror_path")) {
                 config.mirror_path = o.at("mirror_path").as_string();
+                // Treat legacy default as "auto" so HymoFS-on uses /dev/hymo_mirror
+                if (config.mirror_path == (std::string(HYMO_DATA_DIR) + "/img_mnt"))
+                    config.mirror_path.clear();
+            }
             if (o.count("uname_release"))
                 config.uname_release = o.at("uname_release").as_string();
             if (o.count("uname_version"))
                 config.uname_version = o.at("uname_version").as_string();
-            if (o.count("mount_stage"))
-                config.mount_stage = o.at("mount_stage").as_string();
 
             if (o.count("partitions") && o.at("partitions").type == json::Type::Array) {
                 for (const auto& p : o.at("partitions").as_array()) {
@@ -111,6 +115,7 @@ bool Config::save_to_file(const fs::path& path) const {
     root["ignore_protocol_mismatch"] = json::Value(ignore_protocol_mismatch);
     root["enable_kernel_debug"] = json::Value(enable_kernel_debug);
     root["enable_stealth"] = json::Value(enable_stealth);
+    root["enable_hidexattr"] = json::Value(enable_hidexattr);
     root["hymofs_enabled"] = json::Value(hymofs_enabled);
     if (!mirror_path.empty())
         root["mirror_path"] = json::Value(mirror_path);
@@ -118,8 +123,6 @@ bool Config::save_to_file(const fs::path& path) const {
         root["uname_release"] = json::Value(uname_release);
     if (!uname_version.empty())
         root["uname_version"] = json::Value(uname_version);
-    if (!mount_stage.empty())
-        root["mount_stage"] = json::Value(mount_stage);
 
     if (!partitions.empty()) {
         json::Value parts = json::Value::array();

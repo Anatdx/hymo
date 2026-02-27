@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <sstream>
 #include "../defs.hpp"
+#include "../mount/hymofs.hpp"
 #include "../mount/magic.hpp"
 #include "../mount/partition_utils.hpp"
 #include "../utils.hpp"
@@ -113,9 +114,15 @@ std::string export_system_info_json() {
     // Get detected partitions
     auto partitions = export_partitions_json();
 
-    // Get mount base from runtime state or use default
+    // Get mount base from runtime state (actual path in use). Empty → default for display.
     auto state = load_runtime_state();
     std::string mount_base = state.mount_point.empty() ? HYMO_MIRROR_DEV : state.mount_point;
+
+    // Get LKM hooks when HymoFS is available (for WebUI display)
+    std::string hooks;
+    if (HymoFS::is_available()) {
+        hooks = HymoFS::get_hooks();
+    }
 
     std::ostringstream json;
     json << "{"
@@ -123,7 +130,8 @@ std::string export_system_info_json() {
          << "\"selinux\":\"" << selinux << "\","
          << "\"mount_base\":\"" << escape_json_string(mount_base) << "\","
          << "\"mountStats\":" << mount_stats << ","
-         << "\"detectedPartitions\":" << partitions << "}";
+         << "\"detectedPartitions\":" << partitions << ","
+         << "\"hooks\":\"" << escape_json_string(hooks) << "\"}";
 
     return json.str();
 }

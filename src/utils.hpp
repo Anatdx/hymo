@@ -2,6 +2,8 @@
 #pragma once
 
 #include <filesystem>
+#include <fstream>
+#include <memory>
 #include <string>
 
 namespace fs = std::filesystem;
@@ -13,12 +15,14 @@ class Logger {
 public:
     static Logger& getInstance();
     void init(bool debug, bool verbose);
+    void init(bool debug, bool verbose, const char* log_path);  // YukiSU: write to file
     void log(const std::string& level, const std::string& message);
 
 private:
     Logger() = default;
     bool debug_ = false;
     bool verbose_ = false;
+    std::unique_ptr<std::ofstream> log_file_;
 };
 
 #define LOG_INFO(msg) Logger::getInstance().log("INFO", msg)

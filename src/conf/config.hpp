@@ -45,7 +45,8 @@ inline std::string filesystem_type_to_string(FilesystemType type) {
 struct Config {
     fs::path moduledir = "/data/adb/modules";
     fs::path tempdir;
-    std::string mountsource = "KSU";
+    std::string mountsource = "KSU";  // KernelSU CRITICAL: mount source/device name for overlay &
+                                      // tmpfs so KernelSU can identify/manage mounts
     bool debug = false;
     bool verbose = false;
     FilesystemType fs_type = FilesystemType::AUTO;
@@ -54,11 +55,11 @@ struct Config {
     bool ignore_protocol_mismatch = false;
     bool enable_kernel_debug = false;
     bool enable_stealth = true;
+    bool enable_hidexattr = false;  // When true: mount_hide, maps_spoof, statfs_spoof, stealth
     bool hymofs_enabled = true;
     std::string mirror_path;
     std::string uname_release;
     std::string uname_version;
-    std::string mount_stage = "metamount";  // "post-fs-data", "metamount", "services"
     std::vector<std::string> partitions;
     std::map<std::string, std::string> module_modes;
     std::map<std::string, std::vector<ModuleRuleConfig>> module_rules;

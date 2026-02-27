@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useStore } from '@/store'
 import { api } from '@/services/api'
 import { Card, Button, Select } from '@/components/ui'
 import { RefreshCw, Terminal, Copy, Search, Trash2 } from 'lucide-react'
 
 export function LogsPage() {
-  const { t } = useStore((state) => state)
+  const t = useStore((s) => s.t)
   const [logType, setLogType] = useState<'system' | 'kernel'>('system')
   const [logs, setLogs] = useState('')
   const [loading, setLoading] = useState(false)
@@ -76,13 +76,13 @@ export function LogsPage() {
     return <div key={index} className={`${className} font-mono whitespace-pre-wrap break-words`}>{line}</div>
   }
 
-  const getFilteredLogs = () => {
+  const filteredLogsList = useMemo(() => {
     if (!logs) return []
     return logs.split('\n').filter(line => {
       const lowerLine = line.toLowerCase()
       const matchSearch = !searchText || lowerLine.includes(searchText.toLowerCase())
       let matchLevel = true
-    
+
       if (logType === 'kernel') return matchSearch
 
       if (logLevel === 'error') {
@@ -96,12 +96,10 @@ export function LogsPage() {
       } else if (logLevel === 'verbose') {
         matchLevel = line.includes('[VERBOSE]')
       }
-      
+
       return matchSearch && matchLevel
     })
-  }
-
-  const filteredLogsList = getFilteredLogs()
+  }, [logs, searchText, logLevel, logType])
 
   return (
     <div className="space-y-4 h-[calc(100vh-140px)] flex flex-col">

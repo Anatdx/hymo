@@ -143,8 +143,16 @@ const mockApi = {
     console.log('[Mock] Remove hide rule:', _path)
   },
 
-  async getLkmStatus(): Promise<{ loaded: boolean; autoload: boolean }> {
-    return { loaded: true, autoload: true }
+  async getLkmStatus(): Promise<{ loaded: boolean; autoload: boolean; kmi_override?: string }> {
+    return { loaded: true, autoload: true, kmi_override: '' }
+  },
+
+  async lkmSetKmi(_kmi: string): Promise<void> {
+    console.log('[Mock] LKM set KMI')
+  },
+
+  async lkmClearKmi(): Promise<void> {
+    console.log('[Mock] LKM clear KMI')
   },
 
   async lkmLoad(): Promise<void> {
@@ -178,7 +186,8 @@ const realApi = {
       const res = await ksuExec!(cmd)
       const out = apiOutput(res)
       if (res.errno === 0 && out) {
-        return JSON.parse(out)
+        const parsed = JSON.parse(out) as Record<string, unknown>
+        return { ...DEFAULT_CONFIG, ...parsed } as Config
       }
       return DEFAULT_CONFIG
     } catch (e) {
@@ -204,10 +213,11 @@ const realApi = {
       ignore_protocol_mismatch: config.ignore_protocol_mismatch,
       enable_kernel_debug: config.enable_kernel_debug,
       enable_stealth: config.enable_stealth,
+      enable_hidexattr: config.enable_hidexattr ?? false,
       hymofs_enabled: config.hymofs_enabled,
       uname_release: config.uname_release,
       uname_version: config.uname_version,
-      mount_stage: config.mount_stage,
+      mount_stage: config.mount_stage ?? 'metamount',
       partitions: config.partitions,
     }
     const data = JSON.stringify(configToSave, null, 2).replace(/'/g, "'\\''")
@@ -220,6 +230,10 @@ const realApi = {
     await ksuExec!(`${PATHS.BINARY} debug stealth ${config.enable_stealth ? 'enable' : 'disable'}`)
     if (config.hymofs_available) {
       await ksuExec!(`${PATHS.BINARY} hymofs ${config.hymofs_enabled ? 'enable' : 'disable'}`)
+      const hideOn = config.enable_hidexattr ? 'on' : 'off'
+      await ksuExec!(`${PATHS.BINARY} hymofs mount-hide ${hideOn}`)
+      await ksuExec!(`${PATHS.BINARY} hymofs maps-spoof ${hideOn}`)
+      await ksuExec!(`${PATHS.BINARY} hymofs statfs-spoof ${hideOn}`)
     }
     // Apply uname spoofing (always apply to ensure we can clear it)
     {
@@ -486,7 +500,7 @@ const realApi = {
         hymofsModules: mountData.active_modules || [],
         hymofsMismatch: mountData.protocol_mismatch || false,
         mismatchMessage: mountData.mismatch_message,
-        hooks: mountData.hooks || '',
+        hooks: systemData.hooks || mountData.hooks || '',
         mountStats: systemData.mountStats,
         detectedPartitions: systemData.detectedPartitions,
       }
@@ -655,7 +669,7 @@ const realApi = {
     }
   },
 
-  async getLkmStatus(): Promise<{ loaded: boolean; autoload: boolean }> {
+  async getLkmStatus(): Promise<{ loaded: boolean; autoload: boolean; kmi_override?: string }> {
     await initKernelSU()
     if (!ksuExec) return { loaded: false, autoload: true }
     
@@ -668,12 +682,36 @@ const realApi = {
         return {
           loaded: data.loaded === true,
           autoload: data.autoload !== false,
+          kmi_override: data.kmi_override || '',
         }
       }
     } catch (e) {
       console.error('Failed to get LKM status:', e)
     }
     return { loaded: false, autoload: true }
+  },
+
+  async lkmSetKmi(kmi: string): Promise<void> {
+    await initKernelSU()
+    if (!ksuExec) throw new Error('KernelSU not available')
+    
+    const escaped = kmi.replace(/'/g, "'\\''")
+    const cmd = `${PATHS.BINARY} lkm set-kmi '${escaped}'`
+    const { errno, stderr } = await ksuExec!(cmd)
+    if (errno !== 0) {
+      throw new Error(stderr || 'Failed to set KMI override')
+    }
+  },
+
+  async lkmClearKmi(): Promise<void> {
+    await initKernelSU()
+    if (!ksuExec) throw new Error('KernelSU not available')
+    
+    const cmd = `${PATHS.BINARY} lkm clear-kmi`
+    const { errno, stderr } = await ksuExec!(cmd)
+    if (errno !== 0) {
+      throw new Error(stderr || 'Failed to clear KMI override')
+    }
   },
 
   async lkmLoad(): Promise<void> {

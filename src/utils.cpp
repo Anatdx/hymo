@@ -34,6 +34,28 @@ void Logger::init(bool debug, bool verbose) {
     verbose_ = verbose;
 }
 
+void Logger::init(bool debug, bool verbose, const char* log_path) {
+    debug_ = debug;
+    verbose_ = verbose;
+    if (log_path && *log_path) {
+        try {
+            fs::path p(log_path);
+            const fs::path parent = p.parent_path();
+            if (!parent.empty()) {
+                ensure_dir_exists(parent);
+            }
+            // Always append: short-lived commands (getFeatures, getStatus, etc.) run in separate
+            // processes; trunc would clear the log every time the Manager refreshes.
+            log_file_ = std::make_unique<std::ofstream>(log_path, std::ios::app);
+            if (!log_file_->is_open()) {
+                log_file_.reset();
+            }
+        } catch (...) {
+            log_file_.reset();
+        }
+    }
+}
+
 void Logger::log(const std::string& level, const std::string& message) {
     if (level == "VERBOSE" && !verbose_)
         return;
@@ -46,9 +68,13 @@ void Logger::log(const std::string& level, const std::string& message) {
 
     std::string log_line = std::string("[") + time_buf + "] [" + level + "] " + message + "\n";
 
-    // Logs to clog; LogRedirector in main redirects clog -> daemon.log (direct file write)
-    std::clog << log_line;
-    std::clog.flush();
+    if (log_file_ && log_file_->is_open()) {
+        *log_file_ << log_line;
+        log_file_->flush();
+    } else {
+        std::clog << log_line;
+        std::clog.flush();
+    }
 }
 
 // File system utilities
@@ -70,7 +96,7 @@ bool lsetfilecon(const fs::path& path, const std::string& context) {
         return true;
     }
     LOG_DEBUG("lsetfilecon failed for " + path.string() + ": " + strerror(errno));
-#endif // #ifdef __ANDROID__
+#endif  // #ifdef __ANDROID__
     return false;
 }
 
@@ -81,7 +107,7 @@ std::string lgetfilecon(const fs::path& path) {
     if (len > 0) {
         return std::string(buf, len);
     }
-#endif // #ifdef __ANDROID__
+#endif  // #ifdef __ANDROID__
     return DEFAULT_SELINUX_CONTEXT;
 }
 
@@ -490,8 +516,7 @@ static bool is_dangerous_temp_path(const fs::path& path, bool allow_dev_mirror) 
         return true;
     }
 
-    if (allow_dev_mirror &&
-        (p == "/dev/hymo_mirror" || p.rfind("/dev/hymo_mirror/", 0) == 0)) {
+    if (allow_dev_mirror && (p == "/dev/hymo_mirror" || p.rfind("/dev/hymo_mirror/", 0) == 0)) {
         return false;
     }
 
@@ -561,7 +586,7 @@ struct KsuAddTryUmount {
 struct NukeExt4SysfsCmd {
     uint64_t arg;
 };
-#endif // #ifdef __ANDROID__
+#endif  // #ifdef __ANDROID__
 
 bool send_unmountable(const fs::path& target) {
 #ifdef __ANDROID__
@@ -590,7 +615,7 @@ bool send_unmountable(const fs::path& target) {
     } else {
         LOG_WARN("Failed to register unmountable path: " + path_str);
     }
-#endif // #ifdef __ANDROID__
+#endif  // #ifdef __ANDROID__
     return true;
 }
 
@@ -612,7 +637,7 @@ bool ksu_nuke_sysfs(const std::string& target) {
     return true;
 #else
     return false;
-#endif // #ifdef __ANDROID__
+#endif  // #ifdef __ANDROID__
 }
 
 }  // namespace hymo

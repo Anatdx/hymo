@@ -92,7 +92,8 @@ static bool run_mkfs_ext4(const fs::path& img_path) {
     }
 
     std::string path_str = img_path.string();
-    std::vector<const char*> argv = {mkfs_bin, "-t", "ext4", "-b", "1024", path_str.c_str(), nullptr};
+    std::vector<const char*> argv = {mkfs_bin,         "-t",   "ext4", "-b", "1024",
+                                     path_str.c_str(), nullptr};
 
     pid_t pid = fork();
     if (pid < 0) {
@@ -193,7 +194,7 @@ static bool create_erofs_image(const fs::path& modules_dir, const fs::path& imag
     std::string img_str = image_path.string();
     std::string mod_str = modules_dir.string();
     std::vector<const char*> argv = {mkfs_bin, "-zlz4hc,9", img_str.c_str(), mod_str.c_str(),
-                                    nullptr};
+                                     nullptr};
 
     pid_t pid = fork();
     if (pid < 0) {

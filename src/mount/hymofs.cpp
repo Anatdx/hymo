@@ -5,8 +5,8 @@
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <unistd.h>
-#include <chrono>
 #include <cerrno>
+#include <chrono>
 #include <cstring>
 #include <thread>
 #include "../utils.hpp"
@@ -24,9 +24,10 @@ static int get_anon_fd() {
         return s_hymo_fd;
     }
 
-    // Prefer prctl (SECCOMP-safe); fallback to SYS_reboot. Retry with backoff if LKM loads after us.
+    // Prefer prctl (SECCOMP-safe); fallback to SYS_reboot. Retry with backoff if LKM loads after
+    // us.
     int fd = -1;
-    const int kWaitAttempts = 4;   // ~0 + 1s + 2s + 3s
+    const int kWaitAttempts = 4;  // ~0 + 1s + 2s + 3s
     const int kShortRetries = 2;
     for (int wait = 0; wait < kWaitAttempts && fd < 0; ++wait) {
         if (wait > 0) {
@@ -382,6 +383,98 @@ bool HymoFS::hide_overlay_xattrs(const std::string& path) {
         LOG_ERROR("HymoFS: hide_overlay_xattrs failed: " + std::string(strerror(errno)));
     }
     return ret;
+}
+
+int HymoFS::get_features() {
+    int fd = get_anon_fd();
+    if (fd < 0) {
+        return -1;
+    }
+    int features = 0;
+    if (ioctl(fd, HYMO_IOC_GET_FEATURES, &features) != 0) {
+        LOG_VERBOSE("HymoFS: get_features failed: " + std::string(strerror(errno)));
+        return -1;
+    }
+    return features;
+}
+
+bool HymoFS::set_mount_hide(bool enable) {
+    struct hymo_mount_hide_arg arg = {};
+    arg.enable = enable ? 1 : 0;
+    bool ret = hymo_execute_cmd(HYMO_IOC_SET_MOUNT_HIDE, &arg) == 0;
+    if (!ret) {
+        LOG_ERROR("HymoFS: set_mount_hide failed: " + std::string(strerror(errno)));
+    }
+    return ret;
+}
+
+bool HymoFS::set_maps_spoof(bool enable) {
+    struct hymo_maps_spoof_arg arg = {};
+    arg.enable = enable ? 1 : 0;
+    bool ret = hymo_execute_cmd(HYMO_IOC_SET_MAPS_SPOOF, &arg) == 0;
+    if (!ret) {
+        LOG_ERROR("HymoFS: set_maps_spoof failed: " + std::string(strerror(errno)));
+    }
+    return ret;
+}
+
+bool HymoFS::set_statfs_spoof(bool enable) {
+    struct hymo_statfs_spoof_arg arg = {};
+    arg.enable = enable ? 1 : 0;
+    bool ret = hymo_execute_cmd(HYMO_IOC_SET_STATFS_SPOOF, &arg) == 0;
+    if (!ret) {
+        LOG_ERROR("HymoFS: set_statfs_spoof failed: " + std::string(strerror(errno)));
+    }
+    return ret;
+}
+
+bool HymoFS::add_maps_rule(unsigned long target_ino, unsigned long target_dev,
+                           unsigned long spoofed_ino, unsigned long spoofed_dev,
+                           const std::string& spoofed_pathname) {
+    struct hymo_maps_rule rule;
+    memset(&rule, 0, sizeof(rule));
+    rule.target_ino = target_ino;
+    rule.target_dev = target_dev;
+    rule.spoofed_ino = spoofed_ino;
+    rule.spoofed_dev = spoofed_dev;
+    strncpy(rule.spoofed_pathname, spoofed_pathname.c_str(), HYMO_MAX_LEN_PATHNAME - 1);
+    rule.spoofed_pathname[HYMO_MAX_LEN_PATHNAME - 1] = '\0';
+    rule.err = 0;
+
+    LOG_VERBOSE("HymoFS: Adding maps rule ino " + std::to_string(target_ino) + " -> " +
+                spoofed_pathname);
+    int ret = hymo_execute_cmd(HYMO_IOC_ADD_MAPS_RULE, &rule);
+    if (ret != 0) {
+        LOG_ERROR("HymoFS: add_maps_rule failed: " + std::string(strerror(errno)));
+        return false;
+    }
+    if (rule.err != 0) {
+        LOG_ERROR("HymoFS: add_maps_rule kernel err=" + std::to_string(rule.err));
+        return false;
+    }
+    return true;
+}
+
+bool HymoFS::clear_maps_rules() {
+    LOG_VERBOSE("HymoFS: Clearing maps rules");
+    bool ret = hymo_execute_cmd(HYMO_IOC_CLEAR_MAPS_RULES, nullptr) == 0;
+    if (!ret) {
+        LOG_ERROR("HymoFS: clear_maps_rules failed: " + std::string(strerror(errno)));
+    }
+    return ret;
+}
+
+void HymoFS::release_connection() {
+    if (s_hymo_fd >= 0) {
+        close(s_hymo_fd);
+        s_hymo_fd = -1;
+    }
+    s_status_checked = false;
+    s_cached_status = HymoFSStatus::NotPresent;
+}
+
+void HymoFS::invalidate_status_cache() {
+    s_status_checked = false;
 }
 
 }  // namespace hymo

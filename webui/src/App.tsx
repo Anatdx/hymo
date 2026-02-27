@@ -12,7 +12,13 @@ import { Card, Button } from '@/components/ui'
 import { AlertTriangle } from 'lucide-react'
 
 function App() {
-  const { activeTab, backgroundImage, initialize, t, theme, setActiveTab, useSystemFont } = useStore()
+  const activeTab = useStore((s) => s.activeTab)
+  const backgroundImage = useStore((s) => s.backgroundImage)
+  const initialize = useStore((s) => s.initialize)
+  const t = useStore((s) => s.t)
+  const theme = useStore((s) => s.theme)
+  const setActiveTab = useStore((s) => s.setActiveTab)
+  const useSystemFont = useStore((s) => s.useSystemFont)
   const [showWarning, setShowWarning] = useState(false)
   const [countdown, setCountdown] = useState(5)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -25,95 +31,65 @@ function App() {
     }
   }, [useSystemFont])
   
-  const touchStartRef = useRef<{ x: number, y: number, scrollLeft: number } | null>(null)
-  const isLockedVerticalRef = useRef(false)
-  const isDraggingHorizontalRef = useRef(false)
-
-  const onTouchStart = (e: React.TouchEvent) => {
-    if (!scrollRef.current) return
-    touchStartRef.current = {
-      x: e.touches[0].clientX,
-      y: e.touches[0].clientY,
-      scrollLeft: scrollRef.current.scrollLeft
-    }
-    isLockedVerticalRef.current = false
-    isDraggingHorizontalRef.current = false
-  }
-
-  const onTouchMove = (e: React.TouchEvent) => {
-    if (!touchStartRef.current) return
-    
-    const currentX = e.touches[0].clientX
-    const currentY = e.touches[0].clientY
-    
-    const dx = currentX - touchStartRef.current.x
-    const dy = currentY - touchStartRef.current.y
-    const absDx = Math.abs(dx)
-    const absDy = Math.abs(dy)
-
-    if (!isDraggingHorizontalRef.current && !isLockedVerticalRef.current) {
-        if (absDx < 10 && absDy < 10) return
-    }
-
-    if (!isDraggingHorizontalRef.current && !isLockedVerticalRef.current) {
-        if (absDy > absDx * 1.5) {
-            isLockedVerticalRef.current = true
-            return
-        }
-        isDraggingHorizontalRef.current = true
-    }
-    
-    if (isLockedVerticalRef.current) return
-
-    if (isDraggingHorizontalRef.current && scrollRef.current) {
-        const newScroll = touchStartRef.current.scrollLeft - dx
-        const maxScroll = scrollRef.current.scrollWidth - scrollRef.current.clientWidth
-        scrollRef.current.scrollLeft = Math.max(0, Math.min(newScroll, maxScroll))
-    }
-  }
-
-  const onTouchEnd = (e: React.TouchEvent) => {
-    if (isDraggingHorizontalRef.current && scrollRef.current && touchStartRef.current) {
-        const width = scrollRef.current.clientWidth
-        const activeIndex = PAGES.indexOf(activeTab as any)
-        
-        const deltaX = e.changedTouches[0].clientX - touchStartRef.current.x
-        
-        let targetIndex = activeIndex
-
-        if (deltaX < -width * 0.2) {
-             targetIndex = Math.min(activeIndex + 1, PAGES.length - 1)
-        } else if (deltaX > width * 0.2) {
-             targetIndex = Math.max(0, activeIndex - 1)
-        }
-
-        scrollRef.current.scrollTo({
-            left: targetIndex * width,
-            behavior: 'smooth'
-        })
-        
-        if (targetIndex !== activeIndex) {
-            setActiveTab(PAGES[targetIndex])
-        }
-    }
-    
-    touchStartRef.current = null
-    isLockedVerticalRef.current = false
-    isDraggingHorizontalRef.current = false
-  }
-
   const PAGES = ['status', 'config', 'modules', 'hymofs', 'logs', 'info'] as const
+  const scrollEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const syncTabRef = useRef<() => void>(() => {})
+  const [visibleIndex, setVisibleIndex] = useState(0)
+  const lastReportedIndexRef = useRef(0)
+
+  const syncTabFromScroll = () => {
+    if (!scrollRef.current) return
+    const el = scrollRef.current
+    const width = el.clientWidth
+    const index = Math.round(el.scrollLeft / width)
+    const newTab = PAGES[Math.max(0, Math.min(index, PAGES.length - 1))]
+    if (newTab && newTab !== activeTab) {
+      setActiveTab(newTab)
+    }
+  }
+  syncTabRef.current = syncTabFromScroll
 
   useEffect(() => {
     const index = PAGES.indexOf(activeTab as any)
-    if (index !== -1 && scrollRef.current) {
+    if (index !== -1) {
+      setVisibleIndex(index)
+      lastReportedIndexRef.current = index
+      if (scrollRef.current) {
         const width = scrollRef.current.clientWidth
         scrollRef.current.scrollTo({
-            left: index * width,
-            behavior: 'smooth'
+          left: index * width,
+          behavior: 'smooth'
         })
+      }
     }
   }, [activeTab])
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const handler = () => {
+      if (scrollEndTimerRef.current) clearTimeout(scrollEndTimerRef.current)
+      scrollEndTimerRef.current = null
+      syncTabRef.current()
+    }
+    el.addEventListener('scrollend', handler)
+    return () => el.removeEventListener('scrollend', handler)
+  }, [])
+
+  const onScroll = () => {
+    if (scrollEndTimerRef.current) clearTimeout(scrollEndTimerRef.current)
+    scrollEndTimerRef.current = setTimeout(() => syncTabRef.current(), 100)
+
+    const el = scrollRef.current
+    if (!el) return
+    const width = el.clientWidth
+    const idx = Math.round(el.scrollLeft / width)
+    const clamped = Math.max(0, Math.min(idx, PAGES.length - 1))
+    if (clamped !== lastReportedIndexRef.current) {
+      lastReportedIndexRef.current = clamped
+      setVisibleIndex(clamped)
+    }
+  }
 
   useEffect(() => {
     const applyTheme = (isDark: boolean) => {
@@ -173,7 +149,7 @@ function App() {
       }}
     >
       {backgroundImage && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
+        <div className="fixed inset-0 bg-black/50" />
       )}
       
       <div className="relative flex flex-col h-full">
@@ -181,50 +157,28 @@ function App() {
             <Navigation />
         </div>
         
-        <div 
+        <div
             ref={scrollRef}
-            className="flex-1 flex w-full overflow-x-hidden"
-            onTouchStart={onTouchStart}
-            onTouchMove={onTouchMove}
-            onTouchEnd={onTouchEnd}
+            className="flex-1 flex w-full overflow-x-auto overflow-y-hidden snap-x snap-mandatory scroll-smooth"
+            style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
+            onScroll={onScroll}
         >
-            <div className="min-w-full w-full h-full overflow-y-auto px-4 py-8 no-scrollbar">
-                <main className="max-w-7xl mx-auto animate-fade-in">
-                    <StatusPage />
-                </main>
-            </div>
-
-            <div className="min-w-full w-full h-full overflow-y-auto px-4 py-8 no-scrollbar">
-                <main className="max-w-7xl mx-auto animate-fade-in">
-                    <ConfigPage />
-                </main>
-            </div>
-
-            {/* Modules Page */}
-            <div className="min-w-full w-full h-full overflow-y-auto px-4 py-8 no-scrollbar">
-                <main className="max-w-7xl mx-auto animate-fade-in">
-                    <ModulesPage />
-                </main>
-            </div>
-
-            {/* HymoFS Page */}
-            <div className="min-w-full w-full h-full overflow-y-auto px-4 py-8 no-scrollbar">
-                <main className="max-w-7xl mx-auto animate-fade-in">
-                    <HymoFSPage />
-                </main>
-            </div>
-
-            <div className="min-w-full w-full h-full overflow-y-auto px-4 py-8 no-scrollbar">
-                <main className="max-w-7xl mx-auto animate-fade-in">
-                    <LogsPage />
-                </main>
-            </div>
-
-            <div className="min-w-full w-full h-full overflow-y-auto px-4 py-8 no-scrollbar">
-                <main className="max-w-7xl mx-auto animate-fade-in">
-                    <InfoPage />
-                </main>
-            </div>
+            {PAGES.map((tab, idx) => {
+              const isAdjacent = Math.abs(idx - visibleIndex) <= 2
+              const shouldMount = isAdjacent
+              return (
+                <div key={tab} className="min-w-full w-full h-full overflow-y-auto overflow-x-hidden snap-start snap-always shrink-0 px-4 py-8 no-scrollbar">
+                  <main className="max-w-7xl mx-auto">
+                    {shouldMount && tab === 'status' && <StatusPage />}
+                    {shouldMount && tab === 'config' && <ConfigPage />}
+                    {shouldMount && tab === 'modules' && <ModulesPage />}
+                    {shouldMount && tab === 'hymofs' && <HymoFSPage />}
+                    {shouldMount && tab === 'logs' && <LogsPage />}
+                    {shouldMount && tab === 'info' && <InfoPage />}
+                  </main>
+                </div>
+              )
+            })}
         </div>
 
         <ToastContainer />

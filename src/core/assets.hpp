@@ -1,9 +1,9 @@
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
 #include <string>
 #include <vector>
-#include <cstdint>
-#include <cstddef>
 
 namespace hymo {
 
@@ -16,4 +16,4 @@ bool get_asset(const std::string& name, const uint8_t*& data, size_t& size);
 // Decompress and copy asset to a file
 bool copy_asset_to_file(const std::string& name, const std::string& dest_path);
 
-} // namespace hymo
+}  // namespace hymo

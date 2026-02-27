@@ -7,6 +7,7 @@ import { api } from '@/services/api'
 interface LkmStatus {
   loaded: boolean
   autoload: boolean
+  kmi_override?: string
 }
 
 interface HymoFSRule {
@@ -36,7 +37,11 @@ const PATH_SUGGESTIONS = [
 ]
 
 export function HymoFSPage() {
-  const { showToast, t, config, updateConfig, systemInfo } = useStore()
+  const showToast = useStore((s) => s.showToast)
+  const t = useStore((s) => s.t)
+  const config = useStore((s) => s.config)
+  const updateConfig = useStore((s) => s.updateConfig)
+  const systemInfo = useStore((s) => s.systemInfo)
   const [userRules, setUserRules] = useState<string[]>([])
   const [allRules, setAllRules] = useState<HymoFSRule[]>([])
   const [newPath, setNewPath] = useState('')
@@ -45,6 +50,7 @@ export function HymoFSPage() {
   const [filteredSuggestions, setFilteredSuggestions] = useState<string[]>([])
   const [lkmStatus, setLkmStatus] = useState<LkmStatus | null>(null)
   const [lkmLoading, setLkmLoading] = useState(false)
+  const [kmiOverrideInput, setKmiOverrideInput] = useState('')
   const pathScrollTouchRef = useRef<{ x: number; y: number; locked: 'h' | 'v' | null }>({ x: 0, y: 0, locked: null })
 
   useEffect(() => {
@@ -166,6 +172,36 @@ export function HymoFSPage() {
     }
   }
 
+  const handleLkmSetKmi = async () => {
+    const kmi = kmiOverrideInput.trim()
+    if (!kmi) return
+    try {
+      await api.lkmSetKmi(kmi)
+      showToast(t.hymofs?.lkm?.kmiSetSuccess ?? 'KMI override set', 'success')
+      setKmiOverrideInput('')
+      refreshLkmStatus()
+    } catch (e) {
+      showToast(t.hymofs?.lkm?.kmiSetFailed ?? 'Failed to set KMI override', 'error')
+    }
+  }
+
+  const handleLkmClearKmi = async () => {
+    try {
+      await api.lkmClearKmi()
+      showToast(t.hymofs?.lkm?.kmiClearSuccess ?? 'KMI override cleared', 'success')
+      setKmiOverrideInput('')
+      refreshLkmStatus()
+    } catch (e) {
+      showToast(t.hymofs?.lkm?.kmiClearFailed ?? 'Failed to clear KMI override', 'error')
+    }
+  }
+
+  useEffect(() => {
+    if (lkmStatus?.kmi_override && !kmiOverrideInput) {
+      setKmiOverrideInput(lkmStatus.kmi_override)
+    }
+  }, [lkmStatus?.kmi_override])
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4">
@@ -231,6 +267,26 @@ export function HymoFSPage() {
               </Button>
             </div>
           </div>
+          {/* KMI Override */}
+          <div className="mt-4 pt-4 border-t border-gray-700/50">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+              {t.hymofs?.lkm?.kmiOverride ?? 'KMI Override'} (e.g. 6.6.30-android15)
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              <Input
+                value={kmiOverrideInput}
+                onChange={(e) => setKmiOverrideInput(e.target.value)}
+                placeholder={lkmStatus?.kmi_override || "6.6.30-android15"}
+                className="flex-1 min-w-[140px]"
+              />
+              <Button onClick={handleLkmSetKmi} size="sm" variant="secondary" disabled={!kmiOverrideInput.trim()}>
+                {t.hymofs?.lkm?.setKmi ?? 'Set'}
+              </Button>
+              <Button onClick={handleLkmClearKmi} size="sm" variant="ghost" disabled={!lkmStatus?.kmi_override}>
+                {t.hymofs?.lkm?.clearKmi ?? 'Clear'}
+              </Button>
+            </div>
+          </div>
         </Card>
 
         {/* Enable HymoFS Switch */}
@@ -240,6 +296,18 @@ export function HymoFSPage() {
             onChange={(checked) => updateConfig({ hymofs_enabled: checked })}
             label={t.config.enableHymoFS || "Enable HymoFS"}
           />
+        </Card>
+
+        {/* Enable Hide/Xattr (mount_hide, maps_spoof, statfs_spoof) */}
+        <Card>
+          <Switch
+            checked={config.enable_hidexattr ?? false}
+            onChange={(checked) => updateConfig({ enable_hidexattr: checked })}
+            label={t.config.enableHideXattr || "Mount hide / Maps spoof / Statfs spoof"}
+          />
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+            {t.config.enableHideXattrDesc || "Hide overlay from /proc/mounts, spoof /proc/pid/maps, spoof statfs f_type"}
+          </p>
         </Card>
 
         {/* Kernel Version Spoofing Card */}

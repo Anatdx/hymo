@@ -5,7 +5,14 @@ import { Card, Button, Input, Switch, RadioCards } from '@/components/ui'
 import { Plus, X, Radar } from 'lucide-react'
 
 export function ConfigPage() {
-  const { t, config, showAdvanced, setShowAdvanced, updateConfig, saveConfig, useSystemFont, setUseSystemFont } = useStore((state) => state)
+  const t = useStore((s) => s.t)
+  const config = useStore((s) => s.config)
+  const showAdvanced = useStore((s) => s.showAdvanced)
+  const setShowAdvanced = useStore((s) => s.setShowAdvanced)
+  const updateConfig = useStore((s) => s.updateConfig)
+  const saveConfig = useStore((s) => s.saveConfig)
+  const useSystemFont = useStore((s) => s.useSystemFont)
+  const setUseSystemFont = useStore((s) => s.setUseSystemFont)
   const [newPartition, setNewPartition] = useState('')
   const [scanning, setScanning] = useState(false)
   
@@ -13,11 +20,10 @@ export function ConfigPage() {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   useEffect(() => {
-    if (JSON.stringify(config) === JSON.stringify(configRef.current)) return
-    
     if (timeoutRef.current) clearTimeout(timeoutRef.current)
 
     timeoutRef.current = setTimeout(async () => {
+      if (JSON.stringify(config) === JSON.stringify(configRef.current)) return
       try {
         await saveConfig(true)
         configRef.current = config
@@ -225,6 +231,12 @@ export function ConfigPage() {
               checked={config.enable_stealth}
               onChange={(checked) => updateConfig({ enable_stealth: checked })}
               label={t.config.enableStealth}
+            />
+
+            <Switch
+              checked={config.enable_hidexattr ?? false}
+              onChange={(checked) => updateConfig({ enable_hidexattr: checked })}
+              label={t.config.enableHideXattr}
             />
 
             <Switch

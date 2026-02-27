@@ -5,7 +5,13 @@ import { HardDrive, Package, Layers } from 'lucide-react'
 import { BUILTIN_PARTITIONS } from '@/types'
 
 export function StatusPage() {
-  const { t, storage, modules, systemInfo, config, activePartitions, loadStatus } = useStore((state) => state)
+  const t = useStore((s) => s.t)
+  const storage = useStore((s) => s.storage)
+  const modules = useStore((s) => s.modules)
+  const systemInfo = useStore((s) => s.systemInfo)
+  const config = useStore((s) => s.config)
+  const activePartitions = useStore((s) => s.activePartitions)
+  const loadStatus = useStore((s) => s.loadStatus)
 
   useEffect(() => {
     loadStatus()
@@ -149,10 +155,18 @@ export function StatusPage() {
               {systemInfo.selinux}
             </Badge>
           </div>
-          <div className="flex justify-between items-center py-2">
+          <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-white/10">
             <span className="text-gray-500 dark:text-gray-400">{t.status.mountBase}</span>
             <span className="text-gray-900 dark:text-white font-mono text-sm">{systemInfo.mountBase}</span>
           </div>
+          {systemInfo.hooks && (
+            <div className="py-2">
+              <span className="text-gray-500 dark:text-gray-400 block mb-2">{t.status.lkmHooks || 'LKM Hooks'}</span>
+              <pre className="text-xs font-mono text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800/50 p-3 rounded-lg overflow-x-auto whitespace-pre-wrap break-words">
+                {systemInfo.hooks}
+              </pre>
+            </div>
+          )}
         </div>
       </Card>
 

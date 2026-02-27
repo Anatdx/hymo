@@ -13,7 +13,13 @@ const tabs = [
 ]
 
 export function Navigation() {
-  const { activeTab, setActiveTab, t, language, setLanguage, theme, toggleTheme } = useStore((state) => state)
+  const activeTab = useStore((s) => s.activeTab)
+  const setActiveTab = useStore((s) => s.setActiveTab)
+  const t = useStore((s) => s.t)
+  const language = useStore((s) => s.language)
+  const setLanguage = useStore((s) => s.setLanguage)
+  const theme = useStore((s) => s.theme)
+  const toggleTheme = useStore((s) => s.toggleTheme)
   const [isLangOpen, setIsLangOpen] = useState(false)
   const langRef = useRef<HTMLDivElement>(null)
 
@@ -28,7 +34,7 @@ export function Navigation() {
   }, [])
 
   return (
-    <nav className="sticky top-0 z-40 bg-white/70 dark:bg-black/30 backdrop-blur-lg border-b border-gray-200 dark:border-white/10 transition-colors duration-300 pt-[var(--top-inset)]">
+    <nav className="sticky top-0 z-40 bg-white/95 dark:bg-[#0a0a0a]/95 border-b border-gray-200 dark:border-white/10 transition-colors duration-300 pt-[var(--top-inset)]">
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-2 flex-shrink-0">

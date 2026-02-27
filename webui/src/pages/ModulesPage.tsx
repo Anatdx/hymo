@@ -1,11 +1,17 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { useStore } from '@/store'
 import { api } from '@/services/api'
 import { Card, Button, Input, Select, Badge } from '@/components/ui'
 import { Search, Plus, Trash2, AlertCircle, ChevronDown, ChevronUp, Play, Pause, Loader2 } from 'lucide-react'
 
 export function ModulesPage() {
-  const { t, modules, loadModules, updateModule, saveModules, systemInfo, loadStatus } = useStore((state) => state)
+  const t = useStore((s) => s.t)
+  const modules = useStore((s) => s.modules)
+  const loadModules = useStore((s) => s.loadModules)
+  const updateModule = useStore((s) => s.updateModule)
+  const saveModules = useStore((s) => s.saveModules)
+  const systemInfo = useStore((s) => s.systemInfo)
+  const loadStatus = useStore((s) => s.loadStatus)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterMode, setFilterMode] = useState('all')
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set())
@@ -17,11 +23,10 @@ export function ModulesPage() {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   useEffect(() => {
-    if (JSON.stringify(modules) === JSON.stringify(modulesRef.current)) return
-
     if (timeoutRef.current) clearTimeout(timeoutRef.current)
 
     timeoutRef.current = setTimeout(async () => {
+      if (JSON.stringify(modules) === JSON.stringify(modulesRef.current)) return
       await saveModules(true)
       modulesRef.current = modules
     }, 1000)
@@ -37,22 +42,23 @@ export function ModulesPage() {
     loadStatus()
   }, [loadModules, loadStatus])
 
-  const filteredModules = modules.filter((m) => {
-    const matchSearch = m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        m.id.toLowerCase().includes(searchQuery.toLowerCase())
-    
-    // 筛选逻辑：hymofs 筛选显示实际挂载在 HymoFS 上的模块（不管是强制还是 auto 分配的）
-    let matchFilter = false
-    if (filterMode === 'all') {
-      matchFilter = true
-    } else if (filterMode === 'hymofs') {
-      matchFilter = systemInfo.hymofsModules?.includes(m.id) || false
-    } else {
-      matchFilter = m.mode === filterMode
-    }
-    
-    return matchSearch && matchFilter
-  })
+  const filteredModules = useMemo(() => {
+    return modules.filter((m) => {
+      const matchSearch = m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          m.id.toLowerCase().includes(searchQuery.toLowerCase())
+
+      let matchFilter = false
+      if (filterMode === 'all') {
+        matchFilter = true
+      } else if (filterMode === 'hymofs') {
+        matchFilter = systemInfo.hymofsModules?.includes(m.id) || false
+      } else {
+        matchFilter = m.mode === filterMode
+      }
+
+      return matchSearch && matchFilter
+    })
+  }, [modules, searchQuery, filterMode, systemInfo.hymofsModules])
 
   const toggleExpand = (id: string) => {
     const newExpanded = new Set(expandedModules)

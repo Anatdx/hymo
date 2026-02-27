@@ -19,6 +19,7 @@ export const DEFAULT_CONFIG = {
   ignore_protocol_mismatch: false,
   enable_kernel_debug: false,
   enable_stealth: true,
+  enable_hidexattr: false,
   hymofs_enabled: true,
   uname_release: '',
   uname_version: '',

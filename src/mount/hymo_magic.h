@@ -9,11 +9,11 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <sys/ioctl.h>
-#endif // #ifdef __KERNEL__
+#endif  // #ifdef __KERNEL__
 
 #define HYMO_MAGIC1 0x48594D4F  // "HYMO"
 #define HYMO_MAGIC2 0x524F4F54  // "ROOT"
-#define HYMO_PROTOCOL_VERSION 13
+#define HYMO_PROTOCOL_VERSION 14
 
 #define HYMO_MAX_LEN_PATHNAME 256
 #define HYMO_FAKE_CMDLINE_SIZE 4096
@@ -32,7 +32,7 @@
 /* Marks an inode for kstat spoofing */
 #define AS_FLAGS_HYMO_SPOOF_KSTAT 42
 #define BIT_HYMO_SPOOF_KSTAT BIT(42)
-#endif // #ifdef __KERNEL__
+#endif  // #ifdef __KERNEL__
 
 // Only one syscall command: Get anonymous FD
 #define HYMO_CMD_GET_FD 0x48021
@@ -103,6 +103,44 @@ struct hymo_spoof_cmdline {
 #define HYMO_FEATURE_CMDLINE_SPOOF (1 << 2)
 #define HYMO_FEATURE_SELINUX_BYPASS (1 << 4)
 #define HYMO_FEATURE_MERGE_DIR (1 << 5)
+#define HYMO_FEATURE_MOUNT_HIDE (1 << 6)   /* hide overlay from /proc/mounts and mountinfo */
+#define HYMO_FEATURE_MAPS_SPOOF (1 << 7)   /* spoof ino/dev/pathname in /proc/pid/maps */
+#define HYMO_FEATURE_STATFS_SPOOF (1 << 8) /* spoof statfs f_type so direct matches resolved */
+
+/*
+ * Maps spoof rule: when a /proc/pid/maps line has (target_ino[, target_dev]),
+ * replace ino/dev/pathname with spoofed values. target_dev 0 = match any dev.
+ */
+struct hymo_maps_rule {
+    unsigned long target_ino;
+    unsigned long target_dev; /* 0 = match any device */
+    unsigned long spoofed_ino;
+    unsigned long spoofed_dev;
+    char spoofed_pathname[HYMO_MAX_LEN_PATHNAME];
+    int err;
+};
+
+/*
+ * Feature config structs - enable + reserved for future custom rules.
+ */
+struct hymo_mount_hide_arg {
+    int enable;
+    char path_pattern[HYMO_MAX_LEN_PATHNAME];
+    int err;
+};
+
+struct hymo_maps_spoof_arg {
+    int enable;
+    char reserved[sizeof(struct hymo_maps_rule)];
+    int err;
+};
+
+struct hymo_statfs_spoof_arg {
+    int enable;
+    char path[HYMO_MAX_LEN_PATHNAME];
+    unsigned long spoof_f_type;
+    int err;
+};
 
 // ioctl definitions (for fd-based mode)
 // Must be after struct definitions
@@ -126,5 +164,10 @@ struct hymo_spoof_cmdline {
 #define HYMO_IOC_GET_FEATURES _IOR(HYMO_IOC_MAGIC, 19, int)
 #define HYMO_IOC_SET_ENABLED _IOW(HYMO_IOC_MAGIC, 20, int)
 #define HYMO_IOC_GET_HOOKS _IOWR(HYMO_IOC_MAGIC, 22, struct hymo_syscall_list_arg)
+#define HYMO_IOC_ADD_MAPS_RULE _IOW(HYMO_IOC_MAGIC, 23, struct hymo_maps_rule)
+#define HYMO_IOC_CLEAR_MAPS_RULES _IO(HYMO_IOC_MAGIC, 24)
+#define HYMO_IOC_SET_MOUNT_HIDE _IOW(HYMO_IOC_MAGIC, 25, struct hymo_mount_hide_arg)
+#define HYMO_IOC_SET_MAPS_SPOOF _IOW(HYMO_IOC_MAGIC, 26, struct hymo_maps_spoof_arg)
+#define HYMO_IOC_SET_STATFS_SPOOF _IOW(HYMO_IOC_MAGIC, 27, struct hymo_statfs_spoof_arg)
 
 #endif /* _LINUX_HYMO_MAGIC_H */
