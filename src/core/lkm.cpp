@@ -19,7 +19,6 @@
 namespace fs = std::filesystem;
 namespace hymo {
 
-static constexpr int HYMO_SYSCALL_NR = 142;
 static std::string g_lkm_last_error;
 
 static void set_lkm_last_error(const std::string& msg) {

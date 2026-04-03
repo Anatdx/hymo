@@ -39,6 +39,27 @@ static std::string escape_json_string(const std::string& str) {
     return oss.str();
 }
 
+static std::vector<std::string> get_hymofs_feature_names(int features) {
+    std::vector<std::string> names;
+    if (features & HYMO_FEATURE_MOUNT_HIDE)
+        names.emplace_back("mount_hide");
+    if (features & HYMO_FEATURE_MAPS_SPOOF)
+        names.emplace_back("maps_spoof");
+    if (features & HYMO_FEATURE_STATFS_SPOOF)
+        names.emplace_back("statfs_spoof");
+    if (features & HYMO_FEATURE_CMDLINE_SPOOF)
+        names.emplace_back("cmdline_spoof");
+    if (features & HYMO_FEATURE_UNAME_SPOOF)
+        names.emplace_back("uname_spoof");
+    if (features & HYMO_FEATURE_KSTAT_SPOOF)
+        names.emplace_back("kstat_spoof");
+    if (features & HYMO_FEATURE_MERGE_DIR)
+        names.emplace_back("merge_dir");
+    if (features & HYMO_FEATURE_SELINUX_BYPASS)
+        names.emplace_back("selinux_bypass");
+    return names;
+}
+
 std::string export_mount_stats_json() {
     auto stats = get_mount_statistics();
 
@@ -81,6 +102,23 @@ std::string export_partitions_json() {
     return json.str();
 }
 
+std::string export_features_json() {
+    const int features = HymoFS::is_available() ? HymoFS::get_features() : 0;
+    const auto names = get_hymofs_feature_names(features > 0 ? features : 0);
+
+    std::ostringstream json;
+    json << "{"
+         << "\"bitmask\":" << (features > 0 ? features : 0) << ","
+         << "\"names\":[";
+    for (size_t i = 0; i < names.size(); ++i) {
+        if (i > 0)
+            json << ",";
+        json << "\"" << escape_json_string(names[i]) << "\"";
+    }
+    json << "]}";
+    return json.str();
+}
+
 std::string export_system_info_json() {
     // Get kernel version - extract only the version number
     std::string kernel = "Unknown";
@@ -120,18 +158,30 @@ std::string export_system_info_json() {
 
     // Get LKM hooks when HymoFS is available (for WebUI display)
     std::string hooks;
+    int features = 0;
     if (HymoFS::is_available()) {
         hooks = HymoFS::get_hooks();
+        features = HymoFS::get_features();
     }
+    const auto feature_names = get_hymofs_feature_names(features > 0 ? features : 0);
 
     std::ostringstream json;
     json << "{"
          << "\"kernel\":\"" << escape_json_string(kernel) << "\","
          << "\"selinux\":\"" << selinux << "\","
          << "\"mount_base\":\"" << escape_json_string(mount_base) << "\","
+         << "\"hymofs_available\":" << (HymoFS::is_available() ? "true" : "false") << ","
+         << "\"hymofs_status\":" << static_cast<int>(HymoFS::check_status()) << ","
          << "\"mountStats\":" << mount_stats << ","
          << "\"detectedPartitions\":" << partitions << ","
-         << "\"hooks\":\"" << escape_json_string(hooks) << "\"}";
+         << "\"hooks\":\"" << escape_json_string(hooks) << "\","
+         << "\"features\":{\"bitmask\":" << (features > 0 ? features : 0) << ",\"names\":[";
+    for (size_t i = 0; i < feature_names.size(); ++i) {
+        if (i > 0)
+            json << ",";
+        json << "\"" << escape_json_string(feature_names[i]) << "\"";
+    }
+    json << "]}}";
 
     return json.str();
 }

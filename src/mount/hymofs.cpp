@@ -8,6 +8,7 @@
 #include <cerrno>
 #include <chrono>
 #include <cstring>
+#include <fstream>
 #include <thread>
 #include "../utils.hpp"
 #include "hymo_magic.h"
@@ -17,6 +18,22 @@ namespace hymo {
 static HymoFSStatus s_cached_status = HymoFSStatus::NotPresent;
 static bool s_status_checked = false;
 static int s_hymo_fd = -1;  // Cached anonymous fd
+
+// Fast check: if lsmod/proc/modules doesn't show hymofs_lkm, it's not loaded.
+// Avoids slow retry loop in get_anon_fd() when module is absent.
+static bool lkm_in_proc_modules() {
+    std::ifstream f("/proc/modules");
+    if (!f)
+        return false;
+    std::string line;
+    while (std::getline(f, line)) {
+        if (line.compare(0, 11, "hymofs_lkm ") == 0 ||
+            line.compare(0, 11, "hymofs_lkm\t") == 0) {
+            return true;
+        }
+    }
+    return false;
+}
 
 // Get anonymous fd from kernel (only way to communicate with HymoFS)
 static int get_anon_fd() {
@@ -71,6 +88,25 @@ static int hymo_execute_cmd(unsigned int ioctl_cmd, void* arg) {
     return ret;
 }
 
+static bool hymo_execute_kstat_cmd(unsigned int ioctl_cmd, const char* op_name,
+                                   const hymo_spoof_kstat& input) {
+    struct hymo_spoof_kstat rule = input;
+    rule.target_pathname[HYMO_MAX_LEN_PATHNAME - 1] = '\0';
+
+    LOG_VERBOSE("HymoFS: " + std::string(op_name) + " path=" + std::string(rule.target_pathname));
+    const int ret = hymo_execute_cmd(ioctl_cmd, &rule);
+    if (ret != 0) {
+        LOG_ERROR("HymoFS: " + std::string(op_name) + " failed: " + std::string(strerror(errno)));
+        return false;
+    }
+    if (rule.err != 0) {
+        LOG_ERROR("HymoFS: " + std::string(op_name) +
+                  " kernel err=" + std::to_string(rule.err));
+        return false;
+    }
+    return true;
+}
+
 int HymoFS::get_protocol_version() {
     int fd = get_anon_fd();
     if (fd < 0) {
@@ -89,6 +125,13 @@ int HymoFS::get_protocol_version() {
 HymoFSStatus HymoFS::check_status() {
     if (s_status_checked) {
         return s_cached_status;
+    }
+
+    // Fast path: lsmod/proc/modules doesn't show hymofs_lkm → not loaded, skip slow retries
+    if (!lkm_in_proc_modules()) {
+        s_cached_status = HymoFSStatus::NotPresent;
+        s_status_checked = true;
+        return HymoFSStatus::NotPresent;
     }
 
     int k_ver = get_protocol_version();
@@ -330,6 +373,14 @@ bool HymoFS::set_enabled(bool enable) {
     return ret;
 }
 
+bool HymoFS::add_spoof_kstat(const hymo_spoof_kstat& rule) {
+    return hymo_execute_kstat_cmd(HYMO_IOC_ADD_SPOOF_KSTAT, "add_spoof_kstat", rule);
+}
+
+bool HymoFS::update_spoof_kstat(const hymo_spoof_kstat& rule) {
+    return hymo_execute_kstat_cmd(HYMO_IOC_UPDATE_SPOOF_KSTAT, "update_spoof_kstat", rule);
+}
+
 bool HymoFS::set_uname(const std::string& release, const std::string& version) {
     // Always execute to allow clearing (sending empty strings)
     struct hymo_spoof_uname uname_data;
@@ -355,6 +406,48 @@ bool HymoFS::set_uname(const std::string& release, const std::string& version) {
         }
     } else {
         LOG_VERBOSE("HymoFS: set_uname success");
+    }
+    return ret;
+}
+
+bool HymoFS::set_cmdline(const std::string& cmdline) {
+    struct hymo_spoof_cmdline cmdline_data;
+    memset(&cmdline_data, 0, sizeof(cmdline_data));
+
+    if (!cmdline.empty()) {
+        strncpy(cmdline_data.cmdline, cmdline.c_str(), HYMO_FAKE_CMDLINE_SIZE - 1);
+        cmdline_data.cmdline[HYMO_FAKE_CMDLINE_SIZE - 1] = '\0';
+    }
+
+    LOG_VERBOSE("HymoFS: Setting cmdline spoof (length=" + std::to_string(cmdline.size()) + ")");
+    bool ret = hymo_execute_cmd(HYMO_IOC_SET_CMDLINE, &cmdline_data) == 0;
+    if (!ret) {
+        if (errno == EOPNOTSUPP) {
+            LOG_VERBOSE("HymoFS: cmdline spoofing not supported by kernel (LKM build)");
+        } else {
+            LOG_ERROR("HymoFS: set_cmdline failed: " + std::string(strerror(errno)));
+        }
+    } else {
+        LOG_VERBOSE("HymoFS: set_cmdline success");
+    }
+    return ret;
+}
+
+bool HymoFS::set_hide_uids(const std::vector<std::uint32_t>& uids) {
+    struct hymo_uid_list_arg arg = {};
+    arg.count = static_cast<decltype(arg.count)>(uids.size());
+    if (!uids.empty()) {
+        arg.uids = static_cast<decltype(arg.uids)>(reinterpret_cast<std::uintptr_t>(uids.data()));
+    }
+
+    LOG_VERBOSE("HymoFS: Setting hide UIDs count=" + std::to_string(uids.size()));
+    bool ret = hymo_execute_cmd(HYMO_IOC_SET_HIDE_UIDS, &arg) == 0;
+    if (!ret) {
+        if (errno == EOPNOTSUPP) {
+            LOG_VERBOSE("HymoFS: hide UID list not supported by kernel");
+        } else {
+            LOG_ERROR("HymoFS: set_hide_uids failed: " + std::string(strerror(errno)));
+        }
     }
     return ret;
 }

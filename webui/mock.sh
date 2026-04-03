@@ -1,25 +1,13 @@
-#!/bin/bash
+#!/usr/bin/env sh
 
-# Hymo WebUI Development Server
+set -eu
 
-PORT=${1:-8080}
+PORT="${1:-4173}"
+ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 
-echo "🚀 Starting Hymo WebUI Development Server..."
-echo "📍 Port: $PORT"
-echo ""
-echo "🌐 Open your browser to:"
-echo "   http://localhost:$PORT"
-echo "   http://127.0.0.1:$PORT"
-echo ""
+echo "The React WebUI is no longer the primary frontend."
+echo "Serving the new static WebUI from:"
+echo "  ${ROOT_DIR}/module/webroot"
+echo
 
-cd "$(dirname "$0")"
-
-# 检查依赖
-if [ ! -d "node_modules" ]; then
-    echo "📦 Installing dependencies..."
-    npm install
-    echo ""
-fi
-
-# 启动开发服务器
-npm run dev -- --port $PORT --host 0.0.0.0
+exec "${ROOT_DIR}/module/webroot/preview.sh" "$PORT"

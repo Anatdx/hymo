@@ -26,4 +26,7 @@ std::string export_mount_stats_json();
 // Export detected partitions as JSON for WebUI
 std::string export_partitions_json();
 
+// Export HymoFS features as JSON for WebUI
+std::string export_features_json();
+
 }  // namespace hymo

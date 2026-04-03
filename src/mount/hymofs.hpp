@@ -1,7 +1,9 @@
 #pragma once
 
+#include <cstdint>
 #include <filesystem>
 #include <string>
+#include <vector>
 #include "defs.hpp"
 #include "hymo_magic.h"
 
@@ -36,7 +38,11 @@ public:
     static bool set_debug(bool enable);
     static bool set_stealth(bool enable);
     static bool set_enabled(bool enable);
+    static bool add_spoof_kstat(const hymo_spoof_kstat& rule);
+    static bool update_spoof_kstat(const hymo_spoof_kstat& rule);
     static bool set_uname(const std::string& release, const std::string& version);
+    static bool set_cmdline(const std::string& cmdline);
+    static bool set_hide_uids(const std::vector<std::uint32_t>& uids);
     static bool fix_mounts();
     static bool hide_overlay_xattrs(const std::string& path);
 

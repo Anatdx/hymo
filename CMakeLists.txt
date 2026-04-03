@@ -146,18 +146,9 @@ endif()
 # WebUI target
 if(BUILD_WEBUI)
     add_custom_target(webui
-        COMMAND ${CMAKE_COMMAND} -E echo "🎨 Building WebUI..."
-        COMMAND npm install
-        COMMAND npm run build
-        COMMAND ${CMAKE_COMMAND} -E echo "Cleaning old webroot..."
-        COMMAND ${CMAKE_COMMAND} -E remove_directory "${CMAKE_SOURCE_DIR}/module/webroot"
-        COMMAND ${CMAKE_COMMAND} -E echo "Creating webroot..."
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/module/webroot"
-        COMMAND ${CMAKE_COMMAND} -E echo "Copying files..."
-        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/webui/dist" "${CMAKE_SOURCE_DIR}/module/webroot"
-        COMMAND ${CMAKE_COMMAND} -E echo "✅ WebUI built to module/webroot"
-        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/webui"
-        COMMENT "Building WebUI with npm"
+        COMMAND ${CMAKE_COMMAND} -E echo "🎨 Using static WebUI from module/webroot"
+        COMMAND ${CMAKE_COMMAND} -E echo "✅ No frontend build step is required"
+        COMMENT "Preparing static WebUI"
         VERBATIM
     )
 endif()
@@ -198,4 +189,3 @@ add_custom_target(testzip
     VERBATIM
 )
 endif()
-

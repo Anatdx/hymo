@@ -73,6 +73,10 @@ struct LogRedirector {
 
 namespace {
 
+std::string json_quote(const std::string& value) {
+    return json::dump(json::Value(value));
+}
+
 void print_help() {
     std::cout << "Usage: hymod [OPTIONS] <command> [args...]\n\n";
     std::cout << "Main Commands:\n";
@@ -118,6 +122,7 @@ void print_help() {
     std::cout << "  api mount-stats    Mount statistics\n";
     std::cout << "  api partitions     Detected partitions info\n";
     std::cout << "  api lkm            LKM status (loaded, autoload) for WebUI\n";
+    std::cout << "  api features       HymoFS feature bitmask and names\n";
     std::cout << "  api hooks          List currently used LKM hooks\n\n";
 
     std::cout << "LKM Commands (lkm <subcommand>) - HymoFS kernel module:\n";
@@ -138,7 +143,9 @@ void print_help() {
     std::cout << "  debug enable       Enable kernel debug logging\n";
     std::cout << "  debug disable      Disable kernel debug logging\n";
     std::cout << "  debug stealth on|off    Enable/disable stealth mode\n";
-    std::cout << "  debug set-uname <release> <version>  Set kernel version spoofing\n\n";
+    std::cout << "  debug set-uname <release> <version>  Set kernel version spoofing\n";
+    std::cout << "  debug set-cmdline <cmdline>  Set /proc/cmdline spoofing\n";
+    std::cout << "  debug clear-cmdline          Clear /proc/cmdline spoofing\n\n";
 
     std::cout << "Options:\n";
     std::cout << "  -c, --config FILE       Config file path\n";
@@ -366,9 +373,9 @@ int main(int argc, char** argv) {
             } else if (subcmd == "show") {
                 const Config config = load_config(cli);
                 std::cout << "{\n";
-                std::cout << "  \"moduledir\": \"" << config.moduledir.string() << "\",\n";
-                std::cout << "  \"tempdir\": \"" << config.tempdir.string() << "\",\n";
-                std::cout << "  \"mountsource\": \"" << config.mountsource << "\",\n";
+                std::cout << "  \"moduledir\": " << json_quote(config.moduledir.string()) << ",\n";
+                std::cout << "  \"tempdir\": " << json_quote(config.tempdir.string()) << ",\n";
+                std::cout << "  \"mountsource\": " << json_quote(config.mountsource) << ",\n";
                 std::cout << "  \"debug\": " << (config.debug ? "true" : "false") << ",\n";
                 std::cout << "  \"verbose\": " << (config.verbose ? "true" : "false") << ",\n";
                 std::cout << "  \"fs_type\": \"" << filesystem_type_to_string(config.fs_type)
@@ -387,14 +394,17 @@ int main(int argc, char** argv) {
                           << (config.enable_hidexattr ? "true" : "false") << ",\n";
                 std::cout << "  \"hymofs_enabled\": " << (config.hymofs_enabled ? "true" : "false")
                           << ",\n";
-                std::cout << "  \"uname_release\": \"" << config.uname_release << "\",\n";
-                std::cout << "  \"uname_version\": \"" << config.uname_version << "\",\n";
+                std::cout << "  \"uname_release\": " << json_quote(config.uname_release) << ",\n";
+                std::cout << "  \"uname_version\": " << json_quote(config.uname_version) << ",\n";
+                std::cout << "  \"cmdline_value\": " << json_quote(config.cmdline_value)
+                          << ",\n";
                 std::cout << "  \"hymofs_available\": "
                           << (HymoFS::is_available() ? "true" : "false") << ",\n";
                 std::cout << "  \"hymofs_status\": " << (int)HymoFS::check_status() << ",\n";
                 std::cout << "  \"lkm_autoload\": " << (lkm_get_autoload() ? "true" : "false")
                           << ",\n";
-                std::cout << "  \"lkm_kmi_override\": \"" << lkm_get_kmi_override() << "\",\n";
+                std::cout << "  \"lkm_kmi_override\": " << json_quote(lkm_get_kmi_override())
+                          << ",\n";
                 std::cout << "  \"hymofs_builtin\": "
                           << (HymoFS::is_available() && !lkm_is_loaded() ? "true" : "false")
                           << ",\n";
@@ -1145,7 +1155,7 @@ int main(int argc, char** argv) {
         case Command::API: {
             if (cli.args.empty()) {
                 std::cerr
-                    << "Usage: hymod api <system|storage|mount-stats|partitions|lkm|hooks>\n";
+                    << "Usage: hymod api <system|storage|mount-stats|partitions|lkm|features|hooks>\n";
                 return 1;
             }
             const std::string subcmd = cli.args[0];
@@ -1162,11 +1172,13 @@ int main(int argc, char** argv) {
                 std::cout << "{\n";
                 std::cout << "  \"loaded\": " << (lkm_is_loaded() ? "true" : "false") << ",\n";
                 std::cout << "  \"autoload\": " << (lkm_get_autoload() ? "true" : "false") << ",\n";
-                std::cout << "  \"kmi_override\": \"" << lkm_get_kmi_override() << "\",\n";
+                std::cout << "  \"kmi_override\": " << json_quote(lkm_get_kmi_override()) << ",\n";
                 std::cout << "  \"hymofs_builtin\": "
                           << (HymoFS::is_available() && !lkm_is_loaded() ? "true" : "false")
                           << "\n";
                 std::cout << "}\n";
+            } else if (subcmd == "features") {
+                std::cout << export_features_json() << '\n';
             } else if (subcmd == "hooks") {
                 if (HymoFS::is_available()) {
                     std::cout << HymoFS::get_hooks() << "\n";
@@ -1176,7 +1188,7 @@ int main(int argc, char** argv) {
                 }
             } else {
                 std::cerr << "Unknown api subcommand: " << subcmd << "\n";
-                std::cerr << "Available: system, storage, mount-stats, partitions, lkm, hooks\n";
+                std::cerr << "Available: system, storage, mount-stats, partitions, lkm, features, hooks\n";
                 return 1;
             }
             return 0;
@@ -1184,7 +1196,7 @@ int main(int argc, char** argv) {
 
         case Command::DEBUG: {
             if (cli.args.empty()) {
-                std::cerr << "Usage: hymod debug <enable|disable|stealth|set-uname>\n";
+                std::cerr << "Usage: hymod debug <enable|disable|stealth|set-uname|set-cmdline|clear-cmdline>\n";
                 return 1;
             }
             const std::string subcmd = cli.args[0];
@@ -1267,9 +1279,67 @@ int main(int argc, char** argv) {
                     return 1;
                 }
                 return 0;
+            } else if (subcmd == "set-cmdline") {
+                if (cli.args.size() < 2) {
+                    std::cerr << "Usage: hymod debug set-cmdline <cmdline>\n";
+                    return 1;
+                }
+                const std::string cmdline = cli.args[1];
+
+                if (HymoFS::is_available()) {
+                    Config config = load_config(cli);
+                    config.cmdline_value = cmdline;
+
+                    const fs::path config_path = cli.config_file.empty()
+                                                     ? (fs::path(BASE_DIR) / "config.json")
+                                                     : fs::path(cli.config_file);
+
+                    if (config.save_to_file(config_path)) {
+                        std::cout << "Kernel cmdline spoofing configured.\n";
+                        if (HymoFS::set_cmdline(cmdline)) {
+                            std::cout << "Applied cmdline spoofing to kernel.\n";
+                            LOG_VERBOSE("Kernel cmdline updated.");
+                        } else {
+                            std::cerr << "Warning: Failed to apply cmdline to kernel.\n";
+                        }
+                    } else {
+                        std::cerr << "Failed to save config.\n";
+                        return 1;
+                    }
+                } else {
+                    std::cerr << "HymoFS not available.\n";
+                    return 1;
+                }
+                return 0;
+            } else if (subcmd == "clear-cmdline") {
+                if (HymoFS::is_available()) {
+                    Config config = load_config(cli);
+                    config.cmdline_value.clear();
+
+                    const fs::path config_path = cli.config_file.empty()
+                                                     ? (fs::path(BASE_DIR) / "config.json")
+                                                     : fs::path(cli.config_file);
+
+                    if (config.save_to_file(config_path)) {
+                        std::cout << "Kernel cmdline spoofing cleared.\n";
+                        if (HymoFS::set_cmdline("")) {
+                            std::cout << "Cleared cmdline spoofing in kernel.\n";
+                            LOG_VERBOSE("Kernel cmdline cleared.");
+                        } else {
+                            std::cerr << "Warning: Failed to clear cmdline in kernel.\n";
+                        }
+                    } else {
+                        std::cerr << "Failed to save config.\n";
+                        return 1;
+                    }
+                } else {
+                    std::cerr << "HymoFS not available.\n";
+                    return 1;
+                }
+                return 0;
             } else {
                 std::cerr << "Unknown debug subcommand: " << subcmd << "\n";
-                std::cerr << "Available: enable, disable, stealth, set-uname\n";
+                std::cerr << "Available: enable, disable, stealth, set-uname, set-cmdline, clear-cmdline\n";
                 return 1;
             }
         }
@@ -1610,6 +1680,17 @@ int main(int argc, char** argv) {
                 } else {
                     LOG_WARN("Failed to apply kernel version spoofing.");
                 }
+            }
+
+            // Apply /proc/cmdline spoofing from config, including empty value to clear old state.
+            if (HymoFS::set_cmdline(config.cmdline_value)) {
+                if (!config.cmdline_value.empty()) {
+                    LOG_VERBOSE("Applied kernel cmdline spoofing.");
+                } else {
+                    LOG_VERBOSE("Cleared kernel cmdline spoofing.");
+                }
+            } else if (!config.cmdline_value.empty()) {
+                LOG_WARN("Failed to apply kernel cmdline spoofing.");
             }
 
             // Scan modules first to determine mount strategy

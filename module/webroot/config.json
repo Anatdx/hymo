@@ -1,0 +1,12 @@
+{
+  "title": "Hymo",
+  "icon": "icon.svg",
+  "windowResize": true,
+  "backHandler": false,
+  "exitConfirm": false,
+  "historyFallback": false,
+  "_description": [
+    "Static Hymo WebUI for KernelSU/WebUI X.",
+    "Use ?mock=1 or open in a regular browser to preview with mock data."
+  ]
+}

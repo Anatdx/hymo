@@ -60,6 +60,7 @@ struct Config {
     std::string mirror_path;
     std::string uname_release;
     std::string uname_version;
+    std::string cmdline_value;
     std::vector<std::string> partitions;
     std::map<std::string, std::string> module_modes;
     std::map<std::string, std::vector<ModuleRuleConfig>> module_rules;

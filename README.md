@@ -15,7 +15,7 @@ A C++ module manager for KernelSU with support for HymoFS, OverlayFS and Magic M
 ## Features
 
 - **Multiple mount modes**: HymoFS (kernel patch required), OverlayFS, Magic Mount
-- **Web interface**: Module management via browser (React + TypeScript)
+- **Web interface**: Static WebUI X-style control surface with browser mock preview
 - **Smart storage**: Tmpfs when available, ext4 image fallback
 - **Native performance**: Written in C++ using modern Linux mount APIs
 
@@ -37,7 +37,7 @@ A C++ module manager for KernelSU with support for HymoFS, OverlayFS and Magic M
 ./build.sh package   # Create flashable ZIP
 ```
 
-**Requirements**: CMake 3.22+, Android NDK r25+, Node.js (for WebUI)
+**Requirements**: CMake 3.22+, Android NDK r25+
 
 ---
 

@@ -24,8 +24,6 @@ compile_commands.json
 # WebUI
 /webui/node_modules
 /webui/dist
-/module/webroot/*
-!module/webroot/.gitkeep
 .DS_Store
 
 # Telegram bot session (contains auth, do not commit)

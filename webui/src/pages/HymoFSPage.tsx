@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useStore } from '@/store'
-import { Card, Button, Input, Switch } from '@/components/ui'
+import { Card, Button, Input, Switch, Badge } from '@/components/ui'
 import { Plus, Trash2, Eye, Wrench, AlertCircle, CheckCircle, FolderOpen, FileText, Cpu, Loader2 } from 'lucide-react'
 import { api } from '@/services/api'
 
@@ -41,6 +41,7 @@ export function HymoFSPage() {
   const t = useStore((s) => s.t)
   const config = useStore((s) => s.config)
   const updateConfig = useStore((s) => s.updateConfig)
+  const saveConfig = useStore((s) => s.saveConfig)
   const systemInfo = useStore((s) => s.systemInfo)
   const [userRules, setUserRules] = useState<string[]>([])
   const [allRules, setAllRules] = useState<HymoFSRule[]>([])
@@ -51,6 +52,8 @@ export function HymoFSPage() {
   const [lkmStatus, setLkmStatus] = useState<LkmStatus | null>(null)
   const [lkmLoading, setLkmLoading] = useState(false)
   const [kmiOverrideInput, setKmiOverrideInput] = useState('')
+  const configRef = useRef(config)
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const pathScrollTouchRef = useRef<{ x: number; y: number; locked: 'h' | 'v' | null }>({ x: 0, y: 0, locked: null })
 
   useEffect(() => {
@@ -60,6 +63,24 @@ export function HymoFSPage() {
   useEffect(() => {
     api.getLkmStatus().then(setLkmStatus).catch(() => setLkmStatus(null))
   }, [])
+
+  useEffect(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current)
+
+    timeoutRef.current = setTimeout(async () => {
+      if (JSON.stringify(config) === JSON.stringify(configRef.current)) return
+      try {
+        await saveConfig(true)
+        configRef.current = config
+      } catch (e) {
+        showToast(t.common.error ?? 'Error', 'error')
+      }
+    }, 1000)
+
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    }
+  }, [config, saveConfig, showToast, t.common.error])
 
   useEffect(() => {
     if (newPath && newPath.startsWith('/')) {
@@ -131,6 +152,8 @@ export function HymoFSPage() {
 
   const userRuleCount = userRules.length
   const totalRuleCount = allRules.length
+  const hymofsFeatureNames = systemInfo.features?.names ?? []
+  const hasCmdlineSpoof = hymofsFeatureNames.includes('cmdline_spoof')
 
   const refreshLkmStatus = () => {
     api.getLkmStatus().then(setLkmStatus).catch(() => setLkmStatus(null))
@@ -354,6 +377,69 @@ export function HymoFSPage() {
             />
           </div>
         </Card>
+
+        <Card>
+          <div className="flex justify-between items-center mb-4 gap-3">
+            <div>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Kernel Cmdline Spoofing</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                {hasCmdlineSpoof
+                  ? 'Persist and apply a fake /proc/cmdline value through HymoFS.'
+                  : 'Current kernel does not report cmdline spoof support in its feature bitmask.'}
+              </p>
+            </div>
+            <Button
+              onClick={() => updateConfig({ cmdline_value: '' })}
+              size="sm"
+              variant="secondary"
+            >
+              {t.common.clear || 'Clear'}
+            </Button>
+          </div>
+          <textarea
+            value={config.cmdline_value}
+            onChange={(e) => updateConfig({ cmdline_value: e.target.value })}
+            placeholder="androidboot.verifiedbootstate=green buildvariant=user ..."
+            rows={4}
+            className="w-full px-3 py-2 rounded-lg bg-white dark:bg-white/5 border border-gray-200 dark:border-white/20 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 font-mono text-sm"
+          />
+        </Card>
+
+        {(hymofsFeatureNames.length > 0 || systemInfo.hooks) && (
+          <Card>
+            <div className="space-y-4">
+              {hymofsFeatureNames.length > 0 && (
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">Feature Flags</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    Bitmask: <code className="font-mono">{`0x${(systemInfo.features?.bitmask ?? 0).toString(16)}`}</code>
+                  </p>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {hymofsFeatureNames.map((name) => (
+                      <Badge key={name} variant="success" className="font-mono">
+                        {name}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {systemInfo.hooks && (
+                <div className={hymofsFeatureNames.length > 0 ? 'pt-4 border-t border-gray-200 dark:border-white/10' : ''}>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                    {t.hymofs?.hooks?.title ?? 'Kernel Hooks'}
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    {t.hymofs?.hooks?.desc ?? 'HymoFS LKM hook status'}
+                  </p>
+                  <pre className="mt-3 p-3 rounded-lg bg-gray-100 dark:bg-black/20 border border-gray-200 dark:border-white/10 text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words overflow-x-auto">
+                    {systemInfo.hooks}
+                  </pre>
+                </div>
+              )}
+            </div>
+          </Card>
+        )}
 
         {/* Statistics */}
         <Card className="p-4">

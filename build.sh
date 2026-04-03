@@ -209,31 +209,12 @@ download_fonts() {
 # WebUI Builder
 build_webui() {
     if [[ $NO_WEBUI -eq 0 ]]; then
-        download_fonts
-        print_info "Building WebUI..."
-        mkdir -p "${BUILD_DIR}/webui_build"
-        
-        # Check if Node.js is installed
-        if ! command -v npm &> /dev/null; then
-            print_warning "Node.js/npm not found. Skipping WebUI build."
-            if [ "$OS_TYPE" = "macos" ]; then
-                print_info "Install with: brew install node"
-            else
-                print_info "Install Node.js from your package manager"
-            fi
-            return
+        print_info "Preparing static WebUI..."
+        if [[ ! -f "${PROJECT_ROOT}/module/webroot/index.html" ]]; then
+            print_error "module/webroot/index.html not found"
+            return 1
         fi
-        
-        cmake -B "${BUILD_DIR}/webui_build" \
-            -G Ninja \
-            -DBUILD_WEBUI=ON \
-            -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK}/build/cmake/android.toolchain.cmake" \
-            -DANDROID_ABI="arm64-v8a" \
-            -DANDROID_PLATFORM=android-30 \
-            "${PROJECT_ROOT}" > /dev/null
-        
-        cmake --build "${BUILD_DIR}/webui_build" --target webui
-        print_success "WebUI built"
+        print_success "Static WebUI ready in module/webroot"
     fi
 }
 

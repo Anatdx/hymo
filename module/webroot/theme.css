@@ -1,0 +1,183 @@
+@font-face {
+  font-family: "Inter";
+  src: url("./fonts/Inter-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("./fonts/Inter-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("./fonts/Inter-SemiBold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("./fonts/Inter-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Noto Sans SC";
+  src: url("./fonts/NotoSansSC-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+4E00-9FFF, U+3400-4DBF, U+F900-FAFF, U+2F800-2FA1F;
+}
+
+@font-face {
+  font-family: "Noto Sans SC";
+  src: url("./fonts/NotoSansSC-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+4E00-9FFF, U+3400-4DBF, U+F900-FAFF, U+2F800-2FA1F;
+}
+
+@font-face {
+  font-family: "Noto Sans SC";
+  src: url("./fonts/NotoSansSC-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+4E00-9FFF, U+3400-4DBF, U+F900-FAFF, U+2F800-2FA1F;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("./fonts/JetBrainsMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("./fonts/JetBrainsMono-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("./fonts/JetBrainsMono-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light dark;
+  --window-inset-top: env(safe-area-inset-top, 0px);
+  --window-inset-bottom: env(safe-area-inset-bottom, 0px);
+  --top-inset: var(--window-inset-top, env(safe-area-inset-top, 0px));
+  --bottom-inset: var(--window-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --font-ui: "Inter", "Noto Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+  --shadow-soft: 0 24px 60px rgba(15, 37, 33, 0.12);
+  --shadow-card: 0 12px 30px rgba(19, 43, 38, 0.08);
+  --panel-top-line: rgba(255, 255, 255, 0.68);
+  --panel-side-line: rgba(255, 255, 255, 0.28);
+  --panel-bottom-line: rgba(59, 82, 75, 0.14);
+  --panel-sheen: rgba(255, 255, 255, 0.3);
+  --line-soft: rgba(46, 74, 67, 0.12);
+  --line-strong: rgba(46, 74, 67, 0.22);
+  --bg: #f4f1eb;
+  --bg-elevated: rgba(255, 255, 255, 0.76);
+  --surface: rgba(255, 255, 255, 0.92);
+  --surface-muted: rgba(247, 243, 236, 0.9);
+  --surface-strong: #ffffff;
+  --text: #17221f;
+  --text-muted: #5b6a66;
+  --text-soft: #7f8d88;
+  --primary-live: var(--primary, #0f6c64);
+  --primary-strong: #0a544d;
+  --primary-soft: rgba(15, 108, 100, 0.12);
+  --secondary-live: var(--secondary, #a45829);
+  --secondary-soft: rgba(164, 88, 41, 0.12);
+  --success: #23745a;
+  --warning: #a6630c;
+  --danger: #b33c35;
+  --danger-soft: rgba(179, 60, 53, 0.12);
+  --grid-line: rgba(18, 31, 28, 0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --line-soft: rgba(158, 185, 178, 0.12);
+    --line-strong: rgba(158, 185, 178, 0.18);
+    --panel-top-line: rgba(255, 255, 255, 0.16);
+    --panel-side-line: rgba(255, 255, 255, 0.06);
+    --panel-bottom-line: rgba(0, 0, 0, 0.28);
+    --panel-sheen: rgba(255, 255, 255, 0.06);
+    --bg: #0f1412;
+    --bg-elevated: rgba(18, 24, 22, 0.72);
+    --surface: rgba(23, 30, 27, 0.88);
+    --surface-muted: rgba(17, 24, 22, 0.92);
+    --surface-strong: #18211d;
+    --text: #edf2ef;
+    --text-muted: #a2b2ad;
+    --text-soft: #7f908a;
+    --primary-live: var(--primary, #7ed3ca);
+    --primary-strong: #5fb9af;
+    --primary-soft: rgba(126, 211, 202, 0.13);
+    --secondary-live: var(--secondary, #f0b28c);
+    --secondary-soft: rgba(240, 178, 140, 0.12);
+    --success: #68c49e;
+    --warning: #f7bb5e;
+    --danger: #ff8a80;
+    --danger-soft: rgba(255, 138, 128, 0.12);
+    --grid-line: rgba(255, 255, 255, 0.04);
+  }
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --line-soft: rgba(158, 185, 178, 0.12);
+  --line-strong: rgba(158, 185, 178, 0.18);
+  --panel-top-line: rgba(255, 255, 255, 0.16);
+  --panel-side-line: rgba(255, 255, 255, 0.06);
+  --panel-bottom-line: rgba(0, 0, 0, 0.28);
+  --panel-sheen: rgba(255, 255, 255, 0.06);
+  --bg: #0f1412;
+  --bg-elevated: rgba(18, 24, 22, 0.72);
+  --surface: rgba(23, 30, 27, 0.88);
+  --surface-muted: rgba(17, 24, 22, 0.92);
+  --surface-strong: #18211d;
+  --text: #edf2ef;
+  --text-muted: #a2b2ad;
+  --text-soft: #7f908a;
+  --primary-live: var(--primary, #7ed3ca);
+  --primary-strong: #5fb9af;
+  --primary-soft: rgba(126, 211, 202, 0.13);
+  --secondary-live: var(--secondary, #f0b28c);
+  --secondary-soft: rgba(240, 178, 140, 0.12);
+  --success: #68c49e;
+  --warning: #f7bb5e;
+  --danger: #ff8a80;
+  --danger-soft: rgba(255, 138, 128, 0.12);
+  --grid-line: rgba(255, 255, 255, 0.04);
+}

@@ -15,7 +15,7 @@ KernelSU 的 C++ 模块管理器，支持 HymoFS、OverlayFS 和 Magic Mount。
 ## 功能
 
 - **多种挂载模式**：HymoFS（需要内核补丁）、OverlayFS、Magic Mount
-- **网页界面**：浏览器管理模块（React + TypeScript）
+- **网页界面**：静态 WebUI X 风格控制台，支持浏览器 mock 预览
 - **智能存储**：优先使用 tmpfs，不可用时回退到 ext4 镜像
 - **原生性能**：C++ 编写，使用现代 Linux 挂载 API
 
@@ -37,7 +37,7 @@ KernelSU 的 C++ 模块管理器，支持 HymoFS、OverlayFS 和 Magic Mount。
 ./build.sh package   # 生成刷机包
 ```
 
-**需要**：CMake 3.22+、Android NDK r25+、Node.js（编译 WebUI）
+**需要**：CMake 3.22+、Android NDK r25+
 
 ---
 

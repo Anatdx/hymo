@@ -27,7 +27,12 @@ const shouldUseMock = isDev
 
 const mockApi = {
   async loadConfig(): Promise<Config> {
-    return { ...DEFAULT_CONFIG, partitions: ['system', 'vendor'], hymofs_available: true }
+    return {
+      ...DEFAULT_CONFIG,
+      partitions: ['system', 'vendor'],
+      hymofs_available: true,
+      cmdline_value: 'androidboot.verifiedbootstate=green'
+    }
   },
 
   async saveConfig(_config: Config): Promise<void> {
@@ -95,7 +100,13 @@ const mockApi = {
       mountBase: '/dev/hymofs',
       hymofsModules: ['example_module'],
       hymofsMismatch: false,
+      hymofsAvailable: true,
+      hymofsStatus: 0,
       hooks: 'GET_FD: tracepoint (sys_enter/sys_exit)\npath: tracepoint (sys_enter)\nvfs_getattr,d_path,iterate_dir,vfs_getxattr: ftrace+kretprobe\nuname: kretprobe\ncmdline: tracepoint (sys_enter/sys_exit)',
+      features: {
+        bitmask: 0x1e7,
+        names: ['mount_hide', 'maps_spoof', 'statfs_spoof', 'cmdline_spoof', 'uname_spoof', 'kstat_spoof', 'merge_dir']
+      },
       mountStats: {
         total_mounts: 45,
         successful_mounts: 44,
@@ -217,7 +228,7 @@ const realApi = {
       hymofs_enabled: config.hymofs_enabled,
       uname_release: config.uname_release,
       uname_version: config.uname_version,
-      mount_stage: config.mount_stage ?? 'metamount',
+      cmdline_value: config.cmdline_value,
       partitions: config.partitions,
     }
     const data = JSON.stringify(configToSave, null, 2).replace(/'/g, "'\\''")
@@ -240,6 +251,14 @@ const realApi = {
       const release = (config.uname_release || '').replace(/'/g, "'\\''")
       const version = (config.uname_version || '').replace(/'/g, "'\\''")
       await ksuExec!(`${PATHS.BINARY} debug set-uname '${release}' '${version}'`)
+    }
+    {
+      const cmdline = (config.cmdline_value || '').replace(/'/g, "'\\''")
+      if (config.cmdline_value) {
+        await ksuExec!(`${PATHS.BINARY} debug set-cmdline '${cmdline}'`)
+      } else {
+        await ksuExec!(`${PATHS.BINARY} debug clear-cmdline`)
+      }
     }
   },
 
@@ -497,10 +516,13 @@ const realApi = {
         mountBase: systemData.mount_base || mountData.mount_base || '/dev/hymo_mirror',
         unameRelease,
         unameVersion,
+        hymofsAvailable: systemData.hymofs_available,
+        hymofsStatus: systemData.hymofs_status,
         hymofsModules: mountData.active_modules || [],
         hymofsMismatch: mountData.protocol_mismatch || false,
         mismatchMessage: mountData.mismatch_message,
         hooks: systemData.hooks || mountData.hooks || '',
+        features: systemData.features,
         mountStats: systemData.mountStats,
         detectedPartitions: systemData.detectedPartitions,
       }
