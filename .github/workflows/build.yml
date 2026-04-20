@@ -70,6 +70,7 @@ jobs:
       - name: Generate version
         id: parse_version
         run: |
+          git config --global --add safe.directory '*'
           COMMIT_NUM=$(git rev-list --count HEAD)
           VERSION=$((COMMIT_NUM + 200))
           echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
