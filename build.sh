@@ -132,10 +132,6 @@ build_arch() {
     local ARCH=$1
     local EXTRA_ARGS=$2
     local BUILD_SUBDIR="${BUILD_DIR}/${ARCH}"
-    local UPX_ARG=""
-    if command -v upx &>/dev/null && [ -z "${NO_UPX:-}" ]; then
-        UPX_ARG="-DHYMOD_UPX=ON"
-    fi
 
     print_info "Building for ${ARCH}..."
     
@@ -277,12 +273,11 @@ case $COMMAND in
             print_info "Using hymod binaries from CI artifacts (matrix parallel build)"
 
             mkdir -p "${OUT_DIR}"
-            for arch in arm64-v8a armeabi-v7a x86_64; do
-                bin="hymod-${arch}"
+                bin="hymod-arm64-v8a"
                 if [ -f "${OUT_DIR}/${bin}" ]; then
                     :
-                elif [ -f "hymod-${arch}/build/out/${bin}" ]; then
-                    cp -f "hymod-${arch}/build/out/${bin}" "${OUT_DIR}/"
+                elif [ -f "hymod-arm64-v8a/build/out/${bin}" ]; then
+                    cp -f "hymod-arm64-v8a/build/out/${bin}" "${OUT_DIR}/"
                 elif [ -f "build/out/${bin}" ]; then
                     cp -f "build/out/${bin}" "${OUT_DIR}/"
                 else
@@ -291,8 +286,8 @@ case $COMMAND in
                 fi
             done
             count=$(ls "${OUT_DIR}"/hymod-* 2>/dev/null | wc -l)
-            if [ "${count:-0}" -lt 3 ]; then
-                print_error "Expected 3 hymod binaries in build/out, found ${count:-0}"
+            if [ "${count:-0}" -lt 1 ]; then
+                print_error "Expected 1 hymod binary in build/out, found ${count:-0}"
                 ls -la "${OUT_DIR}"/ 2>/dev/null || true
                 exit 1
             fi

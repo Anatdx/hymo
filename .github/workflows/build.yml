@@ -29,106 +29,82 @@ jobs:
           - android14-6.1
           - android15-6.6
           - android16-6.12
-        arch:
-          - arm64
-          - armv7
-          - x86_64
     runs-on: ubuntu-latest
+    container:
+          image: ghcr.io/ylarod/ddk:${{ matrix.kmi }}-20251104
+          options: --privileged
+    env:
+          HYMOFS_REPO: Anatdx/HymoFS
+          HYMOFS_REF: ${{ github.event.inputs.hymofs_ref || github.event.client_payload.ref || 'main' }}
+          TARGET_ARCH: arm64
+          KMI: ${{ matrix.kmi }}
+          OUT: ${{ github.workspace }}/out
+          SRC_ROOT: ${{ github.workspace }}/hymofs_src
+          SRC: ${{ github.workspace }}/hymofs_src/src
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+        
 
-      - name: Build HymoFS LKM for ${{ matrix.kmi }} (${{ matrix.arch }})
-        env:
-          HYMOFS_REPO: Anatdx/HymoFS
-          HYMOFS_REF: ${{ github.event.inputs.hymofs_ref || github.event.client_payload.ref || 'main' }}
+      - name: Validate target arch
+        run: |
+          if [ "$TARGET_ARCH" != "arm64" ]; then
+            echo "DDK workflow currently supports arm64 only, got: $TARGET_ARCH"
+            exit 1
+          fi
+
+      - name: Clone HymoFS
         run: |
           set -euo pipefail
-          KMI="${{ matrix.kmi }}"
-          ARCH="${{ matrix.arch }}"
-          SRC="$GITHUB_WORKSPACE/hymofs_src/src"
-          CC_EXTRA=""
-          echo "Cloning HymoFS (ref: ${HYMOFS_REF})..."
-          git clone --depth 1 "https://github.com/${HYMOFS_REPO}.git" hymofs_src
-          (cd hymofs_src && git fetch --depth 1 origin "${HYMOFS_REF}" && git checkout FETCH_HEAD)
-          echo "Cloning kernel tree (${KMI})..."
-          git clone --depth 1 -b "${KMI}" https://android.googlesource.com/kernel/common kernel_src
-          sudo apt-get update
-          sudo apt-get install -y git make clang lld llvm gcc gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi flex bison bc rsync cpio libelf-dev libssl-dev libdw-dev pahole zip
+          echo "Cloning HymoFS (ref: ${{ env.HYMOFS_REPO }})..."
+          git clone --depth 1 "https://github.com/${{ env.HYMOFS_REPO }}.git" "$SRC_ROOT"
+          (
+            cd "$SRC_ROOT"
+            git fetch --depth 1 origin "${{ env.HYMOFS_REF }}"
+            git checkout FETCH_HEAD
+          )
+          ls -la "$SRC/"
 
-          # 5.10: use GCC cross (no LLVM); else LLVM=1
-          if [[ "$KMI" == android12-5.10 ]] || [[ "$KMI" == android13-5.10 ]]; then
-            LLVM_ARGS=""
-            case "$ARCH" in
-              arm64)   CROSS_ARGS="CROSS_COMPILE=aarch64-linux-gnu-" ;;
-              armv7)   CROSS_ARGS="CROSS_COMPILE=arm-linux-gnueabi-" ;;
-              x86_64)  CROSS_ARGS="" ;;
-              *) echo "Unknown arch: $ARCH"; exit 1 ;;
-            esac
-          else
-            LLVM_ARGS="LLVM=1 LLVM_IAS=1"
-            case "$ARCH" in
-              arm64)   CROSS_ARGS="" ;;
-              armv7)   CROSS_ARGS="CROSS_COMPILE=arm-linux-gnueabi-"
-                WRAP_DIR="$GITHUB_WORKSPACE/.ccache_clang_wrap"
-                mkdir -p "$WRAP_DIR"
-                printf '%s\n' '#!/bin/bash' 'args=()' 'for a in "$@"; do' '  [[ "$a" == "-r" ]] && a="--relocatable"' '  args+=("$a")' 'done' 'exec clang "${args[@]}"' > "$WRAP_DIR/clang"
-                chmod +x "$WRAP_DIR/clang"
-                CC_EXTRA="CC=$WRAP_DIR/clang" ;;
-              x86_64)  CROSS_ARGS="" ;;
-              *) echo "Unknown arch: $ARCH"; exit 1 ;;
-            esac
+      - name: Generate version
+        id: parse_version
+        run: |
+          COMMIT_NUM=$(git rev-list --count HEAD)
+          VERSION=$((COMMIT_NUM + 200))
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build hymofs_lkm.ko
+        run: |
+          set -euo pipefail
+          if [ -z "${KDIR:-}" ] || [ ! -f "$KDIR/Makefile" ]; then
+            echo "KDIR is not available inside DDK container: ${KDIR:-<empty>}"
+            exit 1
           fi
 
-          mkdir -p out
-          if [[ "$ARCH" == "arm64" ]]; then
-            make -C kernel_src ARCH=arm64 $CROSS_ARGS $LLVM_ARGS gki_defconfig 2>/dev/null || make -C kernel_src ARCH=arm64 $CROSS_ARGS $LLVM_ARGS defconfig
-            if [[ "$KMI" == *"6.12"* ]] && [ -f kernel_src/scripts/config ]; then
-              kernel_src/scripts/config --file kernel_src/.config -d GENDWARFKSYMS 2>/dev/null || true
-              make -C kernel_src ARCH=arm64 $CROSS_ARGS $LLVM_ARGS olddefconfig 2>/dev/null || true
-            fi
-            make -C kernel_src ARCH=arm64 $CROSS_ARGS $LLVM_ARGS modules_prepare
-            make -C kernel_src ARCH=arm64 $CROSS_ARGS $LLVM_ARGS M="$SRC" KBUILD_MODPOST_WARN=1 modules
-          elif [[ "$ARCH" == "armv7" ]]; then
-            make -C kernel_src ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- $CROSS_ARGS $LLVM_ARGS $CC_EXTRA multi_v7_defconfig 2>/dev/null || make -C kernel_src ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- $CROSS_ARGS $LLVM_ARGS $CC_EXTRA defconfig
-            if [[ "$KMI" == *"6.12"* ]] && [ -f kernel_src/scripts/config ]; then
-              kernel_src/scripts/config --file kernel_src/.config -d GENDWARFKSYMS 2>/dev/null || true
-              make -C kernel_src ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- $CROSS_ARGS $LLVM_ARGS $CC_EXTRA olddefconfig 2>/dev/null || true
-            fi
-            make -C kernel_src ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- $CROSS_ARGS $LLVM_ARGS $CC_EXTRA modules_prepare
-            make -C kernel_src ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- $CROSS_ARGS $LLVM_ARGS $CC_EXTRA M="$SRC" KBUILD_MODPOST_WARN=1 modules
-          else
-            make -C kernel_src ARCH=x86 $CROSS_ARGS $LLVM_ARGS gki_defconfig 2>/dev/null || make -C kernel_src ARCH=x86 $CROSS_ARGS $LLVM_ARGS x86_64_defconfig
-            if [[ "$KMI" == *"6.12"* ]] && [ -f kernel_src/scripts/config ]; then
-              kernel_src/scripts/config --file kernel_src/.config -d GENDWARFKSYMS 2>/dev/null || true
-              make -C kernel_src ARCH=x86 $CROSS_ARGS $LLVM_ARGS olddefconfig 2>/dev/null || true
-            fi
-            make -C kernel_src ARCH=x86 $CROSS_ARGS $LLVM_ARGS modules_prepare
-            make -C kernel_src ARCH=x86 $CROSS_ARGS $LLVM_ARGS M="$SRC" KBUILD_MODPOST_WARN=1 modules
-          fi
+          VERSION="${{ steps.parse_version.outputs.VERSION }}"
+          echo "Building hymofs_lkm.ko with KDIR=$KDIR"
+          (
+            cd "$SRC_ROOT"
+            make -j"$(nproc --all)" CC=clang \
+              CFLAGS_MODULE="-DHYMOFS_VERSION=\\\"0.1.${VERSION}\\\""
+          )
 
-          cp "$SRC/hymofs_lkm.ko" "out/${KMI}_${ARCH}_hymofs_lkm.ko"
-          llvm-strip -d "out/${KMI}_${ARCH}_hymofs_lkm.ko" 2>/dev/null || true
-          ls -la out/
+          mkdir -p "$OUT"
+          KO_FILE="${KMI}_${TARGET_ARCH}_hymofs_lkm.ko"
+          cp "$SRC/hymofs_lkm.ko" "$OUT/$KO_FILE"
+          llvm-strip -d "$OUT/$KO_FILE" 2>/dev/null || true
+          ls -la "$OUT/"
 
-      - name: Upload LKM artifact
+      - name: Upload .ko
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.kmi }}_${{ matrix.arch }}_hymofs_lkm.ko
-          path: out/${{ matrix.kmi }}_${{ matrix.arch }}_hymofs_lkm.ko
+          name: ${{ matrix.kmi }}_${{env.TARGET_ARCH }}_hymofs_lkm.ko
+          path: ${{ env.OUT }}/${{ matrix.kmi }}_${{ env.TARGET_ARCH }}_hymofs_lkm.ko
 
   build-hymod:
     needs: [build-lkm]
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch' || github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref_type != 'tag' && !contains(github.event.head_commit.message, '[skip ci]'))
-    strategy:
-      fail-fast: false
-      matrix:
-        arch:
-          - arm64-v8a
-          - armeabi-v7a
-          - x86_64
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -136,20 +112,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set LKM arch suffix
-        id: lkm-arch
-        run: |
-          case "${{ matrix.arch }}" in
-            arm64-v8a)   echo "arch=arm64" >> $GITHUB_OUTPUT ;;
-            armeabi-v7a) echo "arch=armv7" >> $GITHUB_OUTPUT ;;
-            x86_64)      echo "arch=x86_64" >> $GITHUB_OUTPUT ;;
-            *) echo "Unknown arch: ${{ matrix.arch }}"; exit 1 ;;
-          esac
-
-      - name: Download LKM artifacts for ${{ matrix.arch }}
+      - name: Download LKM artifacts for arm64-v8a
         uses: actions/download-artifact@v4
         with:
-          pattern: '*_${{ steps.lkm-arch.outputs.arch }}_hymofs_lkm.ko'
+          pattern: '*_arm64_hymofs_lkm.ko'
           merge-multiple: true
 
       - name: Prepare assets
@@ -164,55 +130,54 @@ jobs:
           ndk-version: r25c
         id: setup-ndk
 
-      - name: Setup CMake, Ninja and UPX
+      - name: Setup CMake, Ninja
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build upx-ucl ccache
+          sudo apt-get install -y cmake ninja-build ccache
 
       - name: Cache ccache
         uses: actions/cache@v4
         with:
           path: ~/.ccache
-          key: ccache-hymod-${{ runner.os }}-ndkr25c-${{ matrix.arch }}-${{ hashFiles('CMakeLists.txt', 'src/**/*.c', 'src/**/*.cpp', 'src/**/*.h', 'src/**/*.hpp') }}
+          key: ccache-hymod-${{ runner.os }}-ndkr25c-arm64-v8a-${{ hashFiles('CMakeLists.txt', 'src/**/*.c', 'src/**/*.cpp', 'src/**/*.h', 'src/**/*.hpp') }}
           restore-keys: |
-            ccache-hymod-${{ runner.os }}-ndkr25c-${{ matrix.arch }}-
+            ccache-hymod-${{ runner.os }}-ndkr25c-arm64-v8a-
 
       - name: Cache CMake build (hymod)
         uses: actions/cache@v4
         with:
           path: build
-          key: cmake-hymod-${{ runner.os }}-ndkr25c-${{ matrix.arch }}-${{ hashFiles('CMakeLists.txt', 'src/**/*.c', 'src/**/*.cpp', 'src/**/*.h', 'src/**/*.hpp') }}
+          key: cmake-hymod-${{ runner.os }}-ndkr25c-arm64-v8a-${{ hashFiles('CMakeLists.txt', 'src/**/*.c', 'src/**/*.cpp', 'src/**/*.h', 'src/**/*.hpp') }}
           restore-keys: |
-            cmake-hymod-${{ runner.os }}-ndkr25c-${{ matrix.arch }}-
+            cmake-hymod-${{ runner.os }}-ndkr25c-arm64-v8a-
 
       - name: Ensure cache dirs exist (avoid "Path does not exist" on save)
         run: mkdir -p ~/.ccache build
 
-      - name: Build hymod for ${{ matrix.arch }}
+      - name: Build hymod
         env:
           ANDROID_NDK: ${{ steps.setup-ndk.outputs.ndk-path }}
           NDK_PATH: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
           mkdir -p build/out
-          cmake -B "build/${{ matrix.arch }}" \
+          cmake -B "build/arm64-v8a" \
             -G Ninja \
             -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK}/build/cmake/android.toolchain.cmake" \
-            -DANDROID_ABI="${{ matrix.arch }}" \
+            -DANDROID_ABI="arm64-v8a" \
             -DANDROID_PLATFORM=android-30 \
             -DBUILD_WEBUI=OFF \
-            -DHYMOD_UPX=ON \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             .
-          cmake --build "build/${{ matrix.arch }}"
-          cp "build/${{ matrix.arch }}/hymod-${{ matrix.arch }}" "build/out/"
+          cmake --build "build/arm64-v8a"
+          cp "build/arm64-v8a/hymod-arm64-v8a" "build/out/"
           ls -la build/out/
 
       - name: Upload hymod artifact
         uses: actions/upload-artifact@v4
         with:
-          name: hymod-${{ matrix.arch }}
-          path: build/out/hymod-${{ matrix.arch }}
+          name: hymod-arm64-v8a
+          path: build/out/hymod-arm64-v8a
 
   build:
     needs: [build-lkm, build-hymod]
@@ -252,15 +217,11 @@ jobs:
       - name: Merge hymod artifacts into build/out
         run: |
           mkdir -p build/out
-          # download-artifact: each artifact extracts to folder named after artifact, path preserved inside
-          for d in hymod-arm64-v8a hymod-armeabi-v7a hymod-x86_64; do
-            [ -f "$d/build/out/$d" ] && cp -f "$d/build/out/$d" build/out/
-          done
+          [ -f "hymod-arm64-v8a/build/out/hymod-arm64-v8a" ] && cp -f "hymod-arm64-v8a/build/out/hymod-arm64-v8a" build/out/
+
           # fallback: find hymod binaries anywhere (merge may put build/out/hymod-* directly)
-          for bin in hymod-arm64-v8a hymod-armeabi-v7a hymod-x86_64; do
-            src=$(find . -name "$bin" -type f 2>/dev/null | head -1)
-            [ -n "$src" ] && [ ! -f "build/out/$bin" ] && cp -f "$src" build/out/
-          done
+          src=$(find . -name "hymod-arm64-v8a" -type f 2>/dev/null | head -1)
+          [ -n "$src" ] && [ ! -f "build/out/hymod-arm64-v8a" ] && cp -f "$src" build/out/
           ls -la build/out/
 
       - name: Setup Android NDK
@@ -321,7 +282,6 @@ jobs:
           done
           ls -la
 
-      # 手动导入 GPG，避免 crazy-max/ghaction-import-gpg 的 keygrip preset 在 runner 上报 Not implemented
       - name: Import GPG key
         if: github.actor == 'Anatdx'
         env:

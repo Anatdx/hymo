@@ -121,21 +121,6 @@ if(ANDROID)
     target_compile_definitions(${TARGET_NAME} PRIVATE ${HYMO_COMPILE_DEFINITIONS})
     target_link_options(${TARGET_NAME} PRIVATE ${HYMO_LINK_OPTIONS})
 
-    # Optional: UPX binary compression (--best --lzma)
-    option(HYMOD_UPX "Use UPX to compress hymod binary" OFF)
-    if(HYMOD_UPX)
-        find_program(UPX_PROGRAM upx)
-        if(UPX_PROGRAM)
-            add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
-                COMMAND ${UPX_PROGRAM} --best --lzma $<TARGET_FILE:${TARGET_NAME}>
-                COMMENT "UPX: compressing ${TARGET_NAME} with LZMA (--best)..."
-            )
-            message(STATUS "UPX compression ENABLED (--best --lzma)")
-        else()
-            message(WARNING "HYMOD_UPX=ON but upx not found in PATH; skipping UPX compression")
-        endif()
-    endif()
-
     # Show binary size
     add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E echo "✅ ${ANDROID_ABI}: " && du -h "$<TARGET_FILE:${TARGET_NAME}>" | cut -f1
